@@ -34,10 +34,11 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY scripts ./scripts
 COPY public ./public
-# 先裝全部套件來複製 Monaco / xterm 的靜態檔到 public，再移除只在開發時需要的套件
-RUN npm ci --no-audit --no-fund && \
+# 只裝執行時需要的套件（不含 wrangler），把 Monaco / xterm 的靜態檔複製到 public，
+# 複製完就移除這兩個只在建置時需要的套件
+RUN npm ci --omit=dev --no-audit --no-fund && \
     npm run assets && \
-    npm prune --omit=dev --no-audit --no-fund && \
+    rm -rf node_modules/monaco-editor node_modules/@xterm && \
     npm cache clean --force
 COPY src ./src
 COPY server ./server
