@@ -263,6 +263,24 @@ function createFinder(home, startPath = home) {
     toast(`無法開啟「${e.name}」：${kind(e)}`, true);
   }
 
+  // Open several items: files in their apps, folders in file cabinet windows of their own.
+  async function openMany(list) {
+    if (list.length <= 1) return open(list[0]);
+    if (list.length > 10) {
+      const ok = await dialog({
+        title: `要一次開啟 ${list.length} 個項目嗎？`,
+        message: '每個項目都會開一個視窗。',
+        buttons: [{ label: '取消', value: false, cancel: true, default: true }, { label: '開啟', value: true }],
+      });
+      if (!ok) return;
+    }
+    for (const e of list) {
+      const full = P.join(st.path, e.name);
+      if (isDir(e)) launchApp('files', { path: full });
+      else if (isFile(e)) await openFile(full, e.size); // one at a time, in case one asks which app to use
+    }
+  }
+
   files.addEventListener('click', (ev) => {
     const el = ev.target.closest('.item');
     const i = el ? Number(el.dataset.i) : -1;
@@ -480,6 +498,8 @@ function createFinder(home, startPath = home) {
     if (e && st.sel.has(e.name) && st.sel.size > 1) {
       const list = chosen();
       return showContextMenu(ev, [
+        { label: `開啟 ${list.length} 個項目`, run: () => openMany(list) },
+        null,
         { label: `複製 ${list.length} 個項目`, run: () => copyOrCut('copy', list) },
         { label: `剪下 ${list.length} 個項目`, run: () => copyOrCut('cut', list) },
         { label: '貼上', run: paste },
@@ -542,7 +562,7 @@ function createFinder(home, startPath = home) {
       else return;
     } else if (ev.key === 'Delete' && picked.length) remove(picked);
     else if (ev.key === 'F2' && picked.length === 1) rename(picked[0]);
-    else if (ev.key === 'Enter') open(st.shown[st.selected]);
+    else if (ev.key === 'Enter') openMany(picked.length ? picked : [st.shown[st.selected]].filter(Boolean));
     else if (ev.key === 'Backspace') navigate(P.parent(st.path));
     else if (n && (ev.key === 'ArrowDown' || ev.key === 'ArrowRight')) select(Math.min(n - 1, st.selected + 1));
     else if (n && (ev.key === 'ArrowUp' || ev.key === 'ArrowLeft')) select(Math.max(0, st.selected - 1));

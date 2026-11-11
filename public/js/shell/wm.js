@@ -14,7 +14,9 @@ export const wm = { wins: [], z: 10, focused: null, cascade: 0 };
 export function createWindow({ title, appName, iconHtml, width, height }) {
   const fullTitle = (t) => (appName && t !== appName ? `${t} — ${appName}` : t);
   const win = { title, minimized: false, maximized: false, onClose: null, onFocus: null };
-  const titleEl = h('div', { class: 'title' }, fullTitle(title));
+  const titleIcon = h('span', { class: 'ticon', html: iconHtml });
+  const titleText = h('span', { class: 'ttext' }, fullTitle(title));
+  const titleEl = h('div', { class: 'title' }, titleIcon, titleText);
   const bar = h('div', { class: 'titlebar' },
     h('div', { class: 'traffic' },
       h('button', { type: 'button', class: 'close', title: '關閉', 'aria-label': '關閉', onclick: () => win.close() }),
@@ -40,6 +42,7 @@ export function createWindow({ title, appName, iconHtml, width, height }) {
   const ico = h('span', { class: 'ico', html: iconHtml });
   win.setIcon = (html) => {
     ico.innerHTML = html;
+    titleIcon.innerHTML = html;
   };
   win.dockEl = h('button', { type: 'button', class: 'dock-item open', 'data-app': appName || null, title },
     ico, lbl, h('span', { class: 'dirty', title: '尚未儲存' }));
@@ -52,7 +55,7 @@ export function createWindow({ title, appName, iconHtml, width, height }) {
 
   win.setTitle = (t) => {
     win.title = t;
-    titleEl.textContent = fullTitle(t);
+    titleText.textContent = fullTitle(t);
     lbl.textContent = t;
     win.dockEl.title = t;
     if (wm.focused === win) setActiveTitle(fullTitle(t));

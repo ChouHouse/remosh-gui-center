@@ -194,6 +194,33 @@ function open(it) {
   return openFile(it.path, it.entry.size);
 }
 
+async function openMany(list) {
+  for (const it of list) await open(it); // one at a time, in case one asks which app to use
+}
+
+// Several newcomers: the first is already where it was dropped; the others
+// take the next free cells after it, going down and then across.
+function placeAfter(first, rest) {
+  const { cols, rows } = gridSize();
+  const cells = layout();
+  const moving = new Set(rest);
+  const used = new Set([...cells].filter(([name]) => !moving.has(name)).map(([, p]) => `${p.col},${p.row}`));
+  let { col, row } = cells.get(first);
+  for (const name of rest) {
+    do {
+      if (++row >= rows) {
+        row = 0;
+        col++;
+      }
+    } while (used.has(`${col},${row}`) && col < cols);
+    if (col >= cols) break; // no room left on screen: those stay automatic
+    placed.set(name, { col, row });
+    used.add(`${col},${row}`);
+  }
+  render();
+  saveConfig();
+}
+
 // Delete one icon or a list of them (asks once).
 async function remove(what) {
   const list = [what].flat();
@@ -244,7 +271,7 @@ layer.addEventListener('keydown', (ev) => {
     return setSel(items.map((it) => it.path));
   }
   if (!list.length) return;
-  if (ev.key === 'Enter') open(list[0]);
+  if (ev.key === 'Enter') openMany(list);
   else if (ev.key === 'Delete') remove(list);
 });
 layer.addEventListener('contextmenu', (ev) => {
@@ -252,7 +279,11 @@ layer.addEventListener('contextmenu', (ev) => {
   // Right-click inside a multi-selection acts on all of it.
   if (it && sel.has(it.path) && sel.size > 1) {
     const list = chosen();
-    return showContextMenu(ev, [{ label: `刪除 ${list.length} 個項目`, danger: true, run: () => remove(list) }]);
+    return showContextMenu(ev, [
+      { label: `開啟 ${list.length} 個項目`, run: () => openMany(list) },
+      null,
+      { label: `刪除 ${list.length} 個項目`, danger: true, run: () => remove(list) },
+    ]);
   }
   setSel(it ? [it.path] : []);
   if (!it) {
@@ -328,7 +359,9 @@ registerDropTarget(layer, {
     await load(true);
     // What was dropped lands where it was dropped (several: from that cell on).
     const present = names.filter((n) => items.some((it) => it.entry.name === n));
-    if (present.length) placeAt(present[0], drop.clientX, drop.clientY);
+    if (!present.length) return;
+    placeAt(present[0], drop.clientX, drop.clientY);
+    if (present.length > 1) placeAfter(present[0], present.slice(1));
   },
 });
 
