@@ -1,0 +1,108 @@
+:root {
+  --bg: #dfe6ee;
+  --bg2: #b9c8d8;
+  --surface: #ffffff;
+  --surface-2: #f3f4f6;
+  --surface-3: #e7e9ed;
+  --border: #cfd4db;
+  --text: #1c2026;
+  --muted: #68717d;
+  --accent: #0a64d6;
+  --accent-text: #ffffff;
+  --select: #d6e6fb;
+  --danger: #c0392b;
+  --warn-bg: #fff4d6;
+  --warn-border: #e2b93b;
+  --shadow: 0 18px 50px rgba(20, 30, 50, .28), 0 2px 8px rgba(20, 30, 50, .18);
+  --bar: rgba(255, 255, 255, .72);
+  --folder: #4a9bea;
+  --folder-dark: #2f7fd1;
+  --file: #ffffff;
+  --file-edge: #b8c0cb;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b2330;
+    --bg2: #0f141c;
+    --surface: #23272e;
+    --surface-2: #1c2026;
+    --surface-3: #2c313a;
+    --border: #3a404b;
+    --text: #e6e9ee;
+    --muted: #98a1ad;
+    --accent: #4c9bff;
+    --accent-text: #0b1220;
+    --select: #1f3b5e;
+    --danger: #ff6b5e;
+    --warn-bg: #3a3118;
+    --warn-border: #8a6d1a;
+    --shadow: 0 18px 50px rgba(0, 0, 0, .6), 0 2px 8px rgba(0, 0, 0, .4);
+    --bar: rgba(30, 34, 42, .78);
+    --folder: #5aa7f2;
+    --folder-dark: #3b86d6;
+    --file: #3a404b;
+    --file-edge: #5a6270;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font: 13px/1.45 system-ui, -apple-system, "Segoe UI", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  color: var(--text);
+  background: linear-gradient(160deg, var(--bg), var(--bg2));
+  overflow: hidden;
+  user-select: none;
+}
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+[hidden] { display: none !important; }
+
+/* ---------- dialogs & toasts ---------- */
+.modal {
+  position: fixed; inset: 0; z-index: 90000; display: grid; place-items: center; padding: 16px;
+  background: rgba(15, 20, 30, .3);
+}
+.modal .box {
+  width: min(420px, 100%); background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: var(--shadow); padding: 18px 20px 14px;
+}
+.modal h2 { margin: 0 0 6px; font-size: 15px; }
+.modal p { margin: 0 0 14px; color: var(--muted); overflow-wrap: anywhere; user-select: text; }
+.modal .btns { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.modal button {
+  padding: 6px 14px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface-2);
+}
+.modal button.default { background: var(--accent); color: var(--accent-text); border-color: transparent; font-weight: 600; }
+.modal button.danger { color: var(--danger); }
+#toasts { pointer-events: none; /* never block clicks on what is underneath */ position: fixed; right: 14px; bottom: 68px; z-index: 95000; display: grid; gap: 8px; justify-items: end; }
+.toast {
+  max-width: 380px; padding: 8px 12px; border-radius: 8px; background: var(--surface);
+  border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(20, 30, 50, .25); overflow-wrap: anywhere;
+}
+.toast.err { border-color: var(--danger); }
+.modal input[type="text"] {
+  width: 100%; margin: -4px 0 14px; padding: 7px 9px; border-radius: 7px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text); user-select: text;
+  font: 12.5px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.modal input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+/* Settings > 動畫 switched off: no transitions anywhere. */
+html.no-anim *, html.no-anim *::before, html.no-anim *::after { transition: none !important; }
+
+/* ---------- "open with" chooser and properties (inside .modal) ---------- */
+.app-choices { display: grid; gap: 4px; margin-bottom: 12px; }
+.app-choices .app-choice {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 10px; text-align: left;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2);
+}
+.app-choices .app-choice:hover, .app-choices .app-choice:focus-visible { border-color: var(--accent); outline: none; }
+.app-choice .ico { width: 26px; height: 26px; flex: none; display: flex; }
+.app-choice .ico svg { width: 100%; height: 100%; }
+.choose-remember { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; color: var(--muted); }
+dl.props { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; color: var(--text); }
+dl.props dt { color: var(--muted); white-space: nowrap; }
+dl.props dd { margin: 0; overflow-wrap: anywhere; user-select: text; }

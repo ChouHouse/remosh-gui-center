@@ -12,10 +12,55 @@ browser ──WebSocket /ws──▶ Worker ──TCP (cloudflare:sockets)──
   UI + Monaco                ssh2 client + SFTP
 ```
 
-- `src/worker.js` — one SSH/SFTP session per WebSocket; JSON requests
-  (`connect`, `list`, `read`, `write`, ...).
-- `public/` — the page (`index.html`, `app.css`, `app.js`). `public/vs` is
-  Monaco, copied from `node_modules` by `npm run assets` (not committed).
+Nothing is bundled for the browser: the page loads native ES modules.
+
+```
+src/                    Worker
+  index.js              fetch handler, WebSocket upgrade
+  session.js            one SSH/SFTP session per WebSocket, login, op dispatch
+  ssh.js                socket adapter, algorithms, run-a-command helper
+  util.js               shared helpers
+  ops/                  one handler per request name
+    index.js            the registry (files, manage, stats, terminal)
+    files.js  manage.js  stats.js  terminal.js
+public/
+  index.html
+  css/                  base, login, shell + css/apps/<app>.css
+  js/
+    main.js             imports the apps (start-menu order) and boots
+    core/               dom, store, errors, ui, format, path, icons, events, rpc, text-codec, settings
+    shell/              wm (windows), menubar, context-menu, login, start-menu, clock,
+                        desktop, apps (registry), file-open (associations)
+    apps/
+      files/            檔案櫃
+      editor/           Monaco windows (index.js, monaco.js)
+      notepad/          記事本
+      terminal/         終端機
+      taskman/          工作管理員 (index.js, stats.js)
+      settings/         設定
+  vs/  xterm/           Monaco and xterm.js, copied by `npm run assets` (not committed)
+```
+
+### Adding an app
+
+1. Create `public/js/apps/<name>/index.js`. Build the window with
+   `createWindow()` from `shell/wm.js` (and `attachMenuBar()` from
+   `shell/menubar.js` if it needs menus), then register it:
+
+   ```js
+   registerApp({ id: 'notes', name: '記事本', icon: () => svg, startMenu: true, launch: openNotes });
+   ```
+
+   Optional fields: `autostart`, `extensions` (`'all'` or a list such as
+   `['txt', 'md']`; `launch({ path, size })` then opens a remote file) and
+   `unsavedCount()` (asked before logout).
+2. Import it in `public/js/main.js` and add `css/apps/<name>.css` to `index.html`.
+3. If it needs new data from the host, add a handler in `src/ops/` and list it
+   in `src/ops/index.js`; call it from the page with `rpc('<op>', args)`.
+
+Apps do not import each other. They talk through `core/events.js`
+(`session:start`, `session:resume`, `session:end`, `conn:lost`, `fs:changed`)
+`shell/apps.js` (`launchApp`) and `shell/file-open.js` (`openFile`, `openWith`).
 
 Log in with a password or a private key file (OpenSSH / PEM / PPK; RSA, ECDSA
 or Ed25519, optionally passphrase-protected). Neither is stored; the key text is
@@ -31,6 +76,31 @@ npm run dev      # http://localhost:3000
 npm run deploy   # publish to Cloudflare
 ```
 
+## Desktop
+
+- **Start menu** (bottom left): the tools — 檔案櫃 (file cabinet) and 工作管理員
+  (task manager) — and the signed-in user; click the user for 登出 (log out).
+- **Taskbar**: one entry per open window, clock at the right.
+- **Task manager**: CPU, memory and the process list of the SSH host, refreshed
+  every 3 s by a fixed read-only script run over SSH. When the host is a
+  container it reads the container's own cgroup usage and limits (v2 or v1)
+  instead of `/proc` totals, which would describe the Docker host.
+
+- **File cabinet** (檔案櫃): right-click a file for 開啟 / 開啟程式… / 複製 /
+  剪下 / 貼上 / 刪除 / 內容; right-click the sidebar to add or remove folders.
+  Copy and cut put `remosh/file:<path>` on the clipboard.
+- **File associations**: every app declares the extensions it accepts
+  (`extensions: 'all'` or a list). The first time an extension is opened the
+  user is asked which app to use and the answer is remembered; 設定 → 檔案關聯
+  lists them and lets them be changed or removed (not added by hand).
+- **Notepad** (記事本): a plain textarea editor, no Monaco.
+- **Terminal** (終端機): an interactive shell (xterm.js + an SSH PTY channel).
+  Opening a file with it sets the file to mode 777 and runs it as `./name`
+  from its folder.
+- **Settings** (設定): categories on the left (動畫: on/off and speed; 檔案關聯). 儲存 writes `~/.remosh-gui/setting.json` on the SSH host, so settings
+  follow the account, and they are read back at login. Add a setting in
+  `core/settings.js` and a category in `apps/settings/index.js`.
+
 ## Editor shortcuts
 
 Everything Monaco ships with (Ctrl+C / Ctrl+V / Ctrl+X, Ctrl+Z / Ctrl+Y,
@@ -40,7 +110,13 @@ plus:
 | Key | Action |
 | --- | --- |
 | Ctrl+S | Save the file back to the SSH host |
+| Ctrl+Shift+S | Save as (the window switches to the new file) |
 | Alt+Z | Toggle word wrap |
+| Ctrl+= / Ctrl+- / Ctrl+0 | Larger / smaller / default text size |
+
+Each editor window has two menus: 檔案 (undo, redo, save, save as, close) and
+介面 (text size, minimap on/off, word wrap). The 介面 settings apply to every
+editor window and are remembered in the browser.
 
 Files are read and written as UTF-8 (BOM kept) or Big5, with the original line
 endings; binary files and files over 5 MB are not opened.

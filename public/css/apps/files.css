@@ -1,0 +1,80 @@
+/* ---------- finder ---------- */
+.finder-toolbar {
+  flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 8px;
+  border-bottom: 1px solid var(--border); background: var(--surface);
+}
+.tb-btn {
+  width: 28px; height: 26px; display: grid; place-items: center; padding: 0;
+  border: 1px solid transparent; border-radius: 6px; background: transparent;
+}
+.tb-btn:hover:not(:disabled) { background: var(--surface-3); }
+.tb-btn:disabled { opacity: .35; cursor: default; }
+.tb-btn.on { background: var(--surface-3); border-color: var(--border); }
+.tb-btn svg { width: 16px; height: 16px; }
+.crumbs {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 1px; height: 26px; padding: 0 6px;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); overflow: hidden;
+}
+.crumbs button {
+  border: 0; background: transparent; padding: 2px 5px; border-radius: 4px; white-space: nowrap;
+  max-width: 180px; overflow: hidden; text-overflow: ellipsis; flex: none;
+}
+.crumbs button:hover { background: var(--surface-3); }
+.crumbs .sep { color: var(--muted); flex: none; }
+.crumbs input {
+  flex: 1; min-width: 0; border: 0; background: transparent; outline: none; user-select: text;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px;
+}
+.finder-main { flex: 1; min-height: 0; display: flex; }
+.sidebar {
+  width: 150px; flex: none; padding: 8px 6px; border-right: 1px solid var(--border);
+  background: var(--surface-2); overflow-y: auto;
+}
+.sidebar h3 { margin: 2px 8px 4px; font-size: 11px; font-weight: 600; color: var(--muted); }
+.sidebar button {
+  width: 100%; display: flex; align-items: center; gap: 7px; padding: 4px 8px;
+  border: 0; border-radius: 6px; background: transparent; text-align: left;
+}
+.sidebar button:hover { background: var(--surface-3); }
+.sidebar button.current { background: var(--select); }
+.sidebar svg { width: 16px; height: 16px; flex: none; }
+.sidebar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.files { flex: 1; min-width: 0; overflow: auto; outline: none; position: relative; }
+.files.grid .items {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 4px; padding: 10px;
+}
+.files.grid .item {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px 6px;
+  border-radius: 8px; border: 1px solid transparent; text-align: center;
+}
+.files.grid .item svg { width: 48px; height: 48px; }
+.files.grid .item .name {
+  max-width: 100%; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden; padding: 0 4px; border-radius: 4px;
+}
+.files.grid .item .meta { display: none; }
+.files.list .items { display: block; }
+.files.list .list-head, .files.list .item {
+  display: grid; grid-template-columns: minmax(160px, 1fr) 150px 90px 90px; align-items: center; gap: 8px; padding: 0 12px;
+}
+.files .list-head {
+  position: sticky; top: 0; z-index: 1; height: 26px; background: var(--surface);
+  border-bottom: 1px solid var(--border); color: var(--muted); font-size: 11.5px;
+}
+.files.grid .list-head { display: none; }
+.files .list-head button { border: 0; background: transparent; text-align: left; padding: 0; color: inherit; font-size: inherit; }
+.files .list-head button.sorted { color: var(--text); font-weight: 600; }
+.files.list .item { height: 26px; border-radius: 0; }
+.files.list .item:nth-child(even) { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+.files.list .item .namecell { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.files.list .item svg { width: 18px; height: 18px; flex: none; }
+.files.list .item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.files.list .item .meta { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.files .item.selected, .files.list .item.selected:nth-child(even) { background: var(--select); }
+.files.grid .item.selected { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.files .item.hiddenfile svg, .files .item.hiddenfile .name { opacity: .55; }
+.files .empty, .files .state {
+  position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); padding: 20px; text-align: center;
+}
+.files .state.err { color: var(--danger); }
+.files .item.cut svg, .files .item.cut .name { opacity: .45; }

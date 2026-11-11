@@ -5,11 +5,13 @@
   "description": "Cloudflare Worker: SSH/SFTP file desktop with Monaco editor windows",
   "scripts": {
     "postinstall": "node scripts/strip-native.mjs",
-    "assets": "node scripts/copy-monaco.mjs",
+    "assets": "node scripts/copy-assets.mjs",
     "dev": "npm run assets && wrangler dev --ip 0.0.0.0 --port 3000",
     "deploy": "npm run assets && wrangler deploy"
   },
   "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "ssh2": "^1.16.0"
   },
   "devDependencies": {

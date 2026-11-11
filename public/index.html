@@ -4,19 +4,45 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SSH Desk</title>
-<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/login.css">
+<link rel="stylesheet" href="/css/shell.css">
+<link rel="stylesheet" href="/css/apps/files.css">
+<link rel="stylesheet" href="/css/apps/editor.css">
+<link rel="stylesheet" href="/css/apps/taskman.css">
+<link rel="stylesheet" href="/css/apps/settings.css">
+<link rel="stylesheet" href="/css/apps/notepad.css">
+<link rel="stylesheet" href="/css/apps/terminal.css">
+<link rel="stylesheet" href="/xterm/xterm.css">
 </head>
 <body>
 <div id="desktop" hidden>
-  <header id="menubar">
-    <span class="brand">SSH Desk</span>
-    <span id="active-title"></span>
-    <span class="spacer"></span>
-    <span id="conn-label"></span>
-    <button id="disconnect" type="button">中斷連線</button>
-  </header>
   <main id="windows"></main>
-  <nav id="dock" aria-label="工作列"></nav>
+  <div id="start-menu" role="menu" aria-label="開始選單" hidden>
+    <div class="sm-title">工具</div>
+    <div id="sm-apps"></div>
+    <div class="sm-sep"></div>
+    <div id="sm-logout-row" hidden>
+      <button type="button" id="disconnect" role="menuitem">登出</button>
+    </div>
+    <button type="button" id="sm-user" aria-expanded="false" title="帳號選項">
+      <span class="avatar" id="sm-avatar"></span>
+      <span class="who"><b id="sm-username"></b><small id="conn-label"></small></span>
+      <span class="chev" aria-hidden="true">›</span>
+    </button>
+  </div>
+  <nav id="dock" aria-label="工作列">
+    <button type="button" id="start-btn" aria-haspopup="menu" aria-expanded="false" title="選單" aria-label="選單">
+      <svg viewBox="0 0 22 22" aria-hidden="true">
+        <rect class="frame" x="1.5" y="1.5" width="19" height="19" rx="5.5"/>
+        <circle class="d1" cx="7.4" cy="7.4" r="2.5"/>
+        <circle class="d2" cx="14.6" cy="7.4" r="2.5"/>
+        <circle class="d3" cx="7.4" cy="14.6" r="2.5"/>
+      </svg>
+    </button>
+    <div id="dock-items"></div>
+    <div id="clock" title=""><span id="clock-time"></span><span id="clock-date"></span></div>
+  </nav>
 </div>
 
 <div id="login" class="overlay">
@@ -58,6 +84,6 @@
 <div id="toasts" aria-live="polite"></div>
 
 <script src="/vs/loader.js"></script>
-<script src="/app.js"></script>
+<script type="module" src="/js/main.js"></script>
 </body>
 </html>

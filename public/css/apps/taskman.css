@@ -1,0 +1,49 @@
+/* ---------- task manager ---------- */
+.tm-top { flex: none; padding: 12px 14px 10px; display: grid; gap: 10px; border-bottom: 1px solid var(--border); }
+.tm-meta { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--muted); font-size: 12px; }
+.tm-meta b { color: var(--text); font-weight: 600; }
+.tm-meters { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tm-meter { padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); min-width: 0; }
+.tm-meter h4 { margin: 0 0 2px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.tm-meter .val { font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tm-meter .sub { font-size: 11.5px; color: var(--muted); min-height: 1.45em; }
+.tm-bar { height: 6px; margin-top: 6px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
+.tm-bar i { display: block; height: 100%; width: 0; border-radius: 3px; background: var(--accent); transition: width .3s; }
+.tm-bar.hot i { background: var(--danger); }
+.tm-bar.none { visibility: hidden; }
+.tm-note { font-size: 11.5px; color: var(--muted); }
+.tm-list { flex: 1; min-height: 0; overflow: auto; position: relative; }
+.tm-list table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.tm-list th {
+  position: sticky; top: 0; z-index: 1; padding: 0; background: var(--surface); border-bottom: 1px solid var(--border);
+  text-align: left; font-weight: 400;
+}
+.tm-list th button { width: 100%; padding: 5px 10px; border: 0; background: transparent; text-align: inherit; color: var(--muted); font-size: 11.5px; }
+.tm-list th button.sorted { color: var(--text); font-weight: 600; }
+.tm-list td { padding: 4px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+.tm-list .num, .tm-list th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.tm-list tbody tr:nth-child(even) { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+.tm-list .state { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; text-align: center; color: var(--muted); }
+.tm-list .state.err { color: var(--danger); }
+
+.dock-item {
+  position: relative; flex: none; display: flex; align-items: center; gap: 8px;
+  height: 40px; max-width: 200px; padding: 0 10px 0 6px;
+  border: 1px solid transparent; border-radius: 9px; background: transparent;
+}
+.dock-item:hover { background: var(--surface-3); }
+.dock-item.active { background: var(--surface); border-color: var(--border); }
+.dock-item .ico { width: 28px; height: 28px; flex: none; }
+.dock-item .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.dock-item::after {
+  content: ""; position: absolute; left: 50%; bottom: 2px; width: 14px; height: 3px; margin-left: -7px;
+  border-radius: 2px; background: var(--muted); opacity: 0;
+}
+.dock-item.open::after { opacity: .55; }
+.dock-item.active::after { opacity: 1; background: var(--accent); }
+.dock-item.minimized .lbl { opacity: .6; }
+.dock-item .dirty {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; display: none;
+}
+.dock-item.is-dirty .dirty { display: block; }
+.dock-sep { width: 1px; height: 28px; background: var(--border); flex: none; margin: 0 2px; }

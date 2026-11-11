@@ -1,0 +1,7 @@
+/* ---------- notepad ---------- */
+.np-text {
+  flex: 1; min-height: 0; width: 100%; padding: 10px 12px; border: 0; outline: none; resize: none;
+  background: var(--surface); color: var(--text); user-select: text; tab-size: 4;
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+.np-text:disabled { opacity: .5; }
