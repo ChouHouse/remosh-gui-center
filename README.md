@@ -70,7 +70,8 @@ public/
   js/
     main.js             imports the apps (start-menu order) and boots
     core/               dom, store, errors, ui, format, path, icons, events, rpc, text-codec, settings
-    shell/              wm (windows), menubar, context-menu, login, gate, start-menu, clock, style,
+    shell/              wm (windows), menubar, context-menu, drag, file-drop, shortcuts,
+                        desktop-icons, login, gate, start-menu, clock, style, fullscreen,
                         desktop, apps (registry), file-open (associations)
     apps/
       files/            檔案櫃
@@ -98,6 +99,16 @@ public/
 2. Import it in `public/js/main.js` and add `css/apps/<name>.css` to `index.html`.
 3. If it needs new data from the host, add a handler in `src/ops/` and list it
    in `src/ops/index.js`; call it from the page with `rpc('<op>', args)`.
+
+### Drag and drop
+
+`shell/drag.js` is the one drag API. `makeDraggable(element, (ev) => payload)`
+makes things draggable; the payload is `{ type, name, icon, data }` and the
+card that follows the pointer always shows that icon and name.
+`registerDropTarget(element, { accepts, action, onDrop })` receives them.
+Built-in payload types are `file` (`data.path`) and `app` (`data.id`);
+`shell/file-drop.js` holds the move / copy / shortcut rules shared by the file
+cabinet and the desktop.
 
 ### System colour and light/dark
 
@@ -133,8 +144,15 @@ npm run deploy   # publish to Cloudflare
   "Add to Home Screen") and Chrome/Edge install it as an app.
 - **Full screen** after a successful login (and from the start menu); logging
   out leaves it.
-- **Start menu** (bottom left): the tools — 檔案櫃 (file cabinet) and 工作管理員
-  (task manager) — and the signed-in user; click the user for 登出 (log out).
+- **Start menu** (bottom left): pinned apps and 所有應用程式; right-click an app to
+  pin or unpin it, or drag it onto the desktop. Click the user for full screen
+  and 登出.
+- **Desktop**: shows whatever is in `~/.remosh-gui/desktop`, in columns from the
+  top left. Drop a file or folder on it to move it there (Ctrl = copy, Alt =
+  shortcut). Shortcuts are one-line text files: `name.remosh_gui-app` holds
+  `app:<id>`, `name.remosh_gui-lnk` holds `lnk:<path>`.
+- **Windows**: drag to the left or right edge for half the screen, to the top to
+  maximise; the strip at the far right of the taskbar shows the desktop.
 - **Taskbar**: one entry per open window, clock at the right.
 - **Task manager**: CPU, memory and the process list of the SSH host, refreshed
   every 3 s by a fixed read-only script run over SSH. When the host is a

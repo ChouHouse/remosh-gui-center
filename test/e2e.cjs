@@ -23,7 +23,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const realSettings = fs.existsSync(settingsFile) ? fs.readFileSync(settingsFile) : null;
   const owner = fs.statSync(home);
   const give = (path) => fs.chownSync(path, owner.uid, owner.gid);
-  const scratch = ['/project/ren-a.txt', '/project/ren-b.txt', '/project/poll-new.txt', '/docs/todo.txt', '/docs/todo 複本.txt', '/project/todo 複本.txt', '/project/hello.sh', '/project/src/copy.py'];
+  const scratch = ['/project/drag-a.txt', '/project/drag-b.txt', '/project/ren-a.txt', '/project/ren-b.txt', '/project/poll-new.txt', '/docs/todo.txt', '/docs/todo 複本.txt', '/project/todo 複本.txt', '/project/hello.sh', '/project/src/copy.py'];
   process.on('exit', () => {
     for (const f of scratch) fs.rmSync(home + f, { force: true });
     fs.rmSync(home + '/.remosh-gui', { recursive: true, force: true });
@@ -783,6 +783,134 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check((await tw.locator('.xterm-rows').textContent()).includes(home + '/project'), 'typed commands run in the file\'s folder');
   await tw.locator('.traffic .close').click();
   check((await tw.count()) === 0, 'terminal closes');
+
+  // ---- desktop: ~/.remosh-gui/desktop, drag and drop, shortcuts
+  const desk = home + '/.remosh-gui/desktop';
+  check(fs.existsSync(desk) && fs.statSync(desk).isDirectory(), 'the desktop folder is created in ~/.remosh-gui');
+  const deskItem = (name) => page.locator('.desk-item', { has: page.locator('.name', { hasText: new RegExp('^' + name.replace(/[.]/g, '\\.') + '$') }) });
+  const exists = async (path, want = true) => {
+    for (let i = 0; i < 50; i++) {
+      if (fs.existsSync(path) === want) return true;
+      await sleep(100);
+    }
+    return false;
+  };
+  // A file shows up before its content is written; wait for the content.
+  const holds = async (path, text) => {
+    for (let i = 0; i < 50; i++) {
+      if (fs.existsSync(path) && fs.readFileSync(path, 'utf8') === text) return true;
+      await sleep(100);
+    }
+    return false;
+  };
+  const beginDrag = async (locator, x, y, mod) => {
+    const b = await locator.boundingBox();
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+    await page.mouse.down();
+    if (mod) await page.keyboard.down(mod);
+    await page.mouse.move(b.x + b.width / 2 + 12, b.y + b.height / 2 + 12, { steps: 2 });
+    await page.mouse.move(x, y, { steps: 6 });
+  };
+  const endDrag = async (mod) => {
+    await page.mouse.up();
+    if (mod) await page.keyboard.up(mod);
+  };
+  const ghost = async () => [await page.textContent('.drag-ghost .nm'), await page.textContent('.drag-ghost .act')].join('|');
+  // Clear the screen first: only the file cabinet stays up.
+  if (await page.locator('.win:not(.minimized)').count()) await page.click('#show-desktop');
+  await toFinder();
+  const fwin = page.locator('.win[data-app="檔案櫃"]').first();
+  let tb2 = await fwin.locator('.titlebar .title').boundingBox();
+  await page.mouse.move(tb2.x + 60, tb2.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(tb2.x + 90, tb2.y + 40, { steps: 3 });
+  await page.mouse.move(1279, 300, { steps: 6 });
+  await page.mouse.up();
+  await sleep(350); // file cabinet on the right half, desktop free on the left
+  for (const n of ['drag-a.txt', 'drag-b.txt']) {
+    fs.writeFileSync(home + '/project/' + n, n + '\n');
+    give(home + '/project/' + n);
+  }
+  await item('drag-b.txt').waitFor({ timeout: 9000 });
+  await beginDrag(item('drag-a.txt'), 300, 420);
+  check((await ghost()) === 'drag-a.txt|移動' && (await page.locator('.drag-ghost .ico svg').count()) === 1, 'dragging shows a card with icon, name and what will happen');
+  check(await page.evaluate(() => document.querySelector('#desktop-icons').classList.contains('drop-over')), 'the desktop lights up as a drop target', await page.evaluate(() => {
+    const chain = [];
+    for (let el = document.elementFromPoint(300, 420); el; el = el.parentElement) chain.push(el.tagName + '#' + el.id + '.' + String(el.className).slice(0, 30) + (el.dataset?.app ? '[' + el.dataset.app + ']' : ''));
+    return chain.slice(0, 6).join(' < ') + ' | open: ' + [...document.querySelectorAll('.win:not(.minimized) .titlebar .title')].map((e) => e.textContent).join(',');
+  }));
+  await endDrag();
+  check(await exists(desk + '/drag-a.txt') && await exists(home + '/project/drag-a.txt', false), 'dropping a file on the desktop moves it into ~/.remosh-gui/desktop');
+  await deskItem('drag-a.txt').waitFor();
+  check((await page.locator('.drag-ghost').count()) === 0, 'the card disappears after the drop');
+  await beginDrag(item('drag-b.txt'), 300, 420, 'Control');
+  check((await ghost()) === 'drag-b.txt|複製', 'holding Ctrl turns it into a copy');
+  await endDrag('Control');
+  check(await exists(desk + '/drag-b.txt') && fs.existsSync(home + '/project/drag-b.txt'), 'Ctrl + drop copies');
+  await beginDrag(item('src'), 300, 420, 'Alt');
+  check((await ghost()) === 'src|建立捷徑', 'holding Alt makes a shortcut');
+  await endDrag('Alt');
+  check(await holds(desk + '/src.remosh_gui-lnk', 'lnk:' + home + '/project/src\n') && fs.existsSync(home + '/project/src'), 'Alt + drop writes a .remosh_gui-lnk with "lnk:<path>"');
+  await deskItem('src').waitFor();
+  check((await deskItem('src').locator('.lnk-badge').count()) === 1, 'a shortcut shows its target\'s icon with an arrow, and hides the extension');
+  const boxes = await page.locator('.desk-item').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => [Math.round(r.left), Math.round(r.top)]));
+  check(boxes[0][0] < 30 && boxes[0][1] < 30 && boxes.every((b, i) => i === 0 || (b[0] === boxes[0][0] && b[1] > boxes[i - 1][1])), 'desktop icons fill a column from the top left', JSON.stringify(boxes));
+  await deskItem('src').dblclick();
+  await page.waitForFunction(() => document.querySelectorAll('.win[data-app="檔案櫃"]').length === 2);
+  const viaLnk = page.locator('.win[data-app="檔案櫃"]').nth(1);
+  await viaLnk.locator('.files .item').first().waitFor();
+  check((await viaLnk.locator('.statusbar .path').textContent()) === home + '/project/src', 'opening the shortcut opens the folder it points at');
+  await viaLnk.locator('.traffic .close').click();
+  // an app dragged out of the start menu becomes an app shortcut
+  await page.click('#start-btn');
+  await page.click('#sm-all-btn');
+  await beginDrag(page.locator('#sma-tasks'), 300, 520);
+  check((await ghost()) === '工作管理員|建立捷徑', 'apps can be dragged out of the start menu');
+  await endDrag();
+  check(await holds(desk + '/工作管理員.remosh_gui-app', 'app:tasks\n'), 'dropping an app on the desktop writes a .remosh_gui-app with "app:<id>"');
+  if (await page.isVisible('#start-menu')) await page.keyboard.press('Escape');
+  await deskItem('工作管理員').waitFor();
+  await deskItem('工作管理員').dblclick();
+  const viaApp = page.locator('.win', { has: page.locator('.tm-top') });
+  await viaApp.waitFor();
+  check(true, 'double-clicking the app shortcut starts the app');
+  await viaApp.locator('.traffic .close').click();
+  await deskItem('工作管理員').click({ button: 'right' });
+  check((await menuLabels()).join('|') === '開啟|釘選到開始|刪除' && await page.locator('.ctx-menu button', { hasText: '釘選到開始' }).isDisabled(), 'desktop right-click: open, pin to start (already pinned), delete', (await menuLabels()).join('|'));
+  await page.keyboard.press('Escape');
+  // back into the file cabinet by dragging
+  const fbox = await fwin.locator('.files').boundingBox();
+  await beginDrag(deskItem('drag-a.txt'), fbox.x + fbox.width - 60, fbox.y + fbox.height - 60);
+  check((await ghost()) === 'drag-a.txt|移動', 'desktop icons can be dragged too');
+  await endDrag();
+  check(await exists(home + '/project/drag-a.txt') && await exists(desk + '/drag-a.txt', false), 'dropping it in the file cabinet moves it back');
+  await item('drag-a.txt').waitFor();
+  // in the file cabinet, an app shortcut can be pinned from the right-click menu
+  await page.locator('#desktop-icons').click({ button: 'right', position: { x: 300, y: 600 } });
+  check((await menuLabels()).join('|') === '重新整理|開啟桌面資料夾', 'desktop right-click on empty space', (await menuLabels()).join('|'));
+  await pick('開啟桌面資料夾');
+  await page.waitForFunction(() => document.querySelectorAll('.win[data-app="檔案櫃"]').length === 2);
+  const deskWin = page.locator('.win[data-app="檔案櫃"]').nth(1);
+  const appRow = deskWin.locator('.files .item', { has: page.locator('.name', { hasText: /^工作管理員\.remosh_gui-app$/ }) });
+  await appRow.waitFor();
+  check((await deskWin.locator('.statusbar .path').textContent()) === desk, 'the desktop folder opens in a file cabinet');
+  await appRow.click({ button: 'right' });
+  check((await menuLabels()).includes('釘選到開始') && !(await menuLabels()).includes('開啟程式…'), 'file cabinet right-click on an app shortcut offers "pin to start"', (await menuLabels()).join('|'));
+  await page.keyboard.press('Escape');
+  await deskWin.locator('.traffic .close').click();
+  await deskItem('src').click({ button: 'right' });
+  await pick('刪除');
+  check((await page.textContent('.modal p')).includes('只會刪除這個捷徑'), 'deleting a shortcut says the target is safe');
+  await page.locator('.modal button', { hasText: '刪除' }).click();
+  check(await exists(desk + '/src.remosh_gui-lnk', false) && fs.existsSync(home + '/project/src/math.ts'), 'the shortcut is gone, the folder untouched');
+  await toFinder();
+  tb2 = await fwin.locator('.titlebar .title').boundingBox();
+  await page.mouse.move(tb2.x + 60, tb2.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(tb2.x + 30, tb2.y + 60, { steps: 3 });
+  await page.mouse.move(640, 200, { steps: 5 });
+  await page.mouse.up();
+  await sleep(150);
 
   // ---- settings: 動畫 category, saved on the host
   await page.click('#start-btn');

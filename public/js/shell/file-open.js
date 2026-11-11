@@ -7,7 +7,9 @@ import { P } from '../core/path.js';
 import { errText } from '../core/errors.js';
 import { toast } from '../core/ui.js';
 import { getSettings, updateSettings, whenSettingsReady } from '../core/settings.js';
-import { getApp, acceptsExt, appsForExt } from './apps.js';
+import { rpc } from '../core/rpc.js';
+import { getApp, acceptsExt, appsForExt, launchApp } from './apps.js';
+import { shortcutKind, displayName, readShortcut } from './shortcuts.js';
 
 export const extLabel = (ext) => (ext ? `.${ext} 檔` : '沒有副檔名的檔案');
 
@@ -63,8 +65,31 @@ export async function openWith(path, size, { rememberDefault = false } = {}) {
   return choice.app.launch({ path, size });
 }
 
+// A .remosh_gui-app starts its app; a .remosh_gui-lnk opens what it points at.
+export async function openShortcut(path) {
+  let sc;
+  try {
+    sc = await readShortcut(path);
+  } catch (err) {
+    return toast(`無法開啟「${displayName(P.base(path))}」：${errText(err)}`, true);
+  }
+  if (!sc) return toast(`「${displayName(P.base(path))}」不是有效的捷徑`, true);
+  if (sc.kind === 'app') {
+    if (!getApp(sc.id)) return toast('找不到這個應用程式', true);
+    return launchApp(sc.id);
+  }
+  try {
+    const { entry } = await rpc('stat', { path: sc.target });
+    if (entry.type === 'dir') return launchApp('files', { path: sc.target });
+    return openFile(sc.target, entry.size);
+  } catch (err) {
+    return toast(`捷徑指向的「${sc.target}」無法開啟：${errText(err)}`, true);
+  }
+}
+
 // Double-click / 開啟: use the remembered app, or ask when the extension is unknown.
 export async function openFile(path, size) {
+  if (shortcutKind(P.base(path))) return openShortcut(path);
   await whenSettingsReady();
   const ext = P.ext(P.base(path));
   const app = getApp(getSettings().files.associations[ext]);

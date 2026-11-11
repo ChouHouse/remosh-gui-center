@@ -5,20 +5,24 @@ import { store } from '../../core/store.js';
 import { errText } from '../../core/errors.js';
 import { toast, dialog } from '../../core/ui.js';
 import { fmtSize, fmtTime } from '../../core/format.js';
-import { P } from '../../core/path.js';
+import { P, freeName } from '../../core/path.js';
 import { ICON, folderSvg, fileSvg } from '../../core/icons.js';
 import { conn, rpc } from '../../core/rpc.js';
 import { on, emit } from '../../core/events.js';
 import { getSettings, updateSettings } from '../../core/settings.js';
 import { createWindow } from '../../shell/wm.js';
-import { registerApp, launchApp } from '../../shell/apps.js';
+import { registerApp, launchApp, getApp } from '../../shell/apps.js';
+import { makeDraggable, registerDropTarget } from '../../shell/drag.js';
+import { acceptsDrop, dropAction, dropInto } from '../../shell/file-drop.js';
+import { shortcutKind, readShortcut } from '../../shell/shortcuts.js';
+import { isPinned, pinApp } from '../../shell/start-menu.js';
 import { openFile, openWith } from '../../shell/file-open.js';
 import { showContextMenu } from '../../shell/context-menu.js';
 import { putFiles, takeFiles, clearFiles, cutPaths } from './clipboard.js';
 
 const finders = new Set(); // every open file cabinet window
 
-function createFinder(home) {
+function createFinder(home, startPath = home) {
   const win = createWindow({ title: '檔案櫃', appName: '檔案櫃', iconHtml: folderSvg(), width: 860, height: 540 });
   const st = {
     path: home,
@@ -303,18 +307,6 @@ function createFinder(home) {
     toast(mode === 'cut' ? `已剪下「${e.name}」，到目的資料夾按貼上` : `已複製「${e.name}」`);
   }
 
-  // A name that is not taken in this folder: "a.txt" -> "a 複本.txt" -> "a 複本 2.txt".
-  function freeName(name, taken) {
-    if (!taken.has(name)) return name;
-    const dot = name.lastIndexOf('.');
-    const stem = dot > 0 ? name.slice(0, dot) : name;
-    const ext = dot > 0 ? name.slice(dot) : '';
-    for (let i = 1; ; i++) {
-      const candidate = `${stem} 複本${i > 1 ? ' ' + i : ''}${ext}`;
-      if (!taken.has(candidate)) return candidate;
-    }
-  }
-
   async function paste() {
     const clip = await takeFiles();
     if (!clip) return toast('剪貼簿裡沒有檔案', true);
@@ -407,6 +399,24 @@ function createFinder(home) {
     emit('fs:changed', st.path);
   }
 
+  // ---- drag items out; drop things in (onto a folder = into that folder)
+  makeDraggable(files, (ev) => {
+    const el = ev.target.closest('.item');
+    const e = el && st.shown[Number(el.dataset.i)];
+    if (!e) return null;
+    return { type: 'file', name: e.name, icon: isDir(e) ? folderSvg() : fileSvg(e.name), data: { path: P.join(st.path, e.name), isDir: isDir(e), size: e.size } };
+  });
+  const offDrop = registerDropTarget(files, {
+    accepts: acceptsDrop,
+    action: dropAction,
+    onDrop(payload, drop) {
+      const el = drop.target?.closest?.('.item');
+      const onto = el && files.contains(el) ? st.shown[Number(el.dataset.i)] : null;
+      const dir = onto && isDir(onto) && P.join(st.path, onto.name) !== payload.data?.path ? P.join(st.path, onto.name) : st.path;
+      dropInto(dir, payload, drop);
+    },
+  });
+
   files.addEventListener('contextmenu', (ev) => {
     const el = ev.target.closest('.item');
     const e = el ? st.shown[Number(el.dataset.i)] : null;
@@ -426,7 +436,17 @@ function createFinder(home) {
     const paths = sidebarPaths();
     showContextMenu(ev, [
       { label: '開啟', run: () => open(e) },
-      isFile(e) && { label: '開啟程式…', run: () => openWith(full, e.size) },
+      isFile(e) && !shortcutKind(e.name) && { label: '開啟程式…', run: () => openWith(full, e.size) },
+      shortcutKind(e.name) === 'app' && { label: '釘選到開始', run: async () => {
+        try {
+          const sc = await readShortcut(full);
+          if (sc?.kind !== 'app' || !getApp(sc.id)) return toast('這不是有效的應用程式捷徑', true);
+          if (isPinned(sc.id)) return toast('已經釘選在開始了');
+          pinApp(sc.id);
+        } catch (err) {
+          toast(`無法讀取捷徑：${errText(err)}`, true);
+        }
+      } },
       isDir(e) && { label: '在終端機開啟', run: () => launchApp('terminal', { cwd: full }) },
       isDir(e) && { label: '加到側邊欄', enabled: !paths.includes(full), run: () => setSidebar([...paths, full]) },
       null,
@@ -467,16 +487,18 @@ function createFinder(home) {
     st.token++; // drop any listing still in flight
     clearInterval(pollTimer);
     offSettings();
+    offDrop();
     finders.delete(win);
   };
   win.navigate = navigate;
   win.getPath = () => st.path;
-  navigate(home);
+  navigate(startPath);
   return win;
 }
 
-function openFinder() {
-  finders.add(createFinder(conn.info.home)); // each launch opens another window
+// Each launch opens another window; { path } starts it in that folder.
+function openFinder({ path } = {}) {
+  finders.add(createFinder(conn.info.home, path || conn.info.home));
 }
 
 on('fs:changed', (dir) => {

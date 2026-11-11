@@ -24,3 +24,15 @@ export const P = {
     return i > 0 ? name.slice(i + 1).toLowerCase() : '';
   },
 };
+
+// A name that is not taken in a folder: "a.txt" -> "a 複本.txt" -> "a 複本 2.txt".
+export function freeName(name, taken) {
+  if (!taken.has(name)) return name;
+  const dot = name.lastIndexOf('.');
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot) : '';
+  for (let i = 1; ; i++) {
+    const candidate = `${stem} 複本${i > 1 ? ' ' + i : ''}${ext}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+}
