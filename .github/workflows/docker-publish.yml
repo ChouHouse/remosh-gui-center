@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: calou-code-platform/remosh-gui-center
+  IMAGE_NAME: chouhouse/remosh-gui-center
 jobs:
   build:
     runs-on: ubuntu-latest

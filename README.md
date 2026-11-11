@@ -11,7 +11,7 @@ The same code runs on both; the start command picks the platform.
 
 | | Cloudflare Worker | Docker (Remosh GUI Center) |
 | --- | --- | --- |
-| Start | `npm run deploy` | `docker run ... ghcr.io/calou-code-platform/remosh-gui-center` |
+| Start | `npm run deploy` | `docker run ... ghcr.io/chouhouse/remosh-gui-center` |
 | Entry | `src/index.js` + `src/platform/worker.js` | `server/main.js` + `src/platform/node.js` |
 | SSH targets | public addresses only | anything the container can reach, LAN included |
 | SSH ciphers | AES-CTR + HMAC-SHA2 | everything ssh2 supports |
@@ -24,7 +24,7 @@ docker run -d \
   --restart always \
   -e WEB_PASSWORD=your_access_password \
   -p 8080:8080 \
-  ghcr.io/calou-code-platform/remosh-gui-center:latest
+  ghcr.io/chouhouse/remosh-gui-center:latest
 ```
 
 | Variable | Description | Default |
