@@ -6,7 +6,6 @@ import { gaugeSvg } from '../../core/icons.js';
 import { conn, rpc } from '../../core/rpc.js';
 import { createWindow } from '../../shell/wm.js';
 import { registerApp } from '../../shell/apps.js';
-import { registerTintTarget } from '../../shell/style.js';
 import { parseStats } from './stats.js';
 import { openProcessWindow } from './process.js';
 
@@ -159,16 +158,5 @@ function openTaskManager() {
   tick();
   return win;
 }
-
-registerTintTarget({
-  id: 'tasks',
-  label: '工作管理員',
-  description: '用量條的顏色',
-  apply(t) {
-    const root = document.documentElement;
-    if (t.color) root.style.setProperty('--tm-tint', t.shade);
-    else root.style.removeProperty('--tm-tint');
-  },
-});
 
 registerApp({ id: 'tasks', name: '工作管理員', icon: gaugeSvg, startMenu: true, launch: openTaskManager });

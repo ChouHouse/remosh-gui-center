@@ -155,6 +155,18 @@ async function openEditor(path, size) {
     return hit?.id || 'plaintext';
   };
 
+  // Point this window at another path (after "save as", or when the file is renamed or moved).
+  ed.relocate = (target) => {
+    editors.delete(ed.path);
+    ed.path = target;
+    name = P.base(target);
+    editors.set(target, ed);
+    sPath.textContent = sPath.title = target;
+    win.setIcon(fileSvg(name));
+    monaco.editor.setModelLanguage(model, langFor(name));
+    refresh();
+  };
+
   ed.saveAs = async () => {
     if (ed.saving) return false;
     const answer = await dialog({
@@ -205,15 +217,9 @@ async function openEditor(path, size) {
     try {
       const r = await rpc('write', { path: target, data: toBase64(bytes) });
       // The window now edits the new file, like "Save As" in a desktop editor.
-      editors.delete(ed.path);
-      ed.path = target;
-      name = P.base(target);
-      editors.set(target, ed);
       ed.mtime = r.mtime;
       ed.savedVersion = version;
-      sPath.textContent = sPath.title = target;
-      win.setIcon(fileSvg(name));
-      monaco.editor.setModelLanguage(model, langFor(name));
+      ed.relocate(target);
       emit('fs:changed', P.parent(target));
       toast(`已另存為 ${target}`);
       return true;
@@ -311,6 +317,15 @@ window.addEventListener('keydown', (ev) => {
 // model is closed; that is expected, so keep it out of the console.
 window.addEventListener('unhandledrejection', (ev) => {
   if (ev.reason?.name === 'Canceled') ev.preventDefault();
+});
+
+// A renamed or moved file (or a folder above it) takes its open windows along.
+const movedPath = (path, from, to) => (path === from ? to : path?.startsWith(from + '/') ? to + path.slice(from.length) : null);
+on('fs:moved', (from, to) => {
+  for (const ed of [...editors.values()]) {
+    const next = movedPath(ed.path, from, to);
+    if (next && !editors.has(next)) ed.relocate?.(next);
+  }
 });
 
 on('session:start', () => loadMonaco().catch(() => {})); // warm up so the first file opens quickly

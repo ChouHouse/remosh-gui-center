@@ -13,7 +13,7 @@ import { on } from '../../core/events.js';
 import { getSettings, saveSettings } from '../../core/settings.js';
 import { createWindow } from '../../shell/wm.js';
 import { registerApp, getApp, appsForExt } from '../../shell/apps.js';
-import { TINTS, tintTargets, setTint, uploadWallpaper, useWallpaper, clearWallpaper, wallpaperUrl } from '../../shell/style.js';
+import { COLORS, MODES, setColor, setMode, uploadWallpaper, useWallpaper, clearWallpaper, wallpaperUrl } from '../../shell/style.js';
 
 const row = (title, desc, control) =>
   h('div', { class: 'set-row' }, h('div', { class: 'set-text' }, h('b', null, title), h('small', null, desc)), control);
@@ -89,24 +89,24 @@ const CATEGORIES = [
     // once (a wallpaper is a file on the host, not just a value).
     render(draft) {
       const fail = (what) => (err) => toast(`${what}：${errText(err)}`, true);
-      // One row of swatches per app that registered itself as tintable.
-      const tintSections = tintTargets().flatMap((target) => {
-        const chosen = draft.style.tints[target.id] || 'default';
-        return [
-          h('h4', null, target.label),
-          h('p', { class: 'set-desc' }, target.description),
-          h('div', { class: 'tint-grid', 'data-target': target.id }, TINTS.map((t) =>
-            h('button', {
-              type: 'button',
-              class: 'tint' + (chosen === t.id ? ' current' : ''),
-              'data-tint': t.id,
-              'aria-pressed': String(chosen === t.id),
-              onclick: () => setTint(target.id, t.id).catch(fail('無法儲存色調')),
-            },
-            h('span', { class: 'chip', style: `background:${t.color || '#4a9bea'};border-color:${t.shade || '#2f7fd1'}` }),
-            t.label))),
-        ];
-      });
+      const modes = h('div', { class: 'mode-seg', role: 'group', 'aria-label': '外觀' }, MODES.map(([id, label]) =>
+        h('button', {
+          type: 'button',
+          class: draft.style.mode === id ? 'current' : '',
+          'data-mode': id,
+          'aria-pressed': String(draft.style.mode === id),
+          onclick: () => setMode(id).catch(fail('無法儲存外觀')),
+        }, label)));
+      const colours = h('div', { class: 'tint-grid' }, COLORS.map((c) =>
+        h('button', {
+          type: 'button',
+          class: 'tint' + (draft.style.color === c.id ? ' current' : ''),
+          'data-tint': c.id,
+          'aria-pressed': String(draft.style.color === c.id),
+          onclick: () => setColor(c.id).catch(fail('無法儲存顏色')),
+        },
+        h('span', { class: 'chip', style: `background:${c.color || '#0a64d6'};border-color:${c.shade || '#0a4ea8'}` }),
+        c.label)));
 
       const picker = h('input', { type: 'file', accept: 'image/*', id: 'wp-file', hidden: true });
       const upload = h('button', { type: 'button', id: 'wp-upload', onclick: () => picker.click() }, '上傳壁紙…');
@@ -144,8 +144,10 @@ const CATEGORIES = [
       return h('div', null,
         h('h2', null, '樣式'),
         h('p', { class: 'set-desc' }, '變更會立即套用。'),
-        h('h3', null, '色調'),
-        tintSections,
+        h('h3', null, '外觀'),
+        modes,
+        h('h3', null, '顏色'),
+        colours,
         h('h3', null, '壁紙'),
         h('p', { class: 'set-desc' }, '最多保留 5 張。'),
         thumbs,

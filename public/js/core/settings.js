@@ -20,7 +20,8 @@ const DEFAULTS = {
     sidebar: null, // file cabinet sidebar folders; null = the built-in list
   },
   style: {
-    tints: {}, // tint target ('files', 'editor', ...) -> tint id; see shell/style.js
+    mode: 'auto', // 'auto' (follow the device), 'light' or 'dark'
+    color: 'default', // the system colour; see shell/style.js
     wallpaper: null, // file name in ~/.remosh-gui/wallpaper currently shown, or null
     wallpapers: [], // the last few uploads, most recently used first
   },
@@ -53,23 +54,14 @@ function normalise(obj) {
   };
 }
 
-const TINT_ID = /^[a-z-]{1,24}$/;
-function normaliseTints(st) {
-  const tints = {};
-  for (const [target, id] of Object.entries(st?.tints || {})) {
-    if (TINT_ID.test(target) && typeof id === 'string' && TINT_ID.test(id)) tints[target] = id;
-  }
-  // Files written before tints were per app had one `tint` for everything.
-  if (typeof st?.tint === 'string' && TINT_ID.test(st.tint)) {
-    for (const target of ['files', 'editor']) tints[target] ??= st.tint;
-  }
-  return tints;
-}
+const COLOR_ID = /^[a-z-]{1,24}$/;
 
 function normaliseStyle(st) {
   const wallpapers = [...new Set((Array.isArray(st?.wallpapers) ? st.wallpapers : []).filter((n) => typeof n === 'string' && FILE_NAME.test(n)))].slice(0, MAX_WALLPAPERS);
   return {
-    tints: normaliseTints(st),
+    mode: ['auto', 'light', 'dark'].includes(st?.mode) ? st.mode : DEFAULTS.style.mode,
+    // Earlier files kept the colour as `tint`, then per app in `tints`.
+    color: [st?.color, st?.tints?.files, st?.tint].find((v) => typeof v === 'string' && COLOR_ID.test(v)) || DEFAULTS.style.color,
     wallpaper: wallpapers.includes(st?.wallpaper) ? st.wallpaper : null,
     wallpapers,
   };
@@ -109,7 +101,10 @@ export async function saveSettings(next) {
   await ready; // never write before the file on the host has been read
   const clean = normalise(next);
   const file = { ...raw, version: 1, ...clean };
-  if (file.style) delete file.style.tint; // replaced by style.tints
+  if (file.style) {
+    delete file.style.tint; // both replaced by style.color
+    delete file.style.tints;
+  }
   await rpc('mkdir', { path: settingsDir() });
   await rpc('write', { path: settingsPath(), data: toBase64(new TextEncoder().encode(JSON.stringify(file, null, 2) + '\n')) });
   raw = file;

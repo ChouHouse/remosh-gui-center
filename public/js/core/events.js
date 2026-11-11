@@ -6,6 +6,7 @@
 //   session:end     the user logged out
 //   conn:lost       the connection dropped unexpectedly
 //   fs:changed      (dir) a file was created or replaced in that remote folder
+//   fs:moved        (from, to) a file or folder was renamed or moved
 const handlers = new Map();
 
 export function on(name, fn) {

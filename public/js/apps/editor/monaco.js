@@ -1,37 +1,10 @@
 // Loads Monaco (the VS Code editor component) on demand and configures it.
-import { tintOf, registerTintTarget, reapplyTint } from '../../shell/style.js';
+import { on } from '../../core/events.js';
+import { effectiveMode, onDeviceModeChange } from '../../shell/style.js';
 export let monacoPromise = null;
-export const darkQuery = matchMedia('(prefers-color-scheme: dark)');
-// The editor follows the system light/dark setting; its own tint (設定 → 樣式
-// → 編輯器) only colours the cursor, selection and active line number.
-export const themeName = () => (tintOf('editor').color ? 'remosh-tint' : darkQuery.matches ? 'vs-dark' : 'vs');
-
-function syncTheme(monaco) {
-  const t = tintOf('editor');
-  if (t.color) {
-    monaco.editor.defineTheme('remosh-tint', {
-      base: darkQuery.matches ? 'vs-dark' : 'vs',
-      inherit: true,
-      rules: [],
-      colors: {
-        'editorCursor.foreground': t.shade,
-        'editor.selectionBackground': t.shade + '55',
-        'editor.inactiveSelectionBackground': t.shade + '30',
-        'editorLineNumber.activeForeground': t.shade,
-      },
-    });
-  }
-  monaco.editor.setTheme(themeName());
-}
-
-registerTintTarget({
-  id: 'editor',
-  label: '編輯器',
-  description: '游標、選取範圍與目前行號的顏色',
-  apply() {
-    if (window.monaco) syncTheme(window.monaco); // before Monaco loads there is nothing to colour yet
-  },
-});
+// The code editor is its own app with its own colours: it does not take the
+// system colour, it only switches between its light and dark theme.
+export const themeName = () => (effectiveMode() === 'dark' ? 'vs-dark' : 'vs');
 
 export function loadMonaco() {
   if (monacoPromise) return monacoPromise;
@@ -55,8 +28,10 @@ export function loadMonaco() {
         // so silence "cannot find module / node types" noise.
         d.setDiagnosticsOptions({ diagnosticCodesToIgnore: [2307, 2792, 7016, 2580, 2591, 2688] });
       }
-      darkQuery.addEventListener('change', () => syncTheme(monaco));
-      reapplyTint('editor');
+      const sync = () => monaco.editor.setTheme(themeName());
+      onDeviceModeChange(sync);
+      on('settings:changed', sync);
+      sync();
       resolve(monaco);
     }, reject);
   });

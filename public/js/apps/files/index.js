@@ -14,7 +14,6 @@ import { createWindow } from '../../shell/wm.js';
 import { registerApp, launchApp } from '../../shell/apps.js';
 import { openFile, openWith } from '../../shell/file-open.js';
 import { showContextMenu } from '../../shell/context-menu.js';
-import { registerTintTarget } from '../../shell/style.js';
 import { putFiles, takeFiles, clearFiles, cutPaths } from './clipboard.js';
 
 let finder = null;
@@ -250,6 +249,54 @@ function createFinder(home) {
   const isFile = (e) => e.type === 'file' || (e.type === 'link' && e.targetType === 'file');
   const refresh = () => navigate(st.path, false);
 
+  // ---- live view: quietly re-read the folder every few seconds, so changes
+  // made elsewhere (a terminal, another program) show up on their own.
+  const signature = (entries) => entries.map((e) => `${e.name}|${e.type}|${e.size}|${e.mtime}|${e.mode}|${e.targetType || ''}`).sort().join('\n');
+  let polling = false;
+  async function poll() {
+    // Not while hidden, loading, or showing an error for this folder.
+    if (polling || win.minimized || document.hidden || !conn.ws || files.querySelector('.state')) return;
+    polling = true;
+    const token = st.token;
+    try {
+      const res = await rpc('list', { path: st.path });
+      if (token !== st.token || signature(res.entries) === signature(st.entries)) return;
+      const keep = st.shown[st.selected]?.name;
+      const top = files.scrollTop;
+      st.entries = res.entries;
+      st.selected = -1;
+      render();
+      if (keep != null) select(st.shown.findIndex((e) => e.name === keep));
+      files.scrollTop = top;
+    } catch {
+      /* keep what is shown; a manual refresh will report the problem */
+    } finally {
+      polling = false;
+    }
+  }
+  const pollTimer = setInterval(poll, 4000);
+
+  async function rename(e) {
+    const answer = await dialog({
+      title: '重新命名',
+      message: `「${e.name}」的新名稱：`,
+      input: e.name,
+      buttons: [{ label: '取消', value: false, cancel: true }, { label: '重新命名', value: true, default: true }],
+    });
+    const name = answer.value ? answer.text.trim() : '';
+    if (!answer.value || name === e.name) return;
+    if (!name || name === '.' || name === '..' || name.includes('/')) return toast('名稱不能是空的，也不能包含 /', true);
+    const from = P.join(st.path, e.name);
+    const to = P.join(st.path, name);
+    try {
+      await rpc('move', { from, to });
+    } catch (err) {
+      return toast(`無法重新命名「${e.name}」：${errText(err)}`, true);
+    }
+    emit('fs:moved', from, to); // open documents follow the file
+    emit('fs:changed', st.path);
+  }
+
   async function copyOrCut(mode, e) {
     await putFiles(mode, [P.join(st.path, e.name)]);
     render(); // cut items are dimmed
@@ -282,7 +329,10 @@ function createFinder(home) {
         await rpc(cutting ? 'move' : 'copy', { from, to: P.join(dir, name) });
         taken.add(name);
         done++;
-        if (cutting) emit('fs:changed', P.parent(from));
+        if (cutting) {
+          emit('fs:moved', from, P.join(dir, name));
+          emit('fs:changed', P.parent(from));
+        }
       } catch (err) {
         toast(`無法貼上「${P.base(from)}」：${errText(err)}`, true);
       }
@@ -384,6 +434,7 @@ function createFinder(home) {
       { label: '剪下', run: () => copyOrCut('cut', e) },
       { label: '貼上', run: paste },
       null,
+      { label: '重新命名', run: () => rename(e) },
       { label: '刪除', danger: true, run: () => remove(e) },
       null,
       { label: '內容', run: () => properties(e, full) },
@@ -400,6 +451,7 @@ function createFinder(home) {
       else if (cur) copyOrCut(k === 'x' ? 'cut' : 'copy', cur);
       else return;
     } else if (ev.key === 'Delete' && cur) remove(cur);
+    else if (ev.key === 'F2' && cur) rename(cur);
     else if (ev.key === 'Enter') open(st.shown[st.selected]);
     else if (ev.key === 'Backspace') navigate(P.parent(st.path));
     else if (n && (ev.key === 'ArrowDown' || ev.key === 'ArrowRight')) select(Math.min(n - 1, st.selected + 1));
@@ -413,6 +465,7 @@ function createFinder(home) {
   };
   win.destroy = () => {
     st.token++; // drop any listing still in flight
+    clearInterval(pollTimer);
     offSettings();
     if (finder === win) finder = null;
   };
@@ -431,22 +484,5 @@ on('fs:changed', (dir) => {
   if (finder?.getPath() === dir) finder.navigate(dir, false);
 });
 on('session:resume', () => finder?.navigate(finder.getPath(), false));
-
-// What a tint means here: the folder icons and the selection highlight.
-registerTintTarget({
-  id: 'files',
-  label: '檔案櫃',
-  description: '資料夾圖示與選取的顏色',
-  apply(t) {
-    const root = document.documentElement;
-    if (t.color) {
-      root.style.setProperty('--folder', t.color); // folder front
-      root.style.setProperty('--folder-dark', t.shade); // folder tab
-      root.style.setProperty('--select', `color-mix(in srgb, ${t.shade} 26%, var(--surface))`);
-    } else {
-      for (const name of ['--folder', '--folder-dark', '--select']) root.style.removeProperty(name);
-    }
-  },
-});
 
 registerApp({ id: 'files', name: '檔案櫃', icon: folderSvg, startMenu: true, launch: openFinder });

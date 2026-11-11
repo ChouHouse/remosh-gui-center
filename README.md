@@ -99,24 +99,18 @@ public/
 3. If it needs new data from the host, add a handler in `src/ops/` and list it
    in `src/ops/index.js`; call it from the page with `rpc('<op>', args)`.
 
-### Tinting an app
+### System colour and light/dark
 
-Colours are an API in `shell/style.js`. An app that wants a user-chosen colour
-registers a target; 設定 → 樣式 then shows a row of swatches for it and the
-choice is stored per target in `style.tints`:
-
-```js
-registerTintTarget({
-  id: 'notes', label: '記事本', description: '標題列的顏色',
-  apply(tint) { /* tint = { id, label, color, shade }; color is null for the default */ },
-});
-```
-
-`tintOf(id)` reads the current choice and `setTint(id, tintId)` changes it.
-The file cabinet and the editor are the two built-in targets.
+`shell/style.js` owns the one system colour and the light/dark mode chosen in
+設定 → 樣式. A system app follows them just by using the CSS variables
+(`--accent`, `--accent-text`, `--select`, `--folder`, `--surface`, ...). An app
+that needs the values in code calls `systemColor()` / `effectiveMode()` and
+listens for `settings:changed`. An app that does neither keeps its own colours:
+the code editor only switches between its own light and dark theme.
 
 Apps do not import each other. They talk through `core/events.js`
-(`session:start`, `session:resume`, `session:end`, `conn:lost`, `fs:changed`)
+(`session:start`, `session:resume`, `session:end`, `conn:lost`, `fs:changed`,
+`fs:moved`, `settings:changed`)
 `shell/apps.js` (`launchApp`) and `shell/file-open.js` (`openFile`, `openWith`).
 
 Log in with a password or a private key file (OpenSSH / PEM / PPK; RSA, ECDSA
@@ -143,8 +137,9 @@ npm run deploy   # publish to Cloudflare
   container it reads the container's own cgroup usage and limits (v2 or v1)
   instead of `/proc` totals, which would describe the Docker host.
 
-- **File cabinet** (檔案櫃): right-click a file for 開啟 / 開啟程式… / 複製 /
-  剪下 / 貼上 / 刪除 / 內容; right-click the sidebar to add or remove folders.
+- **File cabinet** (檔案櫃): re-reads the open folder every 4 s. Right-click a file
+  for 開啟 / 開啟程式… / 複製 / 剪下 / 貼上 / 重新命名 / 刪除 / 內容, empty space for
+  新增資料夾 / 在這裡開啟終端機; right-click the sidebar to add or remove folders.
   Copy and cut put `remosh/file:<path>` on the clipboard.
 - **File associations**: every app declares the extensions it accepts
   (`extensions: 'all'` or a list). The first time an extension is opened the
@@ -154,8 +149,8 @@ npm run deploy   # publish to Cloudflare
 - **Terminal** (終端機): an interactive shell (xterm.js + an SSH PTY channel).
   Opening a file with it sets the file to mode 777 and runs it as `./name`
   from its folder.
-- **Settings** (設定): categories on the left (動畫: on/off and speed; 檔案關聯; 樣式: a tint colour per app (file cabinet:
-  folder icons and selection; editor: cursor and selection) and a wallpaper — the last five uploads are
+- **Settings** (設定): categories on the left (動畫: on/off and speed; 檔案關聯; 樣式: light/dark mode, one system colour,
+  and a wallpaper — the last five uploads are
   kept in `~/.remosh-gui/wallpaper`). 儲存 writes `~/.remosh-gui/setting.json` on the SSH host, so settings
   follow the account, and they are read back at login. Add a setting in
   `core/settings.js` and a category in `apps/settings/index.js`.

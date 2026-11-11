@@ -1,5 +1,5 @@
 /* ---------- editor ---------- */
 .editor-host { flex: 1; min-height: 0; position: relative; user-select: text; }
 .editor-loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); }
-.statusbar .dirty-flag { color: var(--accent); font-weight: 600; }
+.statusbar .dirty-flag { color: var(--text); font-weight: 600; }
 .statusbar .err { color: var(--danger); }

@@ -7,67 +7,69 @@ import { on } from '../core/events.js';
 import { toBase64, fromBase64 } from '../core/text-codec.js';
 import { getSettings, updateSettings, settingsDir, wallpaperDir, MAX_WALLPAPERS } from '../core/settings.js';
 
-// ---- tints
-// A tint is a colour, not a light/dark scheme. Each app that can be tinted
-// registers a target and decides what the colour means for it:
-//
-//   registerTintTarget({
-//     id: 'files',                 key in settings (style.tints.files)
-//     label: '檔案櫃',              shown in 設定 → 樣式
-//     description: '…',            what the colour changes
-//     apply(tint) { … },           called now and whenever the choice changes;
-//   });                            tint = { id, label, color, shade } (color null = default)
-//
-// Read the current choice with tintOf(id); change it with setTint(id, tintId).
-const tint = (id, label, color, shade) => ({ id, label, color, shade });
-export const TINTS = [
-  { id: 'default', label: '預設', color: null, shade: null },
-  tint('pink-dark', '深桃紅', '#d6337f', '#a81f5f'),
-  tint('pink-light', '淺桃紅', '#ff9cc4', '#f070a4'),
-  tint('blue-dark', '深藍', '#1f5fbf', '#174a96'),
-  tint('blue-light', '淺藍', '#7db8f5', '#4a9bea'),
-  tint('green-dark', '深綠', '#1f8a4c', '#166a39'),
-  tint('green-light', '淺綠', '#8fdcae', '#5fc48a'),
-  tint('yellow', '黃', '#f5cc3d', '#dba91a'),
-  tint('orange', '橘', '#f59a3d', '#db7a1a'),
-  tint('gray-light', '淺灰', '#c3c9d1', '#a3abb5'),
-  tint('off-white', '稍深白', '#ece8dc', '#d3cdbb'),
+// ---- system colour and light/dark mode
+// The system colour is the one accent of the desktop: buttons, switches, the
+// taskbar indicator, folder icons, selections. System apps get it for free by
+// using the CSS variables (--accent, --accent-text, --select, --folder);
+// an app that wants the value itself calls systemColor() / effectiveMode() and
+// listens for `settings:changed`. An app that does neither keeps its own look
+// (the code editor does, apart from following light/dark).
+const colour = (id, label, color, shade, ink) => ({ id, label, color, shade, ink });
+const WHITE = '#ffffff';
+export const COLORS = [
+  { id: 'default', label: '預設', color: null, shade: null, ink: null },
+  colour('pink-dark', '深桃紅', '#d6337f', '#a81f5f', WHITE),
+  colour('pink-light', '淺桃紅', '#ff9cc4', '#f070a4', '#3a0f22'),
+  colour('blue-dark', '深藍', '#1f5fbf', '#174a96', WHITE),
+  colour('blue-light', '淺藍', '#7db8f5', '#4a9bea', '#0b2545'),
+  colour('green-dark', '深綠', '#1f8a4c', '#166a39', WHITE),
+  colour('green-light', '淺綠', '#8fdcae', '#5fc48a', '#0d3320'),
+  colour('yellow', '黃', '#f5cc3d', '#dba91a', '#3a2c00'),
+  colour('orange', '橘', '#f59a3d', '#db7a1a', '#3a1c00'),
+  colour('gray-light', '淺灰', '#c3c9d1', '#a3abb5', '#1f2429'),
+  colour('off-white', '稍深白', '#ece8dc', '#d3cdbb', '#2a2822'),
 ];
+export const MODES = [['auto', '跟隨裝置'], ['light', '淺色'], ['dark', '深色']];
 
-const targets = new Map();
-const applied = new Map(); // target id -> tint id last applied, to skip no-op calls
+const darkQuery = matchMedia('(prefers-color-scheme: dark)');
+export const systemColor = () => COLORS.find((c) => c.id === getSettings().style.color) || COLORS[0];
+export const effectiveMode = () => {
+  const mode = getSettings().style.mode;
+  return mode === 'auto' ? (darkQuery.matches ? 'dark' : 'light') : mode;
+};
 
-export const tintTargets = () => [...targets.values()];
-export const tintOf = (targetId) => TINTS.find((t) => t.id === getSettings().style.tints[targetId]) || TINTS[0];
-
-function applyTarget(target) {
-  const t = tintOf(target.id);
-  if (applied.get(target.id) === t.id) return;
-  applied.set(target.id, t.id);
-  try {
-    target.apply(t);
-  } catch (err) {
-    console.error(`tint target "${target.id}" failed`, err);
+function applyAppearance() {
+  const root = document.documentElement;
+  const mode = getSettings().style.mode;
+  if (mode === 'auto') root.removeAttribute('data-theme');
+  else root.dataset.theme = mode;
+  const c = systemColor();
+  const vars = c.color
+    ? {
+      '--accent': c.color,
+      '--accent-text': c.ink,
+      '--folder': c.color,
+      '--folder-dark': c.shade,
+      '--select': `color-mix(in srgb, ${c.shade} 26%, var(--surface))`,
+    }
+    : { '--accent': null, '--accent-text': null, '--folder': null, '--folder-dark': null, '--select': null };
+  for (const [name, value] of Object.entries(vars)) {
+    if (value) root.style.setProperty(name, value);
+    else root.style.removeProperty(name);
   }
+  root.dataset.color = c.id;
 }
 
-export function registerTintTarget(target) {
-  if (targets.has(target.id)) throw new Error(`Tint target "${target.id}" is already registered`);
-  targets.set(target.id, target);
-  applyTarget(target);
-}
-
-// Call when a target becomes able to apply (e.g. the editor finished loading).
-export function reapplyTint(targetId) {
-  applied.delete(targetId);
-  const target = targets.get(targetId);
-  if (target) applyTarget(target);
-}
-
-export const setTint = (targetId, tintId) =>
+export const setColor = (id) =>
   updateSettings((s) => {
-    s.style.tints[targetId] = tintId;
+    s.style.color = id;
   });
+export const setMode = (mode) =>
+  updateSettings((s) => {
+    s.style.mode = mode;
+  });
+// Fires when the device switches between light and dark.
+export const onDeviceModeChange = (fn) => darkQuery.addEventListener('change', fn);
 
 // ---- wallpaper
 const urls = new Map(); // file name -> object URL (kept for this session)
@@ -148,10 +150,11 @@ export const clearWallpaper = () =>
   });
 
 on('settings:changed', () => {
-  for (const target of targets.values()) applyTarget(target);
+  applyAppearance();
   applyWallpaper();
 });
 on('session:end', () => {
   for (const url of urls.values()) URL.revokeObjectURL(url);
   urls.clear();
 });
+applyAppearance();

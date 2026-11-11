@@ -7,13 +7,12 @@ import { fmtSize } from '../../core/format.js';
 import { P } from '../../core/path.js';
 import { notepadSvg } from '../../core/icons.js';
 import { conn, rpc } from '../../core/rpc.js';
-import { emit } from '../../core/events.js';
+import { on, emit } from '../../core/events.js';
 import { decodeText, encodeText, toBase64, fromBase64 } from '../../core/text-codec.js';
 import { createWindow } from '../../shell/wm.js';
 import { attachMenuBar } from '../../shell/menubar.js';
 import { registerApp } from '../../shell/apps.js';
 import { showContextMenu } from '../../shell/context-menu.js';
-import { registerTintTarget } from '../../shell/style.js';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const UNTITLED = '未命名';
@@ -38,6 +37,7 @@ async function openNotepad({ path = null, size = 0 } = {}) {
 
   const isDirty = () => area.value !== note.saved;
   note.isDirty = isDirty;
+  note.refresh = () => refresh();
   const setWrap = (on) => {
     area.wrap = on ? 'soft' : 'off';
     store.set('notepadWrap', on);
@@ -222,16 +222,15 @@ async function openNotepad({ path = null, size = 0 } = {}) {
   area.focus();
 }
 
-registerTintTarget({
-  id: 'notepad',
-  label: '記事本',
-  description: '游標與選取的顏色',
-  apply(t) {
-    const root = document.documentElement;
-    if (t.color) root.style.setProperty('--np-tint', t.shade);
-    else root.style.removeProperty('--np-tint');
-    root.toggleAttribute('data-np-tint', !!t.color);
-  },
+// A renamed or moved file (or a folder above it) takes its open notepads along.
+on('fs:moved', (from, to) => {
+  for (const note of notes) {
+    const next = note.path === from ? to : note.path?.startsWith(from + '/') ? to + note.path.slice(from.length) : null;
+    if (next) {
+      note.path = next;
+      note.refresh?.();
+    }
+  }
 });
 
 registerApp({
