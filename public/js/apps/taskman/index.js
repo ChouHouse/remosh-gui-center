@@ -7,6 +7,7 @@ import { conn, rpc } from '../../core/rpc.js';
 import { createWindow } from '../../shell/wm.js';
 import { registerApp } from '../../shell/apps.js';
 import { parseStats } from './stats.js';
+import { openProcessWindow } from './process.js';
 
 let taskman = null;
 function openTaskManager() {
@@ -69,7 +70,7 @@ function openTaskManager() {
       const r = typeof a[k] === 'string' ? a[k].localeCompare(b[k]) : (a[k] ?? -1) - (b[k] ?? -1);
       return (r || a.pid - b.pid) * sort.dir;
     });
-    tbody.replaceChildren(...sorted.map((p) => h('tr', null,
+    tbody.replaceChildren(...sorted.map((p) => h('tr', { 'data-pid': p.pid, 'data-name': p.name, title: '點兩下查看詳細資料' },
       h('td', { title: p.name }, p.name),
       h('td', { class: 'num' }, p.pid),
       h('td', null, p.user),
@@ -150,6 +151,10 @@ function openTaskManager() {
     clearTimeout(timer);
     if (taskman === win) taskman = null;
   };
+  tbody.addEventListener('dblclick', (ev) => {
+    const tr = ev.target.closest('tr[data-pid]');
+    if (tr) openProcessWindow(Number(tr.dataset.pid), tr.dataset.name);
+  });
   renderHead();
   tick();
   return win;

@@ -21,7 +21,7 @@ export function openSocket() {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
     ws.onopen = () => resolve(ws);
-    ws.onerror = () => reject(appError('connect-failed', '無法連上 Worker'));
+    ws.onerror = () => reject(appError('server-unreachable', '無法連上伺服器'));
     ws.onmessage = (ev) => {
       let msg;
       try {

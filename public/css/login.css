@@ -42,3 +42,4 @@ button.primary:disabled { opacity: .6; cursor: progress; }
 .warn .fp { word-break: break-all; }
 .warn code { font-size: 11px; user-select: text; }
 .warn button { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--warn-border); background: transparent; }
+#gate { z-index: 100001; }

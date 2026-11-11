@@ -5,20 +5,61 @@ desktop in the browser: a Finder-style file browser, and every file you open
 gets its own Monaco window (the editor component of VS Code, not the whole
 workbench) with an entry in the taskbar at the bottom.
 
+## Two ways to run it
+
+The same code runs on both; the start command picks the platform.
+
+| | Cloudflare Worker | Docker (Remosh GUI Center) |
+| --- | --- | --- |
+| Start | `npm run deploy` | `docker run ... ghcr.io/calou-code-platform/remosh-gui-center` |
+| Entry | `src/index.js` + `src/platform/worker.js` | `server/main.js` + `src/platform/node.js` |
+| SSH targets | public addresses only | anything the container can reach, LAN included |
+| SSH ciphers | AES-CTR + HMAC-SHA2 | everything ssh2 supports |
+
+## Docker
+
+```bash
+docker run -d \
+  --name=remosh-gui \
+  --restart always \
+  -e WEB_PASSWORD=your_access_password \
+  -p 8080:8080 \
+  ghcr.io/calou-code-platform/remosh-gui-center:latest
+```
+
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `WEB_PASSWORD` | Access password asked before the SSH login screen. Leave it empty and anyone who can reach the port can use the site. | *None* |
+| `cloudflared` | (Optional) Cloudflare Tunnel token; the tunnel should point at `http://localhost:8080`. | *None* |
+| `ALLOWED_HOSTS` | (Optional) Comma-separated SSH targets that may be reached, e.g. `10.0.0.5,example.com:2222`. | *None* |
+| `PORT` | Port inside the container. | `8080` |
+
+The image is based on `ccp-base-debian`, runs as a non-root user, and keeps
+the tunnel token in `/ccp/flags` like Remosh. `WEB_PASSWORD` works on the
+Worker too (`wrangler secret put WEB_PASSWORD`).
+
+The access password is checked by the server: `/ws` is refused without the
+cookie it sets (HttpOnly, 12 hours), and five wrong tries from one address
+lock it for a minute.
+
 ## How it works
 
 ```
-browser ──WebSocket /ws──▶ Worker ──TCP (cloudflare:sockets)──▶ SSH server
-  UI + Monaco                ssh2 client + SFTP
+browser ──WebSocket /ws──▶ Worker ──▶ Durable Object ──TCP (cloudflare:sockets)──▶ SSH server
+  UI + Monaco               routing     ssh2 client + SFTP, one per connection
 ```
 
 Nothing is bundled for the browser: the page loads native ES modules.
 
 ```
-src/                    Worker
-  index.js              fetch handler, WebSocket upgrade
+server/main.js          Node entry (Docker): static files, /ws, /api/gate
+docker/                 run.sh, cloudflared supervisor
+src/                    shared by both entries
+  index.js              fetch handler, and SessionDO (the Durable Object per connection)
   session.js            one SSH/SFTP session per WebSocket, login, op dispatch
   ssh.js                socket adapter, algorithms, run-a-command helper
+  gate.js               optional access password (WEB_PASSWORD)
+  platform/             worker.js / node.js: how each runtime opens TCP
   util.js               shared helpers
   ops/                  one handler per request name
     index.js            the registry (files, manage, stats, terminal)
@@ -72,7 +113,8 @@ changes.
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
+npm run dev      # Worker runtime, http://localhost:3000
+npm run assets && WEB_PASSWORD=secret npm start   # Node server, http://localhost:8080
 npm run deploy   # publish to Cloudflare
 ```
 
@@ -100,6 +142,29 @@ npm run deploy   # publish to Cloudflare
 - **Settings** (設定): categories on the left (動畫: on/off and speed; 檔案關聯). 儲存 writes `~/.remosh-gui/setting.json` on the SSH host, so settings
   follow the account, and they are read back at login. Add a setting in
   `core/settings.js` and a category in `apps/settings/index.js`.
+
+## Deploying to Cloudflare
+
+```bash
+npx wrangler login   # or set CLOUDFLARE_API_TOKEN
+npm run deploy
+```
+
+Works on the Workers Free plan. How the project fits the platform limits:
+
+| Limit | Platform | This project |
+| --- | --- | --- |
+| CPU time | Worker: 10 ms (Free) / 30 s (Paid) for the whole connection. Durable Object: 30 s, renewed by every incoming message | The SSH session runs in a Durable Object (`SessionDO`), so each request from the page gets a fresh budget |
+| Durable Objects on Free | SQLite-backed classes only | `new_sqlite_classes` migration; nothing is stored |
+| WebSocket message | 32 MiB received | Largest is a 5 MB file as base64, about 7 MiB |
+| Worker size | 3 MB gzip (Free) | about 150 KiB gzip |
+| Static assets | 20,000 files, 25 MiB each | about 260 files, largest 5.7 MB |
+| Outbound TCP | No loopback, private or Cloudflare addresses; no port 25 | The SSH host needs a public address; the login form says so when a private one fails |
+
+Connections are dropped when Cloudflare updates the runtime or the Worker is
+redeployed; the page then asks for the password again and keeps the open
+windows. A terminal that prints continuously while the page sends nothing can
+use up the 30 s CPU budget between messages (the page pings every 25 s).
 
 ## Editor shortcuts
 
@@ -132,8 +197,6 @@ analysed on its own — imports of other remote files are not resolved.
 - Workers cannot run ssh2's AES-GCM / ChaCha20 code, so the connection
   negotiates AES-CTR with HMAC-SHA2. A server that only allows AEAD ciphers
   will refuse the handshake.
-- Cloudflare does not let Workers open sockets to private/Cloudflare IP ranges
-  in production, so the SSH server needs a public address.
 - **Restrict who can use it.** With `ALLOWED_HOSTS` empty, anyone who can open
   the page can use the Worker to try logins against any SSH server. Set
   `ALLOWED_HOSTS` in `wrangler.jsonc` and/or put the Worker behind Cloudflare

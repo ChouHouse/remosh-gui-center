@@ -45,7 +45,7 @@
   </nav>
 </div>
 
-<div id="login" class="overlay">
+<div id="login" class="overlay" hidden>
   <form id="login-form" class="card" autocomplete="on">
     <h1>SSH Desk</h1>
     <p class="sub" id="login-sub">連線到 SSH 主機，瀏覽並編輯上面的檔案</p>
@@ -78,6 +78,18 @@
     </div>
     <button type="submit" id="login-btn" class="primary">登入</button>
     <p class="note">密碼與私鑰只用於連線，不會被儲存；私鑰會傳到 Worker 進行登入。</p>
+  </form>
+</div>
+
+<div id="gate" class="overlay" hidden>
+  <form id="gate-form" class="card" autocomplete="off">
+    <h1>SSH Desk</h1>
+    <p class="sub">這個站台需要存取密碼</p>
+    <label>存取密碼
+      <input id="gate-pass" type="password" autocomplete="off" required>
+    </label>
+    <div id="gate-error" class="error" role="alert" hidden></div>
+    <button type="submit" id="gate-btn" class="primary">進入</button>
   </form>
 </div>
 

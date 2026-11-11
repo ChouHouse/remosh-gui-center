@@ -73,3 +73,17 @@ export function hostAllowed(list, host, port) {
   const h = host.toLowerCase();
   return items.includes(h) || items.includes(`${h}:${port}`);
 }
+
+// Loopback, RFC 1918, link-local, CGNAT and unique-local addresses, plus names
+// that only resolve inside a LAN.
+export function isPrivateHost(host) {
+  const h = host.toLowerCase();
+  if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local') || h.endsWith('.internal') || h.endsWith('.lan')) return true;
+  const m = /^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(h);
+  if (m) {
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    return a === 10 || a === 127 || a === 0 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254) || (a === 100 && b >= 64 && b <= 127);
+  }
+  return h === '::1' || /^f[cd][0-9a-f]{2}:/.test(h) || /^fe[89ab][0-9a-f]:/.test(h);
+}

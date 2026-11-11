@@ -1,20 +1,23 @@
 // One Session per WebSocket: logs in to the SSH server, then dispatches the
 // browser's JSON requests to the op registry.
-import { connect } from 'cloudflare:sockets';
+//
+// Runs unchanged on Cloudflare (inside a Durable Object) and on Node (Docker).
+// What differs between the two is passed in as `platform`; see src/platform/.
 import { createHash } from 'node:crypto';
 import ssh2 from 'ssh2';
 import { ops } from './ops/index.js';
-import { ALGORITHMS, CONNECT_TIMEOUT_MS, socketToDuplex } from './ssh.js';
-import { call, withTimeout, codeError, describeError, hostAllowed } from './util.js';
+import { CONNECT_TIMEOUT_MS } from './ssh.js';
+import { call, codeError, describeError, hostAllowed, isPrivateHost } from './util.js';
 
 const { Client, utils } = ssh2;
 
 const MAX_KEY_CHARS = 32 * 1024;
 
 export class Session {
-  constructor(ws, env) {
+  constructor(ws, env, platform) {
     this.ws = ws;
     this.env = env;
+    this.platform = platform;
     this.client = null;
     this.sftp = null;
     this.busy = false;
@@ -106,18 +109,16 @@ export class Session {
     }
 
     this.busy = true;
-    let socket;
+    let sock; // a Node Duplex stream connected to the SSH server
     try {
-      socket = connect({ hostname: host, port });
-      await withTimeout(socket.opened, CONNECT_TIMEOUT_MS, 'connect-timeout');
+      sock = await this.platform.openSocket(host, port, CONNECT_TIMEOUT_MS);
     } catch (err) {
       this.busy = false;
-      try {
-        socket?.close();
-      } catch {
-        /* ignore */
-      }
       if (err?.code === 'connect-timeout') throw err;
+      // Deployed Workers cannot reach loopback, private or Cloudflare addresses.
+      if (this.platform.blocksPrivateHosts && isPrivateHost(host)) {
+        throw codeError('private-address', 'Workers cannot connect to private or local addresses');
+      }
       throw codeError('connect-failed', err?.message || 'Could not reach the host');
     }
 
@@ -129,7 +130,7 @@ export class Session {
         client.once('error', reject);
         client.once('close', () => reject(codeError('closed', 'Connection closed')));
         client.connect({
-          sock: socketToDuplex(socket),
+          sock,
           username,
           ...(privateKey
             ? { privateKey: privateKey.key, passphrase: privateKey.passphrase }
@@ -137,7 +138,7 @@ export class Session {
           readyTimeout: CONNECT_TIMEOUT_MS,
           keepaliveInterval: 20000,
           keepaliveCountMax: 3,
-          algorithms: ALGORITHMS,
+          algorithms: this.platform.algorithms, // undefined = ssh2's defaults
           hostVerifier: (key) => {
             fingerprint = 'SHA256:' + createHash('sha256').update(key).digest('base64').replace(/=+$/, '');
             // Trust-on-first-use: the browser remembers the fingerprint and

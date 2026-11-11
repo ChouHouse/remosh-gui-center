@@ -45,9 +45,38 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
-  page.on('console', (m) => m.type() === 'error' && errors.push('console: ' + m.text()));
+  // The browser logs the 401 of a deliberately wrong access password; that one is expected.
+  page.on('console', (m) => m.type() === 'error' && !/status of 401/.test(m.text()) && errors.push('console: ' + m.text()));
 
   await page.goto(base);
+  // Access password (server started with WEB_PASSWORD): pass the same value in the environment.
+  const webPassword = process.env.WEB_PASSWORD || '';
+  const gateStatus = await (await fetch(base + '/api/gate')).json();
+  check(gateStatus.required === !!webPassword, 'server reports whether an access password is required', JSON.stringify(gateStatus));
+  if (webPassword) {
+    await page.waitForSelector('#gate:not([hidden])');
+    check(await page.isHidden('#login') && await page.isHidden('#desktop'), 'access-password screen comes first; the SSH login is not shown yet');
+    const noCookie = await new Promise((resolve) => {
+      const ws = new WebSocket(base.replace(/^http/, 'ws') + '/ws');
+      ws.onopen = () => resolve('opened');
+      ws.onerror = () => resolve('refused');
+    });
+    check(noCookie === 'refused', 'the WebSocket is refused without the access cookie');
+    await page.fill('#gate-pass', 'not-the-password');
+    await page.click('#gate-btn');
+    await page.waitForSelector('#gate-error:not([hidden])');
+    check((await page.textContent('#gate-error')).includes('不正確') && await page.isVisible('#gate'), 'a wrong access password is rejected');
+    await page.fill('#gate-pass', webPassword);
+    await page.click('#gate-btn');
+    await page.waitForSelector('#gate', { state: 'hidden' });
+    check(await page.isVisible('#login'), 'the right one leads to the SSH login');
+    const cookies = await ctx.cookies();
+    const c = cookies.find((k) => k.name === 'remosh_gate');
+    check(c && c.httpOnly && c.sameSite === 'Strict', 'the access cookie is HttpOnly and SameSite=Strict');
+  } else {
+    await page.waitForSelector('#login:not([hidden])');
+    check(await page.isHidden('#gate'), 'no access-password screen when none is set');
+  }
   await page.fill('#f-host', host);
   await page.fill('#f-port', String(port));
   await page.fill('#f-user', user);
@@ -385,6 +414,42 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await tm.locator('.tm-list th button', { hasText: 'PID' }).click();
   check((await tm.locator('.tm-list tbody tr').first().locator('td').nth(1).textContent()) === '1', 'clicking a column sorts the list');
   check((await page.locator('.dock-item', { hasText: '工作管理員' }).count()) === 1, 'task manager has a dock entry');
+  // ---- double-click a process -> details window -> force close
+  const { execSync, spawn } = require('node:child_process');
+  spawn('su', [user, '-c', 'exec sleep 4321'], { detached: true, stdio: 'ignore' }).unref();
+  await sleep(500);
+  const victim = Number(execSync('pgrep -n -x sleep -u ' + user).toString().trim());
+  const vRow = tm.locator(`.tm-list tbody tr[data-pid="${victim}"]`);
+  await vRow.waitFor({ timeout: 10000 });
+  await vRow.dblclick();
+  const pw = page.locator('.win', { has: page.locator('.proc-body') });
+  await pw.waitFor();
+  await pw.locator('dd[data-k="指令"]').waitFor();
+  const dd = (k) => pw.locator(`dd[data-k="${k}"]`).textContent();
+  check((await pw.locator('.titlebar .title').textContent()) === `sleep（${victim}） — 行程`, 'double-click opens a process window');
+  check((await dd('PID')) === String(victim) && (await dd('執行者')) === user && (await dd('指令')) === 'sleep 4321', 'it shows pid, who runs it and the command', [await dd('PID'), await dd('執行者'), await dd('指令')].join(' | '));
+  check(/B$/.test(await dd('記憶體')) && (await dd('狀態')) === '休眠' && (await dd('執行檔')).endsWith('sleep'), 'and its resource use and state', [await dd('記憶體'), await dd('狀態'), await dd('執行檔')].join(' | '));
+  await page.waitForFunction(() => /%$/.test(document.querySelector('.proc-body dd[data-k="CPU"]').textContent), null, { timeout: 8000 });
+  check(true, 'CPU usage appears after the second sample');
+  await pw.locator('.proc-kill').click();
+  check((await page.textContent('.modal h2')).includes(`PID ${victim}`), 'force close asks first');
+  await page.locator('.modal button', { hasText: '強制關閉' }).click();
+  await page.waitForFunction(() => document.querySelector('.proc-status').textContent === '已強制關閉');
+  let dead = false;
+  try { process.kill(victim, 0); } catch { dead = true; }
+  check(dead && await pw.locator('.proc-kill').isDisabled(), 'the process is really gone and the button is disabled');
+  await pw.locator('.traffic .close').click();
+  const rootRow = tm.locator('.tm-list tbody tr[data-pid="7"]');
+  if (await rootRow.count()) {
+    await rootRow.dblclick();
+    await pw.locator('dd[data-k="指令"]').waitFor();
+    await pw.locator('.proc-kill').click();
+    await page.locator('.modal button', { hasText: '強制關閉' }).click();
+    await page.waitForSelector('.toast.err');
+    check((await page.locator('.toast.err').last().textContent()).includes('權限不足'), 'killing someone else\'s process is refused by the host');
+    check(await pw.locator('.proc-kill').isEnabled(), 'and the window stays usable');
+    await pw.locator('.traffic .close').click();
+  }
   await tm.locator('.traffic .close').click();
   check((await tm.count()) === 0, 'task manager closes');
 

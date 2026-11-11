@@ -5,6 +5,7 @@ import { errText } from '../core/errors.js';
 import { toast } from '../core/ui.js';
 import { conn, rpc, openSocket } from '../core/rpc.js';
 import { on, emit } from '../core/events.js';
+import { ensureGate } from './gate.js';
 
 const loginEl = $('#login');
 const form = $('#login-form');
@@ -64,6 +65,7 @@ async function doLogin(trustNew) {
   btn.textContent = '連線中…';
   let ws;
   try {
+    await ensureGate(); // the access cookie may have expired since the page loaded
     ws = await openSocket();
     conn.ws = ws;
     const res = await rpc('connect', {

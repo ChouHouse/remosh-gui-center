@@ -1,0 +1,9 @@
+node_modules
+.git
+.github
+.wrangler
+.dev.vars
+public/vs
+public/xterm
+test
+*.log
