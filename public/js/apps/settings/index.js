@@ -7,7 +7,8 @@
 import { h } from '../../core/dom.js';
 import { errText } from '../../core/errors.js';
 import { toast } from '../../core/ui.js';
-import { settingsSvg } from '../../core/icons.js';
+import { fmtTime } from '../../core/format.js';
+import { settingsSvg, folderSvg } from '../../core/icons.js';
 import { on } from '../../core/events.js';
 import { getSettings, saveSettings, SETTINGS_DIR, SETTINGS_FILE } from '../../core/settings.js';
 import { createWindow } from '../../shell/wm.js';
@@ -96,8 +97,8 @@ const CATEGORIES = [
           'aria-pressed': String(draft.style.tint === t.id),
           onclick: () => setTint(t.id).catch(fail('無法儲存色調')),
         },
-        h('span', { class: 'chip', style: t.vars ? `background:${t.vars['--surface']};border-color:${t.vars['--border']}` : '' },
-          h('i', { style: t.vars ? `background:${t.vars['--accent']}` : '' })),
+        // A small folder in that colour: this is what changes in the file cabinet.
+        h('span', { class: 'chip', html: folderSvg(), style: t.color ? `--folder:${t.color};--folder-dark:${t.shade}` : '--folder:#4a9bea;--folder-dark:#2f7fd1' }),
         t.label)));
 
       const picker = h('input', { type: 'file', accept: 'image/*', id: 'wp-file', hidden: true });
@@ -116,29 +117,31 @@ const CATEGORIES = [
           upload.textContent = '上傳壁紙…';
         }
       });
-      const thumbs = h('div', { class: 'wp-list' }, draft.style.wallpapers.length
-        ? draft.style.wallpapers.map((name) => {
+      // One row per wallpaper, newest first.
+      const uploadedAt = (name) => fmtTime(Number(/^wp-(\d+)/.exec(name)?.[1]) / 1000) || name;
+      const thumbs = draft.style.wallpapers.length
+        ? h('div', { class: 'wp-list' }, draft.style.wallpapers.map((name) => {
           const using = draft.style.wallpaper === name;
-          const b = h('button', {
-            type: 'button',
-            class: 'wp' + (using ? ' current' : ''),
-            'data-name': name,
-            title: using ? '使用中' : '改用這張（會變成最新的一張）',
-            onclick: () => useWallpaper(name).catch(fail('無法切換壁紙')),
-          }, using && h('span', { class: 'badge' }, '使用中'));
+          const pic = h('span', { class: 'wp-pic' });
           wallpaperUrl(name).then((url) => {
-            b.style.backgroundImage = `url("${url}")`;
-          }, () => b.classList.add('missing'));
-          return b;
-        })
-        : h('p', { class: 'assoc-empty' }, '還沒有上傳過壁紙。'));
+            pic.style.backgroundImage = `url("${url}")`;
+          }, () => {
+            pic.textContent = '檔案不見了';
+          });
+          return h('div', { class: 'wp' + (using ? ' current' : ''), 'data-name': name },
+            pic,
+            h('span', { class: 'wp-info' }, h('b', null, using ? '使用中' : '之前的壁紙'), h('small', null, `上傳於 ${uploadedAt(name)}`)),
+            h('button', { type: 'button', class: 'wp-use', disabled: using, title: '改用這張，它會排到最前面', onclick: () => useWallpaper(name).catch(fail('無法切換壁紙')) }, using ? '使用中' : '使用'));
+        }))
+        : h('p', { class: 'wp-empty' }, '還沒有上傳過壁紙。');
       return h('div', null,
         h('h2', null, '樣式'),
         h('p', { class: 'set-desc' }, '這一頁的變更會立刻套用並儲存。'),
         h('h3', null, '色調'),
+        h('p', { class: 'set-desc' }, '檔案櫃的資料夾與選取顏色，以及編輯器的游標與選取顏色。'),
         swatches,
         h('h3', null, '壁紙'),
-        h('p', { class: 'set-desc' }, '保留最近 5 張，存在主機的 ~/.remosh-gui/wallpaper。點舊的那張就會換回去，並排到最前面。'),
+        h('p', { class: 'set-desc' }, '保留最近 5 張，存在主機的 ~/.remosh-gui/wallpaper。改用舊的那張，它就會排到最前面。'),
         thumbs,
         h('div', { class: 'wp-actions' }, picker, upload,
           h('button', { type: 'button', id: 'wp-none', disabled: !draft.style.wallpaper, onclick: () => clearWallpaper().catch(fail('無法儲存')) }, '不使用壁紙')));

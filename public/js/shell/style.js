@@ -7,40 +7,36 @@ import { on } from '../core/events.js';
 import { toBase64, fromBase64 } from '../core/text-codec.js';
 import { getSettings, updateSettings, settingsDir, wallpaperDir, MAX_WALLPAPERS } from '../core/settings.js';
 
-// [surface, surface-2, surface-3, border, text, muted, accent, accent-text, select]
-const scheme = (id, label, dark, c) => ({
-  id, label, dark,
-  vars: {
-    '--surface': c[0], '--surface-2': c[1], '--surface-3': c[2], '--border': c[3], '--text': c[4], '--muted': c[5],
-    '--accent': c[6], '--accent-text': c[7], '--select': c[8], '--file': dark ? c[2] : '#ffffff', '--file-edge': c[3],
-  },
-});
+// A tint is a colour, not a light/dark scheme: it colours the folder icons,
+// the selection highlight and the editor's cursor / selection. Light or dark
+// still follows the system.
+const tint = (id, label, color, shade) => ({ id, label, color, shade });
 export const TINTS = [
-  { id: 'default', label: '預設（跟隨系統）', dark: null, vars: null },
-  scheme('pink-dark', '深桃紅', true, ['#2b1d26', '#241820', '#3a2733', '#55394b', '#f5e6ee', '#c79fb3', '#ff6fae', '#2a0f1c', '#5a2644']),
-  scheme('pink-light', '淺桃紅', false, ['#fff3f8', '#ffe6f0', '#ffd6e6', '#f2b6cf', '#3a1d2a', '#875a6d', '#c92a74', '#ffffff', '#ffc9df']),
-  scheme('blue-dark', '深藍', true, ['#1b2333', '#161d2b', '#263247', '#384a68', '#e6eefb', '#9db0cc', '#5aa2ff', '#0b1626', '#23406e']),
-  scheme('blue-light', '淺藍', false, ['#f2f7ff', '#e3eefe', '#d3e4fd', '#b3cdf3', '#17263d', '#566d8b', '#1b63cc', '#ffffff', '#c6dcfb']),
-  scheme('green-dark', '深綠', true, ['#1a2a22', '#15231c', '#24392e', '#375646', '#e4f5ec', '#96b8a6', '#4fd08a', '#0a2014', '#1f5238']),
-  scheme('green-light', '淺綠', false, ['#f1fbf5', '#e1f5e9', '#cfecdb', '#a9d8bd', '#17301f', '#50735e', '#17804a', '#ffffff', '#c2ebd2']),
-  scheme('yellow', '黃', false, ['#fffbe8', '#fff5c9', '#ffeea8', '#ecd77a', '#3a3210', '#7a6c30', '#8f6d00', '#ffffff', '#ffe98f']),
-  scheme('orange', '橘', false, ['#fff5ec', '#ffe8d3', '#ffd9b8', '#f2bb8c', '#3d2410', '#85603f', '#bf5a09', '#ffffff', '#ffd2a8']),
-  scheme('gray-light', '淺灰', false, ['#eef0f2', '#e3e6e9', '#d6dade', '#bfc5cc', '#1f2429', '#5d6670', '#44627f', '#ffffff', '#cfd9e3']),
-  scheme('off-white', '稍深白', false, ['#f6f4ee', '#edeae1', '#e3dfd3', '#cfc9b9', '#2a2822', '#6b6659', '#6e5f32', '#ffffff', '#e4dcc3']),
+  { id: 'default', label: '預設', color: null, shade: null },
+  tint('pink-dark', '深桃紅', '#d6337f', '#a81f5f'),
+  tint('pink-light', '淺桃紅', '#ff9cc4', '#f070a4'),
+  tint('blue-dark', '深藍', '#1f5fbf', '#174a96'),
+  tint('blue-light', '淺藍', '#7db8f5', '#4a9bea'),
+  tint('green-dark', '深綠', '#1f8a4c', '#166a39'),
+  tint('green-light', '淺綠', '#8fdcae', '#5fc48a'),
+  tint('yellow', '黃', '#f5cc3d', '#dba91a'),
+  tint('orange', '橘', '#f59a3d', '#db7a1a'),
+  tint('gray-light', '淺灰', '#c3c9d1', '#a3abb5'),
+  tint('off-white', '稍深白', '#ece8dc', '#d3cdbb'),
 ];
-const ALL_VARS = Object.keys(TINTS[1].vars);
 export const currentTint = () => TINTS.find((t) => t.id === getSettings().style.tint) || TINTS[0];
 
 function applyTint() {
-  const tint = currentTint();
+  const t = currentTint();
   const root = document.documentElement;
-  for (const name of ALL_VARS) {
-    if (tint.vars) root.style.setProperty(name, tint.vars[name]);
-    else root.style.removeProperty(name);
+  if (t.color) {
+    root.style.setProperty('--folder', t.color); // folder front
+    root.style.setProperty('--folder-dark', t.shade); // folder tab
+    root.style.setProperty('--select', `color-mix(in srgb, ${t.shade} 26%, var(--surface))`);
+  } else {
+    for (const name of ['--folder', '--folder-dark', '--select']) root.style.removeProperty(name);
   }
-  // Native controls and scrollbars follow the scheme too.
-  root.style.colorScheme = tint.dark == null ? '' : tint.dark ? 'dark' : 'light';
-  root.dataset.tint = tint.id;
+  root.dataset.tint = t.id;
 }
 
 // ---- wallpaper

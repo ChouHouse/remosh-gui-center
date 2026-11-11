@@ -138,8 +138,9 @@ npm run deploy   # publish to Cloudflare
 - **Terminal** (終端機): an interactive shell (xterm.js + an SSH PTY channel).
   Opening a file with it sets the file to mode 777 and runs it as `./name`
   from its folder.
-- **Settings** (設定): categories on the left (動畫: on/off and speed; 檔案關聯; 樣式: window tint and
-  wallpaper — the last five uploads are kept in `~/.remosh-gui/wallpaper`). 儲存 writes `~/.remosh-gui/setting.json` on the SSH host, so settings
+- **Settings** (設定): categories on the left (動畫: on/off and speed; 檔案關聯; 樣式: a tint colour for folder icons,
+  selection and the editor cursor, and a wallpaper — the last five uploads are
+  kept in `~/.remosh-gui/wallpaper`). 儲存 writes `~/.remosh-gui/setting.json` on the SSH host, so settings
   follow the account, and they are read back at login. Add a setting in
   `core/settings.js` and a category in `apps/settings/index.js`.
 
