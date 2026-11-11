@@ -22,14 +22,14 @@
     <div class="sm-title">工具</div>
     <div id="sm-apps"></div>
     <div class="sm-sep"></div>
-    <div id="sm-logout-row" hidden>
-      <button type="button" id="disconnect" role="menuitem">登出</button>
-    </div>
     <button type="button" id="sm-user" aria-expanded="false" title="帳號選項">
       <span class="avatar" id="sm-avatar"></span>
       <span class="who"><b id="sm-username"></b><small id="conn-label"></small></span>
       <span class="chev" aria-hidden="true">›</span>
     </button>
+    <div id="sm-logout-row" hidden>
+      <button type="button" id="disconnect" role="menuitem">登出</button>
+    </div>
   </div>
   <nav id="dock" aria-label="工作列">
     <button type="button" id="start-btn" aria-haspopup="menu" aria-expanded="false" title="選單" aria-label="選單">
@@ -70,12 +70,6 @@
       <button type="button" id="key-clear" hidden>移除</button>
     </div>
     <div id="login-error" class="error" role="alert" hidden></div>
-    <div id="hostkey-warn" class="warn" hidden>
-      <strong>主機金鑰和上次不同</strong>
-      <p>這台主機回報的金鑰指紋與瀏覽器記住的不一樣。可能是主機重灌或換了金鑰，也可能有人攔截連線。</p>
-      <p class="fp">上次：<code id="fp-old"></code><br>這次：<code id="fp-new"></code></p>
-      <button type="button" id="trust-new">信任新的金鑰並繼續</button>
-    </div>
     <button type="submit" id="login-btn" class="primary">登入</button>
     <p class="note">密碼與私鑰只用於連線，不會被儲存；私鑰會傳到 Worker 進行登入。</p>
   </form>

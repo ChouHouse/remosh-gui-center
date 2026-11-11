@@ -70,7 +70,7 @@ public/
   js/
     main.js             imports the apps (start-menu order) and boots
     core/               dom, store, errors, ui, format, path, icons, events, rpc, text-codec, settings
-    shell/              wm (windows), menubar, context-menu, login, start-menu, clock,
+    shell/              wm (windows), menubar, context-menu, login, gate, start-menu, clock, style,
                         desktop, apps (registry), file-open (associations)
     apps/
       files/            檔案櫃
@@ -105,9 +105,8 @@ Apps do not import each other. They talk through `core/events.js`
 
 Log in with a password or a private key file (OpenSSH / PEM / PPK; RSA, ECDSA
 or Ed25519, optionally passphrase-protected). Neither is stored; the key text is
-sent to the Worker over the WebSocket for the login and kept only in memory. The browser
-remembers each host's key fingerprint (trust on first use) and warns when it
-changes.
+sent to the Worker over the WebSocket for the login and kept only in memory. Host keys are not remembered or checked, so a host that is recreated with a new key
+connects without a warning (and a changed key is not detected).
 
 ## Run
 
@@ -139,7 +138,8 @@ npm run deploy   # publish to Cloudflare
 - **Terminal** (終端機): an interactive shell (xterm.js + an SSH PTY channel).
   Opening a file with it sets the file to mode 777 and runs it as `./name`
   from its folder.
-- **Settings** (設定): categories on the left (動畫: on/off and speed; 檔案關聯). 儲存 writes `~/.remosh-gui/setting.json` on the SSH host, so settings
+- **Settings** (設定): categories on the left (動畫: on/off and speed; 檔案關聯; 樣式: window tint and
+  wallpaper — the last five uploads are kept in `~/.remosh-gui/wallpaper`). 儲存 writes `~/.remosh-gui/setting.json` on the SSH host, so settings
   follow the account, and they are read back at login. Add a setting in
   `core/settings.js` and a category in `apps/settings/index.js`.
 

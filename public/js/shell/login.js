@@ -1,8 +1,9 @@
-// Login overlay: host / user / password or private key, host-key trust.
+// Login overlay: host / user / password or private key.
+// Host keys are deliberately not remembered: hosts here are often containers
+// that get a new key every time they are recreated.
 import { $ } from '../core/dom.js';
 import { store } from '../core/store.js';
 import { errText } from '../core/errors.js';
-import { toast } from '../core/ui.js';
 import { conn, rpc, openSocket } from '../core/rpc.js';
 import { on, emit } from '../core/events.js';
 import { ensureGate } from './gate.js';
@@ -14,7 +15,6 @@ const fPort = $('#f-port');
 const fUser = $('#f-user');
 const fPass = $('#f-pass');
 const loginErr = $('#login-error');
-const hostkeyWarn = $('#hostkey-warn');
 
 // Private key text stays in memory only (never in localStorage).
 let keyText = '';
@@ -47,20 +47,16 @@ export function showLogin(message, relogin) {
   $('#login-sub').textContent = message || '連線到 SSH 主機，瀏覽並編輯上面的檔案';
   for (const f of [fHost, fPort, fUser]) f.readOnly = !!relogin;
   loginErr.hidden = true;
-  hostkeyWarn.hidden = true;
   fPass.value = '';
   (fHost.value && fUser.value ? fPass : fHost.value ? fUser : fHost).focus();
 }
 
-async function doLogin(trustNew) {
+async function doLogin() {
   const host = fHost.value.trim();
   const port = Number(fPort.value) || 22;
   const username = fUser.value;
-  const key = `${host}:${port}`;
-  const known = store.get('hostkeys', {});
   const btn = $('#login-btn');
   loginErr.hidden = true;
-  hostkeyWarn.hidden = true;
   btn.disabled = true;
   btn.textContent = '連線中…';
   let ws;
@@ -73,13 +69,7 @@ async function doLogin(trustNew) {
       port,
       username,
       ...(keyText ? { privateKey: keyText, passphrase: fPass.value } : { password: fPass.value }),
-      expectedFingerprint: trustNew ? undefined : known[key],
     });
-    if (known[key] !== res.fingerprint) {
-      toast(`已記住 ${key} 的主機金鑰指紋：${res.fingerprint}`);
-      known[key] = res.fingerprint;
-      store.set('hostkeys', known);
-    }
     store.set('last', { host, port, username });
     const resume = !!conn.info; // set when the previous session dropped rather than logged out
     conn.info = res;
@@ -94,14 +84,8 @@ async function doLogin(trustNew) {
       conn.ws = null;
       ws.close();
     }
-    if (err.code === 'hostkey-changed') {
-      $('#fp-old').textContent = known[key] || '';
-      $('#fp-new').textContent = err.detail?.fingerprint || '';
-      hostkeyWarn.hidden = false;
-    } else {
-      loginErr.textContent = errText(err);
-      loginErr.hidden = false;
-    }
+    loginErr.textContent = errText(err);
+    loginErr.hidden = false;
   } finally {
     btn.disabled = false;
     btn.textContent = '登入';
@@ -110,9 +94,8 @@ async function doLogin(trustNew) {
 
 form.addEventListener('submit', (ev) => {
   ev.preventDefault();
-  doLogin(false);
+  doLogin();
 });
-$('#trust-new').addEventListener('click', () => doLogin(true));
 
 on('conn:lost', () => showLogin('連線已中斷，請重新輸入密碼登入。開著的視窗會保留。', true));
 on('session:end', () => {
@@ -121,6 +104,7 @@ on('session:end', () => {
 });
 
 export function initLogin() {
+  store.remove('hostkeys'); // fingerprints remembered by earlier versions
   const last = store.get('last', null);
   if (last) {
     fHost.value = last.host || '';

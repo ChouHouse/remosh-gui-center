@@ -19,7 +19,16 @@ const DEFAULTS = {
     associations: {}, // extension ('' = no extension) -> app id
     sidebar: null, // file cabinet sidebar folders; null = the built-in list
   },
+  style: {
+    tint: 'default', // colour scheme of the windows; see shell/style.js
+    wallpaper: null, // file name in ~/.remosh-gui/wallpaper currently shown, or null
+    wallpapers: [], // the last few uploads, most recently used first
+  },
 };
+
+export const WALLPAPER_DIR = 'wallpaper';
+export const MAX_WALLPAPERS = 5;
+const FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
 
 export const EXT_PATTERN = /^[a-z0-9_+-]{0,16}$/;
 
@@ -40,6 +49,16 @@ function normalise(obj) {
       speed: Object.hasOwn(ANIMATION_SPEEDS, a?.speed) ? a.speed : DEFAULTS.animation.speed,
     },
     files: { associations, sidebar },
+    style: normaliseStyle(obj?.style),
+  };
+}
+
+function normaliseStyle(st) {
+  const wallpapers = [...new Set((Array.isArray(st?.wallpapers) ? st.wallpapers : []).filter((n) => typeof n === 'string' && FILE_NAME.test(n)))].slice(0, MAX_WALLPAPERS);
+  return {
+    tint: typeof st?.tint === 'string' && /^[a-z-]{1,24}$/.test(st.tint) ? st.tint : DEFAULTS.style.tint,
+    wallpaper: wallpapers.includes(st?.wallpaper) ? st.wallpaper : null,
+    wallpapers,
   };
 }
 
@@ -53,6 +72,7 @@ function apply() {
 export const getSettings = () => structuredClone(current);
 export const settingsDir = () => P.join(conn.info.home, SETTINGS_DIR);
 export const settingsPath = () => P.join(settingsDir(), SETTINGS_FILE);
+export const wallpaperDir = () => P.join(settingsDir(), WALLPAPER_DIR);
 // Duration of UI transitions; 0 when animations are switched off.
 export const animationMs = () => (current.animation.enabled ? ANIMATION_SPEEDS[current.animation.speed] : 0);
 

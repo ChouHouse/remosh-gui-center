@@ -8,6 +8,13 @@ export const store = {
       return fallback;
     }
   },
+  remove(key) {
+    try {
+      localStorage.removeItem('sshdesk.' + key);
+    } catch {
+      /* storage unavailable */
+    }
+  },
   set(key, value) {
     try {
       localStorage.setItem('sshdesk.' + key, JSON.stringify(value));

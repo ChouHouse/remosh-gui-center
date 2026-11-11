@@ -1,6 +1,7 @@
 // Entry point. Importing an app module registers it; the order here is the
 // order of the start menu.
 import './shell/desktop.js';
+import './shell/style.js';
 import './apps/files/index.js';
 import './apps/editor/index.js';
 import './apps/notepad/index.js';

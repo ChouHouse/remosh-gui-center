@@ -1,5 +1,5 @@
 /* ---------- desktop shell ---------- */
-#desktop { position: fixed; inset: 0; display: flex; flex-direction: column; }
+#desktop { position: fixed; inset: 0; display: flex; flex-direction: column; background: center / cover no-repeat; }
 #windows { position: relative; flex: 1; min-height: 0; overflow: hidden; isolation: isolate; }
 
 #dock {
@@ -47,8 +47,13 @@
 #start-menu .who b, #start-menu .who small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #start-menu .who small { color: var(--muted); font-size: 11px; }
 #start-menu .chev { color: var(--muted); transition: transform .12s; }
-#sm-user[aria-expanded="true"] .chev { transform: rotate(-90deg); }
-#start-menu #disconnect { color: var(--danger); padding-left: 50px; }
+#sm-user[aria-expanded="true"] { background: var(--surface-3); }
+/* Logout flies out to the right of the user row. */
+#sm-logout-row {
+  position: absolute; left: calc(100% + 6px); bottom: 6px; min-width: 120px; padding: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow);
+}
+#start-menu #disconnect { color: var(--danger); white-space: nowrap; }
 
 /* ---------- windows ---------- */
 .win {

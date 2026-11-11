@@ -12,6 +12,7 @@ import { on } from '../../core/events.js';
 import { getSettings, saveSettings, SETTINGS_DIR, SETTINGS_FILE } from '../../core/settings.js';
 import { createWindow } from '../../shell/wm.js';
 import { registerApp, getApp, appsForExt } from '../../shell/apps.js';
+import { TINTS, setTint, uploadWallpaper, useWallpaper, clearWallpaper, wallpaperUrl } from '../../shell/style.js';
 
 const row = (title, desc, control) =>
   h('div', { class: 'set-row' }, h('div', { class: 'set-text' }, h('b', null, title), h('small', null, desc)), control);
@@ -80,6 +81,69 @@ const CATEGORIES = [
         list);
     },
   },
+  {
+    id: 'style',
+    label: '樣式',
+    // Unlike the other categories, changes here take effect and are saved at
+    // once (a wallpaper is a file on the host, not just a value).
+    render(draft) {
+      const fail = (what) => (err) => toast(`${what}：${errText(err)}`, true);
+      const swatches = h('div', { class: 'tint-grid' }, TINTS.map((t) =>
+        h('button', {
+          type: 'button',
+          class: 'tint' + (draft.style.tint === t.id ? ' current' : ''),
+          'data-tint': t.id,
+          'aria-pressed': String(draft.style.tint === t.id),
+          onclick: () => setTint(t.id).catch(fail('無法儲存色調')),
+        },
+        h('span', { class: 'chip', style: t.vars ? `background:${t.vars['--surface']};border-color:${t.vars['--border']}` : '' },
+          h('i', { style: t.vars ? `background:${t.vars['--accent']}` : '' })),
+        t.label)));
+
+      const picker = h('input', { type: 'file', accept: 'image/*', id: 'wp-file', hidden: true });
+      const upload = h('button', { type: 'button', id: 'wp-upload', onclick: () => picker.click() }, '上傳壁紙…');
+      picker.addEventListener('change', async () => {
+        const file = picker.files[0];
+        picker.value = '';
+        if (!file) return;
+        upload.disabled = true;
+        upload.textContent = '上傳中…';
+        try {
+          await uploadWallpaper(file);
+        } catch (err) {
+          fail('無法上傳壁紙')(err);
+          upload.disabled = false;
+          upload.textContent = '上傳壁紙…';
+        }
+      });
+      const thumbs = h('div', { class: 'wp-list' }, draft.style.wallpapers.length
+        ? draft.style.wallpapers.map((name) => {
+          const using = draft.style.wallpaper === name;
+          const b = h('button', {
+            type: 'button',
+            class: 'wp' + (using ? ' current' : ''),
+            'data-name': name,
+            title: using ? '使用中' : '改用這張（會變成最新的一張）',
+            onclick: () => useWallpaper(name).catch(fail('無法切換壁紙')),
+          }, using && h('span', { class: 'badge' }, '使用中'));
+          wallpaperUrl(name).then((url) => {
+            b.style.backgroundImage = `url("${url}")`;
+          }, () => b.classList.add('missing'));
+          return b;
+        })
+        : h('p', { class: 'assoc-empty' }, '還沒有上傳過壁紙。'));
+      return h('div', null,
+        h('h2', null, '樣式'),
+        h('p', { class: 'set-desc' }, '這一頁的變更會立刻套用並儲存。'),
+        h('h3', null, '色調'),
+        swatches,
+        h('h3', null, '壁紙'),
+        h('p', { class: 'set-desc' }, '保留最近 5 張，存在主機的 ~/.remosh-gui/wallpaper。點舊的那張就會換回去，並排到最前面。'),
+        thumbs,
+        h('div', { class: 'wp-actions' }, picker, upload,
+          h('button', { type: 'button', id: 'wp-none', disabled: !draft.style.wallpaper, onclick: () => clearWallpaper().catch(fail('無法儲存')) }, '不使用壁紙')));
+    },
+  },
 ];
 
 let win = null;
@@ -132,7 +196,15 @@ function openSettings() {
   // Settings can change behind this window (e.g. a new file association is
   // remembered); follow along unless the user has unsaved edits here.
   const off = on('settings:changed', (next) => {
-    if (saving || JSON.stringify(draft) !== saved) return;
+    if (saving) return;
+    if (JSON.stringify(draft) !== saved) {
+      // Unsaved edits in another category: keep them, but 樣式 saves on its
+      // own, so take its new values into both the draft and the baseline.
+      draft.style = next.style;
+      saved = JSON.stringify({ ...JSON.parse(saved), style: next.style });
+      if (active.id === 'style') show(active);
+      return;
+    }
     Object.assign(draft, next);
     saved = JSON.stringify(draft);
     show(active);

@@ -90,6 +90,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.click('#login-btn');
   await page.waitForSelector('#desktop:not([hidden])', { timeout: 30000 });
   check(await page.isHidden('#login'), 'login overlay closes');
+  check((await page.evaluate(() => localStorage.getItem('sshdesk.hostkeys'))) === null && (await page.locator('.toast').count()) === 0, 'the host key fingerprint is not remembered or announced');
   check((await page.$$('.win')).length === 0 && (await page.$$('.dock-item')).length === 0, 'no app opens by itself after login');
   check((await page.locator('#start-btn').innerText()).trim() === '' && (await page.locator('#start-btn circle').count()) === 3, 'start button is an icon with three dots, no text');
   const dotFills = await page.$$eval('#start-btn circle', (els) => els.map((e) => getComputedStyle(e).fill));
@@ -595,7 +596,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const sw = page.locator('.win', { has: page.locator('.set-main') });
   await sw.waitFor();
   check((await sw.locator('.titlebar .title').textContent()) === '設定', 'settings window opens from the start menu');
-  check((await sw.locator('.set-nav button').allTextContents()).join() === '動畫,檔案關聯', 'settings has the 動畫 and 檔案關聯 categories');
+  check((await sw.locator('.set-nav button').allTextContents()).join() === '動畫,檔案關聯,樣式', 'settings has the 動畫, 檔案關聯 and 樣式 categories');
   check((await sw.locator('.set-path').textContent()) === '~/.remosh-gui/setting.json', 'it shows where settings are stored');
   check(await page.isChecked('#set-anim-enabled') && (await page.inputValue('#set-anim-speed')) === 'normal', 'defaults: animations on, normal speed');
   check(await page.isDisabled('#set-save'), 'nothing to save yet');
@@ -622,6 +623,45 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await sleep(40);
   check(Math.round((await sw.boundingBox()).width) === Math.round(swBox.width), 'and so is restore');
 
+  // ---- settings: 樣式 (tint and wallpaper), applied and saved at once
+  await sw.locator('.set-nav button', { hasText: '樣式' }).click();
+  check((await sw.locator('.tint').count()) === 11, 'ten tints plus the default');
+  check((await sw.locator('.tint').allTextContents()).join() === '預設（跟隨系統）,深桃紅,淺桃紅,深藍,淺藍,深綠,淺綠,黃,橘,淺灰,稍深白', 'tint names');
+  await sw.locator('.tint[data-tint="blue-dark"]').click();
+  check(await waitSetting((st) => st.style?.tint === 'blue-dark'), 'choosing a tint saves it without pressing 儲存');
+  await sw.locator('.tint.current[data-tint="blue-dark"]').waitFor({ timeout: 5000 }).catch(() => {});
+  check((await sw.evaluate((el) => getComputedStyle(el).backgroundColor)) === 'rgb(27, 35, 51)', 'windows take the tint colour', await sw.evaluate((el) => getComputedStyle(el).backgroundColor));
+  check((await sw.locator('.tint.current').getAttribute('data-tint')) === 'blue-dark', 'the chosen tint is marked');
+  const wpDir = home + '/.remosh-gui/wallpaper';
+  const shot = '/tmp/remosh-wp-test.png';
+  await page.screenshot({ path: shot });
+  for (let i = 1; i <= 6; i++) {
+    await page.setInputFiles('#wp-file', shot);
+    await waitSetting((st) => st.style.wallpapers.length === Math.min(i, 5) && st.style.wallpaper === st.style.wallpapers[0] && fs.readdirSync(wpDir).length === Math.min(i, 5));
+    await sleep(150);
+    if (i === 1) {
+      check(fs.readdirSync(wpDir).length === 1 && /^wp-\d+\.jpg$/.test(fs.readdirSync(wpDir)[0]), 'upload stores the picture in ~/.remosh-gui/wallpaper');
+      await page.waitForFunction(() => document.querySelector('#desktop').style.backgroundImage.includes('blob:'));
+      check(true, 'and shows it on the desktop');
+    }
+  }
+  let style = readSettings().style;
+  check(style.wallpapers.length === 5 && fs.readdirSync(wpDir).sort().join() === [...style.wallpapers].sort().join(), 'only the last five are kept, on disk and in setting.json', JSON.stringify(style.wallpapers) + ' / ' + fs.readdirSync(wpDir).join());
+  check([...style.wallpapers].sort().reverse().join() === style.wallpapers.join(), 'newest first');
+  await sw.locator('.wp').nth(4).waitFor();
+  const oldest = style.wallpapers[4];
+  const wasNewest = style.wallpapers[0];
+  await sw.locator(`.wp[data-name="${oldest}"]`).click();
+  check(await waitSetting((st) => st.style.wallpaper === oldest && st.style.wallpapers[0] === oldest && st.style.wallpapers[1] === wasNewest && st.style.wallpapers.length === 5), 'picking an old wallpaper makes it the newest and shifts the others back');
+  await sw.locator(`.wp.current[data-name="${oldest}"]`).waitFor();
+  await page.click('#wp-none');
+  check(await waitSetting((st) => st.style.wallpaper === null && st.style.wallpapers.length === 5), '"no wallpaper" keeps the history');
+  await page.waitForFunction(() => !document.querySelector('#desktop').style.backgroundImage);
+  await sw.locator('.tint[data-tint="default"]').click();
+  check(await waitSetting((st) => st.style.tint === 'default'), 'back to the default tint');
+  await page.waitForFunction(() => !document.documentElement.style.getPropertyValue('--surface'));
+  fs.rmSync(shot, { force: true });
+
   // ---- settings: 檔案關聯 lists what was remembered and lets it be changed
   await sw.locator('.set-nav button', { hasText: '檔案關聯' }).click();
   const rowExts = await sw.locator('.assoc-row code').allTextContents();
@@ -641,6 +681,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.click('#start-btn');
   await page.click('#sm-user');
   check(await page.isVisible('#disconnect'), 'clicking the user reveals logout');
+  const menuBox = await page.locator('#start-menu').boundingBox();
+  const userBox = await page.locator('#sm-user').boundingBox();
+  const outBox = await page.locator('#disconnect').boundingBox();
+  check(outBox.x >= menuBox.x + menuBox.width && outBox.y + outBox.height > userBox.y && outBox.y < userBox.y + userBox.height + 8, 'logout opens to the right of the user row, not above it', JSON.stringify([menuBox, userBox, outBox]));
   await page.click('#disconnect');
   await page.waitForSelector('#login:not([hidden])');
   check(await page.isHidden('#desktop') && (await page.inputValue('#f-pass')) === '', 'disconnect returns to an empty password prompt');
