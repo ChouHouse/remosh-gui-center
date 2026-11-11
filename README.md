@@ -145,8 +145,12 @@ npm run deploy   # publish to Cloudflare
 - **Full screen** after a successful login (and from the start menu); logging
   out leaves it.
 - **Start menu** (bottom left): pinned apps and 所有應用程式; right-click an app to
-  pin or unpin it, or drag it onto the desktop. Click the user for full screen
-  and 登出.
+  pin or unpin it, or drag it onto the desktop. Click the user for 切換使用者,
+  full screen and 登出.
+- **Several users at once**: 切換使用者 signs another user in while the current one
+  stays connected; signed-in users are listed on the user card and at the bottom
+  left of the login screen, and one click switches back without a password.
+  Each extra user is the same page in a full-size frame (`shell/sessions.js`).
 - **Desktop**: shows whatever is in `~/.remosh-gui/desktop`. New icons fill
   columns from the top left; an icon dragged to another grid cell stays there
   (positions are an array of `{ name, col, row }` in
@@ -165,7 +169,8 @@ npm run deploy   # publish to Cloudflare
 - **File cabinet** (檔案櫃): any number of windows; each re-reads its folder every 4 s. Right-click a file
   for 開啟 / 開啟程式… / 複製 / 剪下 / 貼上 / 重新命名 / 刪除 / 內容, empty space for
   新增資料夾 / 在這裡開啟終端機; right-click the sidebar to add or remove folders.
-  Copy and cut put `remosh/file:<path>` on the clipboard.
+  Copy and cut put `remosh/file:<path><<id>>` on the clipboard; the id names the
+  server and account, and pasting files with another id is refused.
 - **File associations**: every app declares the extensions it accepts
   (`extensions: 'all'` or a list). The first time an extension is opened the
   user is asked which app to use and the answer is remembered; 設定 → 檔案關聯

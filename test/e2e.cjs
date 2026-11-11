@@ -621,7 +621,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await toFinder();
   await item('todo.txt').click({ button: 'right' });
   await pick('複製');
-  check((await page.evaluate(() => navigator.clipboard.readText())) === 'remosh/file:' + home + '/docs/todo.txt', 'copy puts remosh/file:<path> on the clipboard');
+  const clip1 = await page.evaluate(() => navigator.clipboard.readText());
+  const clipId = (text) => /<<([0-9a-f]{12})>>$/.exec(text)?.[1];
+  check(clip1 === `remosh/file:${home}/docs/todo.txt<<${clipId(clip1)}>>` && !!clipId(clip1), 'copy puts remosh/file:<path><<id>> on the clipboard', clip1);
   const blank = async () => {
     const b = await page.locator('.files').boundingBox();
     await page.mouse.click(b.x + b.width - 30, b.y + b.height - 30, { button: 'right' });
@@ -1126,6 +1128,86 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check(assoc.txt === 'editor' && !('bin' in assoc), 'association edits are saved', JSON.stringify(assoc));
   check(readSettings().animation.enabled === false, 'saving associations keeps the other settings');
 
+  // ---- switch user: several signed-in users in one tab (needs a second account: SSH_USER2 / SSH_PW2)
+  const user2 = process.env.SSH_USER2;
+  if (user2) {
+    const home2 = '/home/' + user2;
+    process.on('exit', () => fs.rmSync(home2 + '/.remosh-gui', { recursive: true, force: true }));
+    const sessionFrame = async () => {
+      for (let i = 0; i < 50; i++) {
+        const f = page.frames().find((x) => /[?&]session=/.test(x.url()));
+        if (f) return f;
+        await sleep(100);
+      }
+      throw new Error('no session frame');
+    };
+    const label1 = `${user}@${host}:${port}`;
+    await page.click('#start-btn');
+    await page.click('#sm-user');
+    const cardButtons = await page.locator('#sm-logout-row > button:not([hidden])').evaluateAll((els) => els.map((e) => e.textContent.trim() + (e.querySelector('svg') ? '*' : '')));
+    check(cardButtons.join('|') === '切換使用者*|離開全螢幕*|登出*', 'the user card: switch user, full screen, log out, each with an icon', cardButtons.join('|'));
+    await page.click('#sm-switch');
+    let f2 = await sessionFrame();
+    await f2.waitForSelector('#login:not([hidden])');
+    const kept = f2.locator('#kept-sessions button');
+    await kept.waitFor();
+    const keptBox = await kept.boundingBox();
+    check((await kept.textContent()).trim().endsWith(label1) && keptBox.x < 40 && keptBox.y > 700, 'the login screen for another user lists the signed-in one at the bottom left', JSON.stringify(keptBox));
+    await kept.click();
+    await page.waitForFunction(() => !document.querySelector('.session-frame'));
+    check(await page.isVisible('#desktop') && await page.isHidden('#login'), 'clicking it goes straight back; the unused login screen is dropped');
+    await page.click('#start-btn');
+    await page.click('#sm-user');
+    await page.click('#sm-switch');
+    f2 = await sessionFrame();
+    await f2.fill('#f-host', host);
+    await f2.fill('#f-port', String(port));
+    await f2.fill('#f-user', user2);
+    await f2.fill('#f-pass', process.env.SSH_PW2);
+    await f2.click('#login-btn');
+    await f2.waitForSelector('#desktop:not([hidden])', { timeout: 30000 });
+    check((await f2.textContent('#conn-label')).startsWith(user2 + '@') && (await f2.locator('.win').count()) === 0, 'a second user signs in with their own empty desktop');
+    await f2.click('#start-btn');
+    await f2.click('#sm-files');
+    const item2 = f2.locator('.files .item', { has: f2.locator('.name', { hasText: /^two\.txt$/ }) });
+    await item2.click({ button: 'right' });
+    await f2.locator('.ctx-menu button', { hasText: '複製' }).click();
+    await sleep(200);
+    const clip2 = await page.evaluate(() => navigator.clipboard.readText());
+    check(clip2 === `remosh/file:${home2}/two.txt<<${clipId(clip2)}>>` && clipId(clip2) !== clipId(clip1), 'a different account gets a different id', clip2 + ' vs ' + clip1);
+    await f2.click('#start-btn');
+    await f2.click('#sm-user');
+    check((await f2.locator('#sm-sessions .sm-session').textContent()).trim().endsWith(label1), 'the other signed-in user is listed on the user card');
+    const t0 = Date.now();
+    await f2.locator('#sm-sessions .sm-session').click();
+    await page.waitForFunction(() => document.querySelector('.session-frame').hidden);
+    check(Date.now() - t0 < 1500 && await page.isHidden('#login') && await page.isVisible('#desktop'), 'switching back is immediate and asks for no password');
+    await toFinder();
+    await page.click('button[title="重新整理"]');
+    await item('hello.sh').waitFor();
+    check(true, 'the first user\'s connection is still alive');
+    await blank();
+    await pick('貼上');
+    check(await page.locator('.toast.err', { hasText: '不可跨域貼上' }).first().waitFor({ timeout: 5000 }).then(() => true, () => false) && !fs.existsSync(home + '/project/two.txt'), 'pasting files copied under another account is refused: 不可跨域貼上');
+    await page.click('#start-btn');
+    await page.click('#sm-user');
+    await page.locator('#sm-sessions .sm-session').click();
+    await page.waitForFunction(() => !document.querySelector('.session-frame').hidden);
+    await f2.click('button[title="重新整理"]');
+    await item2.waitFor();
+    check((await f2.locator('.win').count()) === 1, 'the second user is exactly as they left it, still connected');
+    await f2.click('#start-btn');
+    await f2.click('#sm-user');
+    await f2.click('#disconnect');
+    await page.waitForFunction(() => !document.querySelector('.session-frame'));
+    check(await page.isVisible('#desktop') && await page.evaluate(() => !!document.fullscreenElement), 'logging the second user out returns to the first, still full screen');
+    await page.click('#start-btn');
+    await page.click('#sm-user');
+    check((await page.locator('#sm-sessions .sm-session').count()) === 0, 'and they are gone from the list');
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('#start-menu', { state: 'hidden' });
+  }
+
   // ---- log out from the start menu
   await page.click('#start-btn');
   await page.click('#sm-user');
@@ -1137,7 +1219,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.click('#disconnect');
   await page.waitForSelector('#login:not([hidden])');
   check(await page.isHidden('#desktop') && (await page.inputValue('#f-pass')) === '', 'disconnect returns to an empty password prompt');
-  check(!(await page.evaluate(() => !!document.fullscreenElement)), 'logging out leaves full screen');
+  check(await page.waitForFunction(() => !document.fullscreenElement, null, { timeout: 3000 }).then(() => true, () => false), 'logging out (the last user) leaves full screen');
 
   // ---- settings follow the account: log in again and they are loaded from the host
   check(!(await page.evaluate(() => document.documentElement.classList.contains('no-anim'))), 'logout resets settings to defaults');

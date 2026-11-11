@@ -170,7 +170,10 @@ export class Session {
         }
       });
       const home = await call(sftp, 'realpath', '.');
-      return { home, fingerprint, username, host, port };
+      // Same server and account -> same id, in every tab; used to refuse pasting
+      // files copied from somewhere else.
+      const domain = createHash('sha256').update(`${fingerprint}\0${username}`).digest('hex').slice(0, 12);
+      return { home, fingerprint, username, host, port, domain };
     } catch (err) {
       try {
         client.end();

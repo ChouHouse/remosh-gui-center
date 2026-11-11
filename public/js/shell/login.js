@@ -1,12 +1,13 @@
 // Login overlay: host / user / password or private key.
 // Host keys are deliberately not remembered: hosts here are often containers
 // that get a new key every time they are recreated.
-import { $ } from '../core/dom.js';
+import { $, h } from '../core/dom.js';
 import { store } from '../core/store.js';
 import { errText } from '../core/errors.js';
 import { conn, rpc, openSocket } from '../core/rpc.js';
 import { on, emit } from '../core/events.js';
 import { ensureGate } from './gate.js';
+import { host, otherSessions, onSessionsChange } from './sessions.js';
 
 const loginEl = $('#login');
 const form = $('#login-form');
@@ -103,7 +104,19 @@ on('session:end', () => {
   showLogin();
 });
 
+// Users who are still signed in wait at the bottom left of the login screen.
+function renderKept() {
+  const others = otherSessions();
+  $('#kept-sessions').replaceChildren(...(others.length
+    ? [h('h2', null, '已登入'), ...others.map((s) =>
+      h('button', { type: 'button', 'data-session': s.id, title: `回到 ${s.label}`, onclick: () => host.switchTo(s.id) },
+        h('span', { class: 'avatar' }, [...s.label][0]), h('span', null, s.label)))]
+    : []));
+}
+onSessionsChange(renderKept);
+
 export function initLogin() {
+  renderKept();
   store.remove('hostkeys'); // fingerprints remembered by earlier versions
   const last = store.get('last', null);
   if (last) {

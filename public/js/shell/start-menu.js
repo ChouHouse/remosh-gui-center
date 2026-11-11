@@ -9,6 +9,7 @@ import { getSettings, updateSettings, animationMs } from '../core/settings.js';
 import { listApps, launchApp, getApp } from './apps.js';
 import { showContextMenu } from './context-menu.js';
 import { makeDraggable } from './drag.js';
+import { host, otherSessions, onSessionsChange } from './sessions.js';
 import { logout } from './desktop.js';
 
 const startBtn = $('#start-btn');
@@ -139,6 +140,27 @@ $('#sm-user').addEventListener('click', () => {
   row.hidden = !row.hidden;
   $('#sm-user').setAttribute('aria-expanded', String(!row.hidden));
   if (!row.hidden) $('#disconnect').focus();
+});
+// Other signed-in users: one click switches to them, no password needed.
+function renderSessions() {
+  $('#sm-sessions').replaceChildren(...otherSessions().map((s) =>
+    h('button', {
+      type: 'button',
+      class: 'sm-session',
+      role: 'menuitem',
+      'data-session': s.id,
+      title: `切換到 ${s.label}`,
+      onclick: () => {
+        closeStart();
+        host.switchTo(s.id);
+      },
+    }, h('span', { class: 'avatar' }, [...s.label][0]), h('span', null, s.label))));
+}
+onSessionsChange(renderSessions);
+renderSessions();
+$('#sm-switch').addEventListener('click', () => {
+  closeStart();
+  host.add();
 });
 $('#disconnect').addEventListener('click', () => {
   closeStart();

@@ -1,5 +1,6 @@
 // Entry point. Importing an app module registers it; the order here is the
 // order of the start menu.
+import './shell/sessions.js';
 import './shell/desktop.js';
 import './shell/context-menu.js';
 import './shell/style.js';

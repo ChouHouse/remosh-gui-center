@@ -44,8 +44,10 @@
       <span class="chev" aria-hidden="true">›</span>
     </button>
     <div id="sm-logout-row" hidden>
+      <div id="sm-sessions"></div>
+      <button type="button" id="sm-switch" role="menuitem"><span class="sm-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5.2" r="2.4"/><path d="M1.8 13c.5-2.3 2.1-3.6 4.2-3.6 1 0 1.9.3 2.6.9M11.5 8.5v5M9 11h5"/></svg></span><span>切換使用者</span></button>
       <button type="button" id="sm-fullscreen" role="menuitem" hidden><span class="sm-ico" id="sm-fullscreen-ico"></span><span id="sm-fullscreen-label">全螢幕</span></button>
-      <button type="button" id="disconnect" role="menuitem">登出</button>
+      <button type="button" id="disconnect" role="menuitem"><span class="sm-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 2.5H3.5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3M10.5 5 13.5 8l-3 3M13.5 8H6.5"/></svg></span><span>登出</span></button>
     </div>
   </div>
   <nav id="dock" aria-label="工作列">
@@ -91,6 +93,7 @@
     <button type="submit" id="login-btn" class="primary">登入</button>
     <p class="note">密碼與私鑰不會被儲存。</p>
   </form>
+  <div id="kept-sessions" aria-label="已登入的使用者"></div>
 </div>
 
 <div id="gate" class="overlay" hidden>

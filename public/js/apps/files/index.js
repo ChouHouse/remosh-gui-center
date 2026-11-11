@@ -311,6 +311,7 @@ function createFinder(home, startPath = home) {
   async function paste() {
     const clip = await takeFiles();
     if (!clip) return toast('剪貼簿裡沒有檔案', true);
+    if (clip.foreign) return toast('不可跨域貼上：這些檔案是從另一台主機或另一個帳號複製的', true);
     const dir = st.path;
     const taken = new Set(st.entries.map((e) => e.name));
     let done = 0;
