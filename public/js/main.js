@@ -10,6 +10,7 @@ import './apps/terminal/index.js';
 import './apps/taskman/index.js';
 import './apps/settings/index.js';
 import './shell/clock.js';
+import './shell/fullscreen.js';
 import { initStartMenu } from './shell/start-menu.js';
 import { initLogin } from './shell/login.js';
 import { ensureGate } from './shell/gate.js';

@@ -129,6 +129,10 @@ npm run deploy   # publish to Cloudflare
 
 ## Desktop
 
+- **Installable**: a web app manifest and icons let Safari ("Add to Dock",
+  "Add to Home Screen") and Chrome/Edge install it as an app.
+- **Full screen** after a successful login (and from the start menu); logging
+  out leaves it.
 - **Start menu** (bottom left): the tools — 檔案櫃 (file cabinet) and 工作管理員
   (task manager) — and the signed-in user; click the user for 登出 (log out).
 - **Taskbar**: one entry per open window, clock at the right.

@@ -154,3 +154,7 @@ html.no-anim #sm-logout-row { animation: none; }
   #start-menu { transition: none; }
   #sm-logout-row { animation: none; }
 }
+
+/* Installed on a phone or tablet: keep the taskbar clear of the home indicator. */
+#dock { padding-bottom: env(safe-area-inset-bottom, 0px); height: calc(54px + env(safe-area-inset-bottom, 0px)); }
+#start-menu .sm-ico svg { color: var(--muted); }

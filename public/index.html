@@ -2,8 +2,17 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SSH Desk</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Remosh GUI</title>
+<!-- Installable as an app: Safari "Add to Dock" / "Add to Home Screen", Chrome/Edge "Install". -->
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Remosh GUI">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1b2330">
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/login.css">
 <link rel="stylesheet" href="/css/shell.css">
@@ -22,6 +31,7 @@
     <div class="sm-title">工具</div>
     <div id="sm-apps"></div>
     <div class="sm-sep"></div>
+    <button type="button" id="sm-fullscreen" role="menuitem" hidden><span class="sm-ico" id="sm-fullscreen-ico"></span><span id="sm-fullscreen-label">全螢幕</span></button>
     <button type="button" id="sm-user" aria-expanded="false" title="帳號選項">
       <span class="avatar" id="sm-avatar"></span>
       <span class="who"><b id="sm-username"></b><small id="conn-label"></small></span>
@@ -47,7 +57,7 @@
 
 <div id="login" class="overlay" hidden>
   <form id="login-form" class="card" autocomplete="on">
-    <h1>SSH Desk</h1>
+    <h1>Remosh GUI</h1>
     <p class="sub" id="login-sub">連線到 SSH 主機，瀏覽並編輯上面的檔案</p>
     <div class="row">
       <label class="grow">主機位置
@@ -77,7 +87,7 @@
 
 <div id="gate" class="overlay" hidden>
   <form id="gate-form" class="card" autocomplete="off">
-    <h1>SSH Desk</h1>
+    <h1>Remosh GUI</h1>
     <p class="sub">這個站台需要存取密碼</p>
     <label>存取密碼
       <input id="gate-pass" type="password" autocomplete="off" required>

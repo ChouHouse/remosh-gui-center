@@ -5,7 +5,7 @@ import { animationMs } from '../core/settings.js';
 export const winLayer = $('#windows');
 export const dockItems = $('#dock-items');
 export const setActiveTitle = (t) => {
-  document.title = t ? `${t} — SSH Desk` : 'SSH Desk';
+  document.title = t ? `${t} — Remosh GUI` : 'Remosh GUI';
 };
 export const wm = { wins: [], z: 10, focused: null, cascade: 0 };
 
