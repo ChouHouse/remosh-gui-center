@@ -19,6 +19,9 @@ const DEFAULTS = {
     associations: {}, // extension ('' = no extension) -> app id
     sidebar: null, // file cabinet sidebar folders; null = the built-in list
   },
+  start: {
+    pinned: null, // app ids pinned to the start menu, in order; null = every app
+  },
   style: {
     mode: 'auto', // 'auto' (follow the device), 'light' or 'dark'
     controls: 'left', // which end of the title bar holds close / minimise / maximise
@@ -51,6 +54,11 @@ function normalise(obj) {
       speed: Object.hasOwn(ANIMATION_SPEEDS, a?.speed) ? a.speed : DEFAULTS.animation.speed,
     },
     files: { associations, sidebar },
+    start: {
+      pinned: Array.isArray(obj?.start?.pinned)
+        ? [...new Set(obj.start.pinned.filter((id) => typeof id === 'string' && /^[a-z0-9-]{1,32}$/.test(id)))]
+        : null,
+    },
     style: normaliseStyle(obj?.style),
   };
 }

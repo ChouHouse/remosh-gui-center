@@ -98,6 +98,21 @@ export function createWindow({ title, appName, iconHtml, width, height }) {
     win.el.classList.toggle('maximized', win.maximized);
     win.focus();
   };
+  // Fill the left or right half of the desktop; the previous size comes back
+  // when the window is dragged away again.
+  win.snap = (side) => {
+    if (!win.snapped) {
+      const el = win.el;
+      win.restoreRect = { w: el.offsetWidth, h: el.offsetHeight };
+    }
+    const ms = animationMs();
+    clearTimeout(animTimer);
+    win.el.classList.toggle('animating', ms > 0);
+    if (ms) animTimer = setTimeout(() => win.el.classList.remove('animating'), ms + 60);
+    win.snapped = side;
+    win.el.classList.add('snapped');
+    Object.assign(win.el.style, { left: side === 'left' ? '0' : '50%', top: '0', width: '50%', height: '100%' });
+  };
   win.close = async (force) => {
     if (!force && win.onClose && (await win.onClose()) === false) return false;
     win.destroy?.();
@@ -119,7 +134,7 @@ export function createWindow({ title, appName, iconHtml, width, height }) {
     if (!ev.target.closest('.traffic')) win.toggleMax();
   });
   bar.addEventListener('pointerdown', (ev) => {
-    if (ev.button !== 0 || ev.target.closest('.traffic') || win.maximized) return;
+    if (ev.button !== 0 || ev.target.closest('.traffic')) return;
     dragRect(ev, win, 'move');
   });
   for (const handle of win.el.querySelectorAll('.rs')) {
@@ -139,15 +154,68 @@ export function focusTop() {
   if (next) next.focus();
 }
 
+const SNAP_EDGE = 6; // px from an edge of the desktop that counts as "at the edge"
+
+function snapZone(e, area) {
+  const x = e.clientX - area.left;
+  const y = e.clientY - area.top;
+  if (y <= SNAP_EDGE) return 'max';
+  if (x <= SNAP_EDGE) return 'left';
+  if (x >= area.width - SNAP_EDGE) return 'right';
+  return null;
+}
+
 export function dragRect(ev, win, mode) {
   ev.preventDefault();
   const el = win.el;
   const area = winLayer.getBoundingClientRect();
-  const start = { x: ev.clientX, y: ev.clientY, l: el.offsetLeft, t: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight };
+  let start = { x: ev.clientX, y: ev.clientY, l: el.offsetLeft, t: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight };
   const MIN_W = 320;
   const MIN_H = 200;
+  let zone = null;
+  let preview = null;
+  let lifted = false; // a maximised or snapped window has been pulled back to its normal size
+  if (mode !== 'move' && win.snapped) {
+    // Resizing a snapped window makes it an ordinary window of that size.
+    win.snapped = null;
+    el.classList.remove('snapped');
+    Object.assign(el.style, { left: start.l + 'px', top: start.t + 'px', width: start.w + 'px', height: start.h + 'px' });
+  }
   document.body.classList.add('dragging');
+  const showPreview = (z) => {
+    if (z === zone) return;
+    zone = z;
+    if (!z) {
+      preview?.remove();
+      preview = null;
+      return;
+    }
+    if (!preview) {
+      // Grow out of the window's own outline.
+      preview = document.createElement('div');
+      preview.className = 'snap-preview';
+      Object.assign(preview.style, { left: el.offsetLeft + 'px', top: el.offsetTop + 'px', width: el.offsetWidth + 'px', height: el.offsetHeight + 'px' });
+      winLayer.append(preview);
+      void preview.offsetWidth;
+    }
+    Object.assign(preview.style, { left: z === 'right' ? '50%' : '0', top: '0', width: z === 'max' ? '100%' : '50%', height: '100%' });
+  };
   const move = (e) => {
+    if (mode === 'move' && !lifted && (win.maximized || win.snapped)) {
+      if (Math.hypot(e.clientX - start.x, e.clientY - start.y) < 5) return;
+      // Pull it off the edge: back to its normal size, kept under the pointer.
+      const ratio = (start.x - area.left - el.offsetLeft) / el.offsetWidth;
+      const w = win.snapped ? win.restoreRect.w : parseFloat(el.style.width) || 640;
+      const hgt = win.snapped ? win.restoreRect.h : parseFloat(el.style.height) || 420;
+      win.maximized = false;
+      win.snapped = null;
+      el.classList.remove('maximized', 'snapped', 'animating');
+      const l = e.clientX - area.left - ratio * w;
+      const t = Math.max(0, e.clientY - area.top - 17);
+      Object.assign(el.style, { left: l + 'px', top: t + 'px', width: w + 'px', height: hgt + 'px' });
+      start = { x: e.clientX, y: e.clientY, l, t, w, h: hgt };
+      lifted = true;
+    }
     const dx = e.clientX - start.x;
     const dy = e.clientY - start.y;
     let { l, t, w, h: hh } = start;
@@ -156,6 +224,7 @@ export function dragRect(ev, win, mode) {
       t += dy;
       l = Math.max(80 - w, Math.min(l, area.width - 80));
       t = Math.max(0, Math.min(t, area.height - 34));
+      if (dx || dy) showPreview(snapZone(e, area));
     } else {
       if (mode.includes('e')) w = Math.max(MIN_W, start.w + dx);
       if (mode.includes('s')) hh = Math.max(MIN_H, start.h + dy);
@@ -175,8 +244,32 @@ export function dragRect(ev, win, mode) {
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
     window.removeEventListener('pointercancel', up);
+    const z = zone;
+    showPreview(null);
+    if (z === 'max') {
+      // Keep a sensible size to come back to, then maximise.
+      Object.assign(el.style, { left: Math.max(8, start.l) + 'px', top: '24px', width: start.w + 'px', height: start.h + 'px' });
+      if (!win.maximized) win.toggleMax();
+    } else if (z) {
+      Object.assign(el.style, { width: start.w + 'px', height: start.h + 'px' });
+      win.snap(z);
+    }
   };
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', up);
   window.addEventListener('pointercancel', up);
 }
+
+// "Show desktop": minimise everything, or bring back what was minimised that way.
+let tuckedAway = [];
+export function toggleShowDesktop() {
+  const visible = wm.wins.filter((w) => !w.minimized);
+  if (visible.length) {
+    tuckedAway = visible.sort((a, b) => a.el.style.zIndex - b.el.style.zIndex);
+    for (const w of tuckedAway) w.minimize();
+  } else {
+    for (const w of tuckedAway) if (wm.wins.includes(w)) w.focus();
+    tuckedAway = [];
+  }
+}
+$('#show-desktop').addEventListener('click', toggleShowDesktop);

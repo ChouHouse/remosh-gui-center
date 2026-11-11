@@ -28,16 +28,23 @@
 <div id="desktop" hidden>
   <main id="windows"></main>
   <div id="start-menu" role="menu" aria-label="開始選單" hidden>
-    <div class="sm-title">工具</div>
-    <div id="sm-apps"></div>
+    <div id="sm-home">
+      <div class="sm-title">已釘選</div>
+      <div id="sm-apps"></div>
+      <button type="button" id="sm-all-btn" role="menuitem"><span>所有應用程式</span><span class="chev" aria-hidden="true">›</span></button>
+    </div>
+    <div id="sm-all" hidden>
+      <button type="button" id="sm-back" role="menuitem"><span class="chev" aria-hidden="true">‹</span><span>所有應用程式</span></button>
+      <div id="sm-all-list"></div>
+    </div>
     <div class="sm-sep"></div>
-    <button type="button" id="sm-fullscreen" role="menuitem" hidden><span class="sm-ico" id="sm-fullscreen-ico"></span><span id="sm-fullscreen-label">全螢幕</span></button>
     <button type="button" id="sm-user" aria-expanded="false" title="帳號選項">
       <span class="avatar" id="sm-avatar"></span>
       <span class="who"><b id="sm-username"></b><small id="conn-label"></small></span>
       <span class="chev" aria-hidden="true">›</span>
     </button>
     <div id="sm-logout-row" hidden>
+      <button type="button" id="sm-fullscreen" role="menuitem" hidden><span class="sm-ico" id="sm-fullscreen-ico"></span><span id="sm-fullscreen-label">全螢幕</span></button>
       <button type="button" id="disconnect" role="menuitem">登出</button>
     </div>
   </div>
@@ -52,6 +59,7 @@
     </button>
     <div id="dock-items"></div>
     <div id="clock" title=""><span id="clock-time"></span><span id="clock-date"></span></div>
+    <button type="button" id="show-desktop" title="顯示桌面" aria-label="顯示桌面"></button>
   </nav>
 </div>
 

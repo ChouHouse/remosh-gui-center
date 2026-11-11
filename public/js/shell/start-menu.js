@@ -1,9 +1,14 @@
-// Start menu: tools (from the app registry) and the signed-in user with logout.
+// Start menu: pinned apps, a view of all apps, and the signed-in user with
+// full screen and logout.
 import { $, h } from '../core/dom.js';
 import { conn } from '../core/rpc.js';
 import { on } from '../core/events.js';
-import { animationMs } from '../core/settings.js';
-import { listApps, launchApp } from './apps.js';
+import { errText } from '../core/errors.js';
+import { toast } from '../core/ui.js';
+import { getSettings, updateSettings, animationMs } from '../core/settings.js';
+import { listApps, launchApp, getApp } from './apps.js';
+import { showContextMenu } from './context-menu.js';
+import { makeDraggable } from './drag.js';
 import { logout } from './desktop.js';
 
 const startBtn = $('#start-btn');
@@ -29,7 +34,8 @@ function closeStart() {
   document.removeEventListener('keydown', onKey, true);
 }
 function onOutside(ev) {
-  if (!startMenu.contains(ev.target) && !startBtn.contains(ev.target)) closeStart();
+  // Its own right-click menu is drawn outside the panel but belongs to it.
+  if (!startMenu.contains(ev.target) && !startBtn.contains(ev.target) && !ev.target.closest?.('.ctx-menu')) closeStart();
 }
 function onKey(ev) {
   if (ev.key !== 'Escape') return;
@@ -41,6 +47,8 @@ function onKey(ev) {
 function openStart() {
   $('#sm-logout-row').hidden = true;
   $('#sm-user').setAttribute('aria-expanded', 'false');
+  $('#sm-home').hidden = false;
+  $('#sm-all').hidden = true;
   isOpen = true;
   clearTimeout(hideTimer);
   startMenu.inert = false;
@@ -61,19 +69,69 @@ function showUser() {
   $('#conn-label').textContent = `${username}@${host}${port === 22 ? '' : ':' + port}`;
 }
 
+// ---- pinned apps and "all apps"
+const pinnedIds = () => getSettings().start.pinned ?? listApps().map((app) => app.id);
+const setPinned = (ids) =>
+  updateSettings((s) => {
+    s.start.pinned = ids;
+  }, { optimistic: true }).catch((err) => toast(`無法儲存釘選：${errText(err)}`, true));
+export const isPinned = (id) => pinnedIds().includes(id);
+export const pinApp = (id) => (isPinned(id) ? null : setPinned([...pinnedIds(), id]));
+export const unpinApp = (id) => setPinned(pinnedIds().filter((x) => x !== id));
+
+const appButton = (app, prefix) =>
+  h('button', {
+    type: 'button',
+    id: prefix + app.id,
+    role: 'menuitem',
+    'data-app-id': app.id,
+    onclick: () => {
+      closeStart();
+      launchApp(app.id);
+    },
+  }, h('span', { class: 'sm-ico', html: app.icon() }), app.name);
+
+function showView(all) {
+  $('#sm-home').hidden = all;
+  $('#sm-all').hidden = !all;
+  (all ? $('#sm-all-list button') : $('#sm-apps button') || $('#sm-all-btn'))?.focus();
+}
+
+function renderApps() {
+  const pinned = pinnedIds().map(getApp).filter(Boolean);
+  $('#sm-apps').replaceChildren(...(pinned.length
+    ? pinned.map((app) => appButton(app, 'sm-'))
+    : [h('p', { class: 'sm-empty' }, '還沒有釘選的應用程式')]));
+  $('#sm-all-list').replaceChildren(...listApps().map((app) => appButton(app, 'sma-')));
+}
+
 // Call once, after every app module has registered itself.
 export function initStartMenu() {
-  $('#sm-apps').replaceChildren(...listApps().filter((app) => app.startMenu).map((app) =>
-    h('button', {
-      type: 'button',
-      id: 'sm-' + app.id,
-      role: 'menuitem',
-      onclick: () => {
-        closeStart();
-        launchApp(app.id);
-      },
-    }, h('span', { class: 'sm-ico', html: app.icon() }), app.name)));
+  renderApps();
+  for (const list of [$('#sm-apps'), $('#sm-all-list')]) {
+    // Right-click: open, pin or unpin.
+    list.addEventListener('contextmenu', (ev) => {
+      const app = getApp(ev.target.closest('button[data-app-id]')?.dataset.appId);
+      if (!app) return;
+      showContextMenu(ev, [
+        { label: '開啟', run: () => {
+          closeStart();
+          launchApp(app.id);
+        } },
+        null,
+        isPinned(app.id) ? { label: '從開始取消釘選', run: () => unpinApp(app.id) } : { label: '釘選到開始', run: () => pinApp(app.id) },
+      ]);
+    });
+    // Apps can be dragged out, e.g. onto the desktop.
+    makeDraggable(list, (ev) => {
+      const app = getApp(ev.target.closest('button[data-app-id]')?.dataset.appId);
+      return app && { type: 'app', name: app.name, icon: app.icon(), data: { id: app.id } };
+    });
+  }
+  $('#sm-all-btn').addEventListener('click', () => showView(true));
+  $('#sm-back').addEventListener('click', () => showView(false));
 }
+on('settings:changed', renderApps);
 
 startBtn.addEventListener('click', () => (isOpen ? closeStart() : openStart()));
 $('#sm-user').addEventListener('click', () => {

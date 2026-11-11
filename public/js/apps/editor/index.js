@@ -6,7 +6,7 @@ import { toast, dialog } from '../../core/ui.js';
 import { fmtSize } from '../../core/format.js';
 import { P } from '../../core/path.js';
 import { fileSvg } from '../../core/icons.js';
-import { rpc } from '../../core/rpc.js';
+import { conn, rpc } from '../../core/rpc.js';
 import { on, emit } from '../../core/events.js';
 import { decodeText, encodeText, toBase64, fromBase64 } from '../../core/text-codec.js';
 import { createWindow, wm } from '../../shell/wm.js';
@@ -14,7 +14,9 @@ import { attachMenuBar } from '../../shell/menubar.js';
 import { registerApp } from '../../shell/apps.js';
 import { loadMonaco, themeName, NAME_LANG, EXT_LANG } from './monaco.js';
 
-const editors = new Map(); // remote path -> editor record
+const editors = new Map(); // key (remote path, or an id for an unsaved new file) -> editor record
+const UNTITLED = '未命名';
+let untitledSeq = 0;
 
 // Display preferences shared by every editor window and remembered per browser.
 const FONT_DEFAULT = 13;
@@ -36,13 +38,14 @@ function setMinimap(on) {
   applyPrefs();
 }
 
-async function openEditor(path, size) {
-  const existing = editors.get(path);
+// With a path: open that remote file. Without: a new, unsaved document.
+async function openEditor(path = null, size = 0) {
+  const existing = path && editors.get(path);
   if (existing) return existing.win.focus();
   if (size > 5 * 1024 * 1024) return toast(`「${P.base(path)}」太大（${fmtSize(size)}），編輯器上限是 5 MB`, true);
 
-  let name = P.base(path); // both change on "save as"
-  const win = createWindow({ title: name, appName: '編輯器', iconHtml: fileSvg(name), width: 820, height: 560 });
+  let name = path ? P.base(path) : UNTITLED; // both change on "save as"
+  const win = createWindow({ title: name, appName: '程式碼編輯器', iconHtml: fileSvg(name), width: 820, height: 560 });
   const host = h('div', { class: 'editor-host' }, h('div', { class: 'editor-loading' }, '開啟中…'));
   const sPos = h('span');
   const sLang = h('span');
@@ -53,30 +56,30 @@ async function openEditor(path, size) {
   const sPath = h('span', { class: 'path', title: path }, path);
   const menubar = h('div', { class: 'ed-menubar' });
   win.body.append(menubar, host, h('div', { class: 'statusbar' }, sState, sPath, h('span', { class: 'spacer' }), sPos, sWrap, sEol, sEnc, sLang));
-  const ed = { path, win, editor: null, model: null, saving: false };
-  editors.set(path, ed);
+  const ed = { path, key: path || `\0untitled-${++untitledSeq}`, win, editor: null, model: null, saving: false };
+  editors.set(ed.key, ed);
   win.destroy = () => {
-    editors.delete(ed.path);
+    editors.delete(ed.key);
     ed.editor?.dispose();
     ed.model?.dispose();
   };
 
   let monaco, res;
   try {
-    [monaco, res] = await Promise.all([loadMonaco(), rpc('read', { path })]);
+    [monaco, res] = await Promise.all([loadMonaco(), path ? rpc('read', { path }) : null]);
   } catch (err) {
     await win.close(true);
     return toast(`無法開啟「${name}」：${errText(err)}`, true);
   }
-  if (editors.get(path) !== ed) return; // closed while loading
-  const decoded = decodeText(fromBase64(res.data));
+  if (editors.get(ed.key) !== ed) return; // closed while loading
+  const decoded = res ? decodeText(fromBase64(res.data)) : { text: '', encoding: 'UTF-8', bom: false };
   if (!decoded) {
     await win.close(true);
     return toast(`「${name}」不是文字檔，無法在編輯器中開啟`, true);
   }
-  Object.assign(ed, { encoding: decoded.encoding, bom: decoded.bom, mtime: res.mtime });
+  Object.assign(ed, { encoding: decoded.encoding, bom: decoded.bom, mtime: res ? res.mtime : null });
 
-  const uri = monaco.Uri.from({ scheme: 'sftp', authority: 'remote', path });
+  const uri = monaco.Uri.from({ scheme: 'sftp', authority: 'remote', path: path || `/untitled-${untitledSeq}` });
   monaco.editor.getModel(uri)?.dispose();
   const lang = NAME_LANG[name.toLowerCase()] || EXT_LANG[P.ext(name)];
   const model = (ed.model = monaco.editor.createModel(decoded.text, lang, uri));
@@ -113,6 +116,7 @@ async function openEditor(path, size) {
 
   ed.save = async (force) => {
     if (ed.saving) return false;
+    if (!ed.path) return ed.saveAs(); // a new document needs a place first
     let bytes;
     try {
       bytes = encodeText(model.getValue(), ed.encoding, ed.bom);
@@ -157,8 +161,8 @@ async function openEditor(path, size) {
 
   // Point this window at another path (after "save as", or when the file is renamed or moved).
   ed.relocate = (target) => {
-    editors.delete(ed.path);
-    ed.path = target;
+    editors.delete(ed.key);
+    ed.path = ed.key = target;
     name = P.base(target);
     editors.set(target, ed);
     sPath.textContent = sPath.title = target;
@@ -172,7 +176,7 @@ async function openEditor(path, size) {
     const answer = await dialog({
       title: '另存新檔',
       message: '輸入要存到主機上的路徑：',
-      input: ed.path,
+      input: ed.path || P.join(conn.info.home, UNTITLED + '.txt'),
       buttons: [{ label: '取消', value: false, cancel: true }, { label: '儲存', value: true, default: true }],
     });
     const typed = answer.value ? answer.text.trim() : '';
@@ -180,7 +184,7 @@ async function openEditor(path, size) {
       if (answer.value) toast('請輸入包含檔名的路徑', true);
       return false;
     }
-    const target = P.norm(typed.startsWith('/') ? typed : P.join(P.parent(ed.path), typed));
+    const target = P.norm(typed.startsWith('/') ? typed : P.join(ed.path ? P.parent(ed.path) : conn.info.home, typed));
     if (target === ed.path) return ed.save();
     if (editors.has(target)) {
       toast(`「${P.base(target)}」已經在另一個視窗開啟，請先關閉它`, true);
@@ -332,9 +336,10 @@ on('session:start', () => loadMonaco().catch(() => {})); // warm up so the first
 
 registerApp({
   id: 'editor',
-  name: '編輯器',
-  icon: () => fileSvg(''),
+  name: '程式碼編輯器',
+  icon: () => fileSvg('.js'),
+  startMenu: true,
   extensions: 'all',
-  launch: ({ path, size }) => openEditor(path, size),
+  launch: (args) => openEditor(args?.path, args?.size),
   unsavedCount: () => [...editors.values()].filter((ed) => ed.isDirty?.()).length,
 });
