@@ -140,3 +140,17 @@ body.dragging iframe, body.dragging .monaco-editor { pointer-events: none; }
 html[data-controls="right"] .titlebar { flex-direction: row-reverse; }
 html[data-controls="right"] .traffic { flex-direction: row-reverse; }
 html[data-controls="right"] .titlebar .title { padding-right: 0; padding-left: 60px; }
+
+/* Start menu rises and fades in; the logout flyout slides out from it. */
+#start-menu {
+  opacity: 0; transform: translateY(10px) scale(.98); transform-origin: bottom left;
+  transition: opacity var(--anim, .2s) ease, transform var(--anim, .2s) ease;
+}
+#start-menu.open { opacity: 1; transform: none; }
+@keyframes sm-flyout { from { opacity: 0; transform: translateX(-8px); } }
+#sm-logout-row { animation: sm-flyout var(--anim, .2s) ease; }
+html.no-anim #sm-logout-row { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  #start-menu { transition: none; }
+  #sm-logout-row { animation: none; }
+}

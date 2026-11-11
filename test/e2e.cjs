@@ -373,20 +373,24 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const clockBox = await page.locator('#clock').boundingBox();
   const startBox = await page.locator('#start-btn').boundingBox();
   check(startBox.x < 20 && startBox.y > 740 && clockBox.x + clockBox.width > 1260 && clockBox.y > 740, 'start button bottom-left, clock bottom-right');
+  const menuGone = () => page.waitForSelector('#start-menu', { state: 'hidden', timeout: 2000 }).then(() => true, () => false);
   check(await page.isHidden('#start-menu'), 'start menu starts closed');
   await page.click('#start-btn');
-  check(await page.isVisible('#start-menu'), 'start button opens the menu');
+  await sleep(40);
+  const midOpacity = Number(await page.evaluate(() => getComputedStyle(document.querySelector('#start-menu')).opacity));
+  check(await page.isVisible('#start-menu') && midOpacity > 0 && midOpacity < 1, 'start button opens the menu with a fade', String(midOpacity));
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('#start-menu')).opacity === '1');
   check((await page.textContent('#sm-username')) === user, 'start menu shows the current user');
   check(await page.isHidden('#disconnect'), 'logout is hidden until the user is clicked');
   await page.keyboard.press('Escape');
-  check(await page.isHidden('#start-menu'), 'Escape closes the start menu');
+  check(await page.isVisible('#start-menu') && await menuGone(), 'Escape closes the start menu, fading out first');
 
   await page.locator('.win', { has: page.locator('.finder-main') }).locator('.traffic .close').click();
   check((await page.locator('.finder-main').count()) === 0 && (await page.$$('.dock-item')).length === 1, 'file cabinet can be closed');
   await page.click('#start-btn');
   await page.click('#sm-files');
   await page.waitForSelector('.files .item');
-  check(await page.isHidden('#start-menu') && (await page.textContent('.finder-main + .statusbar .path')) === home, 'start menu reopens the file cabinet at home');
+  check(await menuGone() && (await page.textContent('.finder-main + .statusbar .path')) === home, 'start menu reopens the file cabinet at home');
 
   await page.click('#start-btn');
   await page.click('#sm-tasks');

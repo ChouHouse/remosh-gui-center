@@ -2,15 +2,27 @@
 import { $, h } from '../core/dom.js';
 import { conn } from '../core/rpc.js';
 import { on } from '../core/events.js';
+import { animationMs } from '../core/settings.js';
 import { listApps, launchApp } from './apps.js';
 import { logout } from './desktop.js';
 
 const startBtn = $('#start-btn');
 const startMenu = $('#start-menu');
 
+// Open/closed is tracked here rather than read from the element, because the
+// menu stays in the page for a moment while it animates out.
+let isOpen = false;
+let hideTimer = 0;
+
 function closeStart() {
-  if (startMenu.hidden) return;
-  startMenu.hidden = true;
+  if (!isOpen) return;
+  isOpen = false;
+  startMenu.classList.remove('open');
+  startMenu.inert = true; // not clickable while it fades out
+  clearTimeout(hideTimer);
+  const ms = animationMs();
+  if (ms) hideTimer = setTimeout(() => (startMenu.hidden = true), ms);
+  else startMenu.hidden = true;
   startBtn.classList.remove('open');
   startBtn.setAttribute('aria-expanded', 'false');
   document.removeEventListener('pointerdown', onOutside, true);
@@ -29,7 +41,12 @@ function onKey(ev) {
 function openStart() {
   $('#sm-logout-row').hidden = true;
   $('#sm-user').setAttribute('aria-expanded', 'false');
+  isOpen = true;
+  clearTimeout(hideTimer);
+  startMenu.inert = false;
   startMenu.hidden = false;
+  void startMenu.offsetWidth; // start from the closed style so the transition runs
+  startMenu.classList.add('open');
   startBtn.classList.add('open');
   startBtn.setAttribute('aria-expanded', 'true');
   document.addEventListener('pointerdown', onOutside, true);
@@ -58,7 +75,7 @@ export function initStartMenu() {
     }, h('span', { class: 'sm-ico', html: app.icon() }), app.name)));
 }
 
-startBtn.addEventListener('click', () => (startMenu.hidden ? openStart() : closeStart()));
+startBtn.addEventListener('click', () => (isOpen ? closeStart() : openStart()));
 $('#sm-user').addEventListener('click', () => {
   const row = $('#sm-logout-row');
   row.hidden = !row.hidden;
