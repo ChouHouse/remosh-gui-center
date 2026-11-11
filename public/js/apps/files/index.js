@@ -16,7 +16,7 @@ import { openFile, openWith } from '../../shell/file-open.js';
 import { showContextMenu } from '../../shell/context-menu.js';
 import { putFiles, takeFiles, clearFiles, cutPaths } from './clipboard.js';
 
-let finder = null;
+const finders = new Set(); // every open file cabinet window
 
 function createFinder(home) {
   const win = createWindow({ title: '檔案櫃', appName: '檔案櫃', iconHtml: folderSvg(), width: 860, height: 540 });
@@ -467,7 +467,7 @@ function createFinder(home) {
     st.token++; // drop any listing still in flight
     clearInterval(pollTimer);
     offSettings();
-    if (finder === win) finder = null;
+    finders.delete(win);
   };
   win.navigate = navigate;
   win.getPath = () => st.path;
@@ -476,13 +476,14 @@ function createFinder(home) {
 }
 
 function openFinder() {
-  if (finder) finder.focus();
-  else finder = createFinder(conn.info.home);
+  finders.add(createFinder(conn.info.home)); // each launch opens another window
 }
 
 on('fs:changed', (dir) => {
-  if (finder?.getPath() === dir) finder.navigate(dir, false);
+  for (const f of finders) if (f.getPath() === dir) f.navigate(dir, false);
 });
-on('session:resume', () => finder?.navigate(finder.getPath(), false));
+on('session:resume', () => {
+  for (const f of finders) f.navigate(f.getPath(), false);
+});
 
 registerApp({ id: 'files', name: '檔案櫃', icon: folderSvg, startMenu: true, launch: openFinder });

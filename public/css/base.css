@@ -135,3 +135,9 @@ dl.props dd { margin: 0; overflow-wrap: anywhere; user-select: text; }
 button.primary, .set-save, .modal button.default, input.switch:checked, .wp .badge {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 16%, transparent);
 }
+
+/* Cross-fade while the colour or light/dark mode changes (class set briefly by shell/style.js). */
+html.theme-fade *, html.theme-fade *::before, html.theme-fade *::after {
+  transition: background-color var(--anim, .2s) ease, color var(--anim, .2s) ease, border-color var(--anim, .2s) ease,
+    fill var(--anim, .2s) ease, stroke var(--anim, .2s) ease, box-shadow var(--anim, .2s) ease !important;
+}

@@ -5,7 +5,7 @@ import { P } from '../core/path.js';
 import { rpc } from '../core/rpc.js';
 import { on } from '../core/events.js';
 import { toBase64, fromBase64 } from '../core/text-codec.js';
-import { getSettings, updateSettings, settingsDir, wallpaperDir, MAX_WALLPAPERS } from '../core/settings.js';
+import { getSettings, updateSettings, settingsDir, wallpaperDir, animationMs, MAX_WALLPAPERS } from '../core/settings.js';
 
 // ---- system colour and light/dark mode
 // The system colour is the one accent of the desktop: buttons, switches, the
@@ -38,9 +38,20 @@ export const effectiveMode = () => {
   return mode === 'auto' ? (darkQuery.matches ? 'dark' : 'light') : mode;
 };
 
+let lastLook = '';
+let fadeTimer = 0;
 function applyAppearance() {
   const root = document.documentElement;
-  const mode = getSettings().style.mode;
+  const { mode, color, controls } = getSettings().style;
+  // Cross-fade when the look actually changes (and animations are on).
+  const look = `${mode}|${color}`;
+  if (lastLook && look !== lastLook && animationMs() > 0) {
+    root.classList.add('theme-fade');
+    clearTimeout(fadeTimer);
+    fadeTimer = setTimeout(() => root.classList.remove('theme-fade'), animationMs() + 80);
+  }
+  lastLook = look;
+  root.dataset.controls = controls;
   if (mode === 'auto') root.removeAttribute('data-theme');
   else root.dataset.theme = mode;
   const c = systemColor();
@@ -60,14 +71,20 @@ function applyAppearance() {
   root.dataset.color = c.id;
 }
 
+// These show at once and are saved in the background.
+const now = { optimistic: true };
 export const setColor = (id) =>
   updateSettings((s) => {
     s.style.color = id;
-  });
+  }, now);
 export const setMode = (mode) =>
   updateSettings((s) => {
     s.style.mode = mode;
-  });
+  }, now);
+export const setControls = (side) =>
+  updateSettings((s) => {
+    s.style.controls = side;
+  }, now);
 // Fires when the device switches between light and dark.
 export const onDeviceModeChange = (fn) => darkQuery.addEventListener('change', fn);
 
@@ -121,7 +138,7 @@ async function promote(name) {
     dropped = list.slice(MAX_WALLPAPERS);
     s.style.wallpapers = list.slice(0, MAX_WALLPAPERS);
     s.style.wallpaper = name;
-  });
+  }, now);
   for (const old of dropped) {
     rpc('remove', { path: P.join(wallpaperDir(), old) }).catch(() => {});
     const url = urls.get(old);
@@ -147,7 +164,7 @@ export const useWallpaper = (name) => promote(name);
 export const clearWallpaper = () =>
   updateSettings((s) => {
     s.style.wallpaper = null;
-  });
+  }, now);
 
 on('settings:changed', () => {
   applyAppearance();

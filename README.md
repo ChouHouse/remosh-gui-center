@@ -137,7 +137,7 @@ npm run deploy   # publish to Cloudflare
   container it reads the container's own cgroup usage and limits (v2 or v1)
   instead of `/proc` totals, which would describe the Docker host.
 
-- **File cabinet** (檔案櫃): re-reads the open folder every 4 s. Right-click a file
+- **File cabinet** (檔案櫃): any number of windows; each re-reads its folder every 4 s. Right-click a file
   for 開啟 / 開啟程式… / 複製 / 剪下 / 貼上 / 重新命名 / 刪除 / 內容, empty space for
   新增資料夾 / 在這裡開啟終端機; right-click the sidebar to add or remove folders.
   Copy and cut put `remosh/file:<path>` on the clipboard.
@@ -149,8 +149,8 @@ npm run deploy   # publish to Cloudflare
 - **Terminal** (終端機): an interactive shell (xterm.js + an SSH PTY channel).
   Opening a file with it sets the file to mode 777 and runs it as `./name`
   from its folder.
-- **Settings** (設定): categories on the left (動畫: on/off and speed; 檔案關聯; 樣式: light/dark mode, one system colour,
-  and a wallpaper — the last five uploads are
+- **Settings** (設定): categories on the left (動畫: on/off and speed; 檔案關聯; 樣式: light/dark mode, which side the window
+  buttons sit on, one system colour, and a wallpaper — the last five uploads are
   kept in `~/.remosh-gui/wallpaper`). 儲存 writes `~/.remosh-gui/setting.json` on the SSH host, so settings
   follow the account, and they are read back at login. Add a setting in
   `core/settings.js` and a category in `apps/settings/index.js`.

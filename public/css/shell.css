@@ -1,5 +1,5 @@
 /* ---------- desktop shell ---------- */
-#desktop { position: fixed; inset: 0; display: flex; flex-direction: column; background: center / cover no-repeat; }
+#desktop { position: fixed; inset: 0; display: flex; flex-direction: column; background: center / cover no-repeat; transition: background-image var(--anim, .2s) ease; }
 #windows { position: relative; flex: 1; min-height: 0; overflow: hidden; isolation: isolate; }
 
 #dock {
@@ -135,3 +135,8 @@ body.dragging iframe, body.dragging .monaco-editor { pointer-events: none; }
 .ctx-menu { position: fixed; top: 0; left: 0; z-index: 80000; min-width: 180px; }
 .ctx-menu button.danger { color: var(--danger); }
 .ctx-menu button.danger:hover:not(:disabled), .ctx-menu button.danger:focus-visible { background: var(--danger); color: #fff; }
+
+/* Window buttons on the right (設定 → 樣式): close ends up in the far corner. */
+html[data-controls="right"] .titlebar { flex-direction: row-reverse; }
+html[data-controls="right"] .traffic { flex-direction: row-reverse; }
+html[data-controls="right"] .titlebar .title { padding-right: 0; padding-left: 60px; }

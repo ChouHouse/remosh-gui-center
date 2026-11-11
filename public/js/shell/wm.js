@@ -22,7 +22,7 @@ export function createWindow({ title, appName, iconHtml, width, height }) {
       h('button', { type: 'button', class: 'max', title: '放大', 'aria-label': '放大', onclick: () => win.toggleMax() })),
     titleEl);
   win.body = h('div', { class: 'win-body' });
-  win.el = h('section', { class: 'win' }, bar, win.body,
+  win.el = h('section', { class: 'win', 'data-app': appName || null }, bar, win.body,
     ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'].map((d) => h('div', { class: 'rs ' + d, 'data-dir': d })));
 
   const area = winLayer.getBoundingClientRect();
@@ -41,7 +41,7 @@ export function createWindow({ title, appName, iconHtml, width, height }) {
   win.setIcon = (html) => {
     ico.innerHTML = html;
   };
-  win.dockEl = h('button', { type: 'button', class: 'dock-item open', title },
+  win.dockEl = h('button', { type: 'button', class: 'dock-item open', 'data-app': appName || null, title },
     ico, lbl, h('span', { class: 'dirty', title: '尚未儲存' }));
   win.dockEl.addEventListener('click', () => {
     if (win.minimized) win.focus();

@@ -21,6 +21,7 @@ const DEFAULTS = {
   },
   style: {
     mode: 'auto', // 'auto' (follow the device), 'light' or 'dark'
+    controls: 'left', // which end of the title bar holds close / minimise / maximise
     color: 'default', // the system colour; see shell/style.js
     wallpaper: null, // file name in ~/.remosh-gui/wallpaper currently shown, or null
     wallpapers: [], // the last few uploads, most recently used first
@@ -60,6 +61,7 @@ function normaliseStyle(st) {
   const wallpapers = [...new Set((Array.isArray(st?.wallpapers) ? st.wallpapers : []).filter((n) => typeof n === 'string' && FILE_NAME.test(n)))].slice(0, MAX_WALLPAPERS);
   return {
     mode: ['auto', 'light', 'dark'].includes(st?.mode) ? st.mode : DEFAULTS.style.mode,
+    controls: st?.controls === 'right' ? 'right' : 'left',
     // Earlier files kept the colour as `tint`, then per app in `tints`.
     color: [st?.color, st?.tints?.files, st?.tint].find((v) => typeof v === 'string' && COLOR_ID.test(v)) || DEFAULTS.style.color,
     wallpaper: wallpapers.includes(st?.wallpaper) ? st.wallpaper : null,
@@ -96,29 +98,55 @@ export async function loadSettings() {
   apply();
 }
 
+// Writes go to the host one at a time, in the order they were asked for.
+let saveQueue = Promise.resolve();
+function writeFile(clean) {
+  const run = async () => {
+    await ready; // never write before the file on the host has been read
+    const file = { ...raw, version: 1, ...clean };
+    if (file.style) {
+      delete file.style.tint; // both replaced by style.color
+      delete file.style.tints;
+    }
+    await rpc('mkdir', { path: settingsDir() });
+    await rpc('write', { path: settingsPath(), data: toBase64(new TextEncoder().encode(JSON.stringify(file, null, 2) + '\n')) });
+    raw = file;
+    emit('fs:changed', settingsDir());
+  };
+  const result = saveQueue.then(run);
+  saveQueue = result.catch(() => {});
+  return result;
+}
+
 // Writes the file first; the new values take effect only if that succeeded.
 export async function saveSettings(next) {
-  await ready; // never write before the file on the host has been read
   const clean = normalise(next);
-  const file = { ...raw, version: 1, ...clean };
-  if (file.style) {
-    delete file.style.tint; // both replaced by style.color
-    delete file.style.tints;
-  }
-  await rpc('mkdir', { path: settingsDir() });
-  await rpc('write', { path: settingsPath(), data: toBase64(new TextEncoder().encode(JSON.stringify(file, null, 2) + '\n')) });
-  raw = file;
+  await writeFile(clean);
   current = clean;
   apply();
-  emit('fs:changed', settingsDir());
 }
 
 // Change one thing and save, e.g. updateSettings((s) => { s.files.associations.txt = 'notepad'; }).
-export async function updateSettings(mutate) {
+// With { optimistic: true } the change shows at once and is saved in the
+// background; if the save fails it is undone and the returned promise rejects.
+export async function updateSettings(mutate, { optimistic = false } = {}) {
   await ready;
   const next = getSettings();
   mutate(next);
-  await saveSettings(next);
+  if (!optimistic) return saveSettings(next);
+  const before = current;
+  const clean = normalise(next);
+  current = clean;
+  apply();
+  try {
+    await writeFile(clean);
+  } catch (err) {
+    if (current === clean) {
+      current = before;
+      apply();
+    }
+    throw err;
+  }
 }
 
 let ready = Promise.resolve();

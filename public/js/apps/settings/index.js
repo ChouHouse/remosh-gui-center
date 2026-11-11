@@ -7,13 +7,12 @@
 import { h } from '../../core/dom.js';
 import { errText } from '../../core/errors.js';
 import { toast } from '../../core/ui.js';
-import { fmtTime } from '../../core/format.js';
 import { settingsSvg } from '../../core/icons.js';
 import { on } from '../../core/events.js';
 import { getSettings, saveSettings } from '../../core/settings.js';
 import { createWindow } from '../../shell/wm.js';
 import { registerApp, getApp, appsForExt } from '../../shell/apps.js';
-import { COLORS, MODES, setColor, setMode, uploadWallpaper, useWallpaper, clearWallpaper, wallpaperUrl } from '../../shell/style.js';
+import { COLORS, MODES, setColor, setMode, setControls, uploadWallpaper, useWallpaper, clearWallpaper, wallpaperUrl } from '../../shell/style.js';
 
 const row = (title, desc, control) =>
   h('div', { class: 'set-row' }, h('div', { class: 'set-text' }, h('b', null, title), h('small', null, desc)), control);
@@ -89,14 +88,17 @@ const CATEGORIES = [
     // once (a wallpaper is a file on the host, not just a value).
     render(draft) {
       const fail = (what) => (err) => toast(`${what}：${errText(err)}`, true);
-      const modes = h('div', { class: 'mode-seg', role: 'group', 'aria-label': '外觀' }, MODES.map(([id, label]) =>
-        h('button', {
-          type: 'button',
-          class: draft.style.mode === id ? 'current' : '',
-          'data-mode': id,
-          'aria-pressed': String(draft.style.mode === id),
-          onclick: () => setMode(id).catch(fail('無法儲存外觀')),
-        }, label)));
+      const segmented = (id, label, options, value, set) =>
+        h('div', { class: 'mode-seg', id, role: 'group', 'aria-label': label }, options.map(([key, text]) =>
+          h('button', {
+            type: 'button',
+            class: value === key ? 'current' : '',
+            'data-value': key,
+            'aria-pressed': String(value === key),
+            onclick: () => set(key).catch(fail('無法儲存')),
+          }, text)));
+      const modes = segmented('set-mode', '模式', MODES, draft.style.mode, setMode);
+      const controls = segmented('set-controls', '視窗按鈕', [['left', '左上'], ['right', '右上']], draft.style.controls, setControls);
       const colours = h('div', { class: 'tint-grid' }, COLORS.map((c) =>
         h('button', {
           type: 'button',
@@ -124,32 +126,31 @@ const CATEGORIES = [
           upload.textContent = '上傳壁紙…';
         }
       });
-      // One row per wallpaper, newest first.
-      const uploadedAt = (name) => fmtTime(Number(/^wp-(\d+)/.exec(name)?.[1]) / 1000) || name;
-      const thumbs = draft.style.wallpapers.length
-        ? h('div', { class: 'wp-list' }, draft.style.wallpapers.map((name) => {
-          const using = draft.style.wallpaper === name;
-          const pic = h('span', { class: 'wp-pic' });
-          wallpaperUrl(name).then((url) => {
-            pic.style.backgroundImage = `url("${url}")`;
-          }, () => {
-            pic.textContent = '檔案不見了';
-          });
-          return h('div', { class: 'wp' + (using ? ' current' : ''), 'data-name': name },
-            pic,
-            h('span', { class: 'wp-info' }, h('b', null, using ? '使用中' : '之前的壁紙'), h('small', null, `上傳於 ${uploadedAt(name)}`)),
-            h('button', { type: 'button', class: 'wp-use', disabled: using, title: '改用這張，它會排到最前面', onclick: () => useWallpaper(name).catch(fail('無法切換壁紙')) }, using ? '使用中' : '使用'));
-        }))
-        : h('p', { class: 'wp-empty' }, '還沒有上傳過壁紙。');
+      // Thumbnails side by side, newest first; click one to use it.
+      const thumbs = h('div', { class: 'wp-list' }, draft.style.wallpapers.map((name) => {
+        const using = draft.style.wallpaper === name;
+        const b = h('button', {
+          type: 'button',
+          class: 'wp' + (using ? ' current' : ''),
+          'data-name': name,
+          'aria-label': using ? '使用中的壁紙' : '改用這張壁紙',
+          'aria-pressed': String(using),
+          onclick: () => useWallpaper(name).catch(fail('無法切換壁紙')),
+        });
+        wallpaperUrl(name).then((url) => {
+          b.style.backgroundImage = `url("${url}")`;
+        }, () => b.classList.add('missing'));
+        return b;
+      }));
       return h('div', null,
         h('h2', null, '樣式'),
         h('p', { class: 'set-desc' }, '變更會立即套用。'),
         h('h3', null, '外觀'),
-        modes,
+        h('div', { class: 'look-row' }, h('span', null, '模式'), modes),
+        h('div', { class: 'look-row' }, h('span', null, '視窗按鈕'), controls),
         h('h3', null, '顏色'),
         colours,
         h('h3', null, '壁紙'),
-        h('p', { class: 'set-desc' }, '最多保留 5 張。'),
         thumbs,
         h('div', { class: 'wp-actions' }, picker, upload,
           h('button', { type: 'button', id: 'wp-none', disabled: !draft.style.wallpaper, onclick: () => clearWallpaper().catch(fail('無法儲存')) }, '不使用壁紙')));

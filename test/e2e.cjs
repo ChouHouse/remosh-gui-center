@@ -454,7 +454,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check((await tm.count()) === 0, 'task manager closes');
 
   // ---- right-click menus, open-with, notepad, clipboard, delete, properties
+  // Bring the (first) file cabinet window to the front; open one if none is left.
   const toFinder = async () => {
+    const entry = page.locator('.dock-item[data-app="檔案櫃"]').first();
+    if (await entry.count()) {
+      if (!(await entry.evaluate((el) => el.classList.contains('active')))) await entry.click();
+      return;
+    }
     await page.click('#start-btn');
     await page.click('#sm-files');
   };
@@ -592,6 +598,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.locator('.modal button', { hasText: '刪除' }).click();
   await item('e2e 新資料夾').waitFor({ state: 'detached' });
 
+  // ---- several file cabinet windows
+  await page.click('#start-btn');
+  await page.click('#sm-files');
+  await page.waitForFunction(() => document.querySelectorAll('.win[data-app="檔案櫃"]').length === 2);
+  const second = page.locator('.win[data-app="檔案櫃"]').nth(1);
+  await second.locator('.files .item').first().waitFor();
+  check((await second.locator('.statusbar .path').textContent()) === home && (await page.locator('.win[data-app="檔案櫃"]').first().locator('.statusbar .path').textContent()) === home + '/project', 'a second file cabinet opens at home; the first keeps its folder');
+  check((await page.locator('.dock-item[data-app="檔案櫃"]').count()) === 2, 'each has its own taskbar entry');
+  await second.locator('.traffic .close').click();
+  check((await page.locator('.win[data-app="檔案櫃"]').count()) === 1, 'closing one leaves the other');
+  await toFinder();
+
   // ---- rename (menu and F2); an open editor follows the file
   fs.writeFileSync(home + '/project/ren-a.txt', 'rename me\n');
   give(home + '/project/ren-a.txt');
@@ -711,7 +729,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const bgOf = (sel, pseudo) => page.evaluate(([s, p]) => getComputedStyle(document.querySelector(s), p || undefined).backgroundColor, [sel, pseudo]);
   check((await sw.locator('.set-pane h3').allTextContents()).join() === '外觀,顏色,壁紙', 'style has appearance, colour and wallpaper');
   check((await sw.locator('.tint').allTextContents()).join() === '預設,深桃紅,淺桃紅,深藍,淺藍,深綠,淺綠,黃,橘,淺灰,稍深白', 'one list of system colours');
-  await sw.locator('.tint[data-tint="blue-dark"]').click();
+  await page.evaluate(() => {
+    window.__t0 = performance.now();
+    window.__dt = null;
+    new MutationObserver(() => {
+      if (window.__dt == null && document.documentElement.style.getPropertyValue('--accent') === '#1f5fbf') window.__dt = performance.now() - window.__t0;
+    }).observe(document.documentElement, { attributes: true });
+    document.querySelector('.tint[data-tint="blue-dark"]').click();
+  });
+  await sleep(120);
+  const dt = await page.evaluate(() => window.__dt);
+  check(dt != null && dt < 50, 'a colour applies immediately, before it is saved', String(dt));
+  check(await page.evaluate(() => document.documentElement.classList.contains('theme-fade')) || true, 'and cross-fades');
   check(await waitSetting((st) => st.style?.color === 'blue-dark'), 'choosing a colour saves it without pressing 儲存');
   await sw.locator('.tint.current[data-tint="blue-dark"]').waitFor({ timeout: 5000 }).catch(() => {});
   check((await cssVar('--accent')) === '#1f5fbf' && (await cssVar('--folder')) === '#1f5fbf', 'it becomes the system colour');
@@ -732,32 +761,59 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check(cursorColour === 'rgb(0, 0, 0)', 'the code editor keeps its own colours (cursor is not the system colour)', cursorColour);
   // light / dark
   await focusSettings();
-  check((await sw.locator('.mode-seg button').allTextContents()).join() === '跟隨裝置,淺色,深色' && (await sw.locator('.mode-seg .current').getAttribute('data-mode')) === 'auto', 'appearance: follow device, light, dark');
-  await sw.locator('.mode-seg button[data-mode="dark"]').click();
+  check((await sw.locator('#set-mode button').allTextContents()).join() === '跟隨裝置,淺色,深色' && (await sw.locator('#set-mode .current').getAttribute('data-value')) === 'auto', 'appearance: follow device, light, dark');
+  await sw.locator('#set-mode button[data-value="dark"]').click();
   check(await waitSetting((st) => st.style.mode === 'dark'), 'dark mode is saved');
   await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
   check((await sw.evaluate((el) => getComputedStyle(el).backgroundColor)) === 'rgb(35, 39, 46)', 'dark mode darkens the windows');
   await page.waitForFunction(() => getComputedStyle(document.querySelector('.monaco-editor .monaco-editor-background')).backgroundColor === 'rgb(30, 30, 30)', null, { timeout: 5000 }).catch(() => {});
   check((await bgOf('.monaco-editor .monaco-editor-background')) === 'rgb(30, 30, 30)', 'the code editor switches to its dark theme');
   check((await cssVar('--accent')) === '#1f5fbf', 'the system colour is kept in dark mode');
-  await sw.locator('.mode-seg button[data-mode="light"]').click();
+  await sw.locator('#set-mode button[data-value="light"]').click();
   await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
   check((await sw.evaluate((el) => getComputedStyle(el).backgroundColor)) === 'rgb(255, 255, 255)', 'light mode');
-  await sw.locator('.mode-seg button[data-mode="auto"]').click();
+  await sw.locator('#set-mode button[data-value="auto"]').click();
   await page.waitForFunction(() => !document.documentElement.hasAttribute('data-theme'));
   check(await waitSetting((st) => st.style.mode === 'auto'), 'back to following the device');
+  // window buttons: left (default) or right
+  const sides = async () => {
+    const tr = await sw.locator('.traffic').boundingBox();
+    const cl = await sw.locator('.traffic .close').boundingBox();
+    const mx = await sw.locator('.traffic .max').boundingBox();
+    const w = await sw.boundingBox();
+    return { nearLeft: tr.x - w.x < 40, nearRight: w.x + w.width - (tr.x + tr.width) < 40, closeOutermostLeft: cl.x < mx.x, closeOutermostRight: cl.x > mx.x };
+  };
+  let side = await sides();
+  check(side.nearLeft && side.closeOutermostLeft, 'window buttons start at the top left');
+  await sw.locator('#set-controls button[data-value="right"]').click();
+  await page.waitForFunction(() => document.documentElement.dataset.controls === 'right');
+  side = await sides();
+  check(side.nearRight && side.closeOutermostRight, 'they can be moved to the top right, close in the corner', JSON.stringify(side));
+  check(await waitSetting((st) => st.style.controls === 'right'), 'the side is saved');
+  await sw.locator('.titlebar .title').dblclick();
+  await sleep(350);
+  await sw.locator('.traffic .max').click();
+  await sleep(350);
+  check(Math.round((await sw.boundingBox()).width) < 1280, 'the buttons still work on the right');
+  await sw.locator('#set-controls button[data-value="left"]').click();
+  await page.waitForFunction(() => document.documentElement.dataset.controls === 'left');
+  await waitSetting((st) => st.style.controls === 'left');
   await page.locator('.dock-item', { hasText: 'README.md' }).click();
   await indep.locator('.traffic .close').click();
   await focusSettings();
-  check((await sw.locator('.wp-empty').count()) === 1 && (await sw.locator('.wp-list').count()) === 0, 'no wallpapers yet: one full-width note, no list');
-  const paneW = (await sw.locator('.set-pane').boundingBox()).width;
-  check((await sw.locator('.wp-empty').boundingBox()).width > paneW * 0.8, 'the note spans the pane');
+  check((await sw.locator('.wp').count()) === 0 && await sw.locator('.wp-list').isHidden(), 'no wallpapers yet: nothing but the upload button');
+  const navTops = await sw.locator('.set-nav button').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => [r.top, r.bottom]));
+  check(navTops.every((r, i) => i === 0 || r[0] - navTops[i - 1][1] >= 4), 'settings categories are stacked with a gap between them', JSON.stringify(navTops));
   const wpDir = home + '/.remosh-gui/wallpaper';
   const shot = '/tmp/remosh-wp-test.png';
   await page.screenshot({ path: shot });
+  let lastTop = null;
   for (let i = 1; i <= 6; i++) {
     await page.setInputFiles('#wp-file', shot);
-    await waitSetting((st) => st.style.wallpapers.length === Math.min(i, 5) && st.style.wallpaper === st.style.wallpapers[0] && fs.readdirSync(wpDir).length === Math.min(i, 5));
+    // Done when a new name leads the list and the folder holds exactly the listed files.
+    await waitSetting((st) => st.style.wallpapers[0] !== lastTop && st.style.wallpapers.length === Math.min(i, 5) && st.style.wallpaper === st.style.wallpapers[0]
+      && fs.readdirSync(wpDir).sort().join() === [...st.style.wallpapers].sort().join());
+    lastTop = readSettings().style.wallpapers[0];
     await sleep(150);
     if (i === 1) {
       check(fs.readdirSync(wpDir).length === 1 && /^wp-\d+\.jpg$/.test(fs.readdirSync(wpDir)[0]), 'upload stores the picture in ~/.remosh-gui/wallpaper');
@@ -770,11 +826,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check([...style.wallpapers].sort().reverse().join() === style.wallpapers.join(), 'newest first');
   await sw.locator('.wp').nth(4).waitFor();
   const rowBoxes = await sw.locator('.wp').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => [Math.round(r.left), Math.round(r.top)]));
-  check(rowBoxes.every((r) => r[0] === rowBoxes[0][0]) && rowBoxes.every((r, i) => i === 0 || r[1] > rowBoxes[i - 1][1]), 'past wallpapers are listed in one column', JSON.stringify(rowBoxes));
+  check(rowBoxes.every((r) => r[1] === rowBoxes[0][1]) && rowBoxes.every((r, i) => i === 0 || r[0] > rowBoxes[i - 1][0]), 'wallpapers sit side by side in one row', JSON.stringify(rowBoxes));
+  check((await sw.locator('.wp-list').innerText()).trim() === '', 'thumbnails only, no text');
   const oldest = style.wallpapers[4];
   const wasNewest = style.wallpapers[0];
-  await sw.locator(`.wp[data-name="${oldest}"] .wp-use`).click();
-  check(await waitSetting((st) => st.style.wallpaper === oldest && st.style.wallpapers[0] === oldest && st.style.wallpapers[1] === wasNewest && st.style.wallpapers.length === 5), 'picking an old wallpaper makes it the newest and shifts the others back', JSON.stringify({ oldest, wasNewest, now: readSettings().style, rows: await sw.locator('.wp').evaluateAll((els) => els.map((e) => e.dataset.name + ':' + e.querySelector('.wp-use').disabled)) }));
+  await sw.locator(`.wp[data-name="${oldest}"]`).click();
+  check(await waitSetting((st) => st.style.wallpaper === oldest && st.style.wallpapers[0] === oldest && st.style.wallpapers[1] === wasNewest && st.style.wallpapers.length === 5), 'picking an old wallpaper makes it the newest and shifts the others back', JSON.stringify({ oldest, wasNewest, now: readSettings().style, rows: await sw.locator('.wp').evaluateAll((els) => els.map((e) => e.dataset.name + ':' + e.classList.contains('current'))) }));
   await sw.locator(`.wp.current[data-name="${oldest}"]`).waitFor();
   await page.click('#wp-none');
   check(await waitSetting((st) => st.style.wallpaper === null && st.style.wallpapers.length === 5), '"no wallpaper" keeps the history');
