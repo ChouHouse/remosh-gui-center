@@ -6,6 +6,7 @@ import { gaugeSvg } from '../../core/icons.js';
 import { conn, rpc } from '../../core/rpc.js';
 import { createWindow } from '../../shell/wm.js';
 import { registerApp } from '../../shell/apps.js';
+import { registerTintTarget } from '../../shell/style.js';
 import { parseStats } from './stats.js';
 import { openProcessWindow } from './process.js';
 
@@ -110,12 +111,11 @@ function openTaskManager() {
     const count = s.useCgroup && s.cg.pids != null ? s.cg.pids : s.procs.length;
     const age = s.useCgroup ? s.pid1Age : s.uptime;
     meta.replaceChildren(
-      h('span', null, '範圍 ', h('b', { id: 'tm-scope' }, s.useCgroup ? `容器（cgroup v${s.cg.version}）` : '整台主機')),
+      h('span', null, '範圍 ', h('b', { id: 'tm-scope' }, s.useCgroup ? '容器' : '整台主機')),
       h('span', null, '主機名稱 ', h('b', null, s.host || '—')),
       h('span', null, s.useCgroup ? '工作數 ' : '行程數 ', h('b', null, count)),
       age != null && h('span', null, '已運作 ', h('b', null, fmtDuration(age))));
-    note.textContent = s.useCgroup ? '以上是這個容器自己的用量與上限，不是宿主機的資源。' : '';
-    note.hidden = !s.useCgroup;
+    note.hidden = true;
     state.hidden = rows.length > 0;
     state.className = 'state';
     state.textContent = rows.length ? '' : '這台主機沒有提供行程清單（找不到 ps）';
@@ -159,5 +159,16 @@ function openTaskManager() {
   tick();
   return win;
 }
+
+registerTintTarget({
+  id: 'tasks',
+  label: '工作管理員',
+  description: '用量條的顏色',
+  apply(t) {
+    const root = document.documentElement;
+    if (t.color) root.style.setProperty('--tm-tint', t.shade);
+    else root.style.removeProperty('--tm-tint');
+  },
+});
 
 registerApp({ id: 'tasks', name: '工作管理員', icon: gaugeSvg, startMenu: true, launch: openTaskManager });

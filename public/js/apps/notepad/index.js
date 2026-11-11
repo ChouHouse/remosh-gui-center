@@ -12,6 +12,8 @@ import { decodeText, encodeText, toBase64, fromBase64 } from '../../core/text-co
 import { createWindow } from '../../shell/wm.js';
 import { attachMenuBar } from '../../shell/menubar.js';
 import { registerApp } from '../../shell/apps.js';
+import { showContextMenu } from '../../shell/context-menu.js';
+import { registerTintTarget } from '../../shell/style.js';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const UNTITLED = '未命名';
@@ -170,6 +172,33 @@ async function openNotepad({ path = null, size = 0 } = {}) {
       (ev.shiftKey ? saveAs : save)();
     }
   });
+  // Right-click: the browser's own menu is turned off, so offer the basics here.
+  area.addEventListener('contextmenu', (ev) => {
+    const hasSelection = area.selectionStart !== area.selectionEnd;
+    const command = (name) => () => {
+      area.focus();
+      document.execCommand(name);
+      refresh();
+    };
+    showContextMenu(ev, [
+      { label: '剪下', enabled: hasSelection, run: command('cut') },
+      { label: '複製', enabled: hasSelection, run: command('copy') },
+      { label: '貼上', run: async () => {
+        area.focus();
+        try {
+          area.setRangeText(await navigator.clipboard.readText(), area.selectionStart, area.selectionEnd, 'end');
+          refresh();
+        } catch {
+          toast('瀏覽器不允許讀取剪貼簿，請改用 Ctrl+V', true);
+        }
+      } },
+      null,
+      { label: '全選', run: () => {
+        area.focus();
+        area.select();
+      } },
+    ]);
+  });
   area.addEventListener('input', refresh);
   win.onFocus = () => {
     if (!win.el.contains(document.activeElement)) area.focus();
@@ -192,6 +221,18 @@ async function openNotepad({ path = null, size = 0 } = {}) {
   refresh();
   area.focus();
 }
+
+registerTintTarget({
+  id: 'notepad',
+  label: '記事本',
+  description: '游標與選取的顏色',
+  apply(t) {
+    const root = document.documentElement;
+    if (t.color) root.style.setProperty('--np-tint', t.shade);
+    else root.style.removeProperty('--np-tint');
+    root.toggleAttribute('data-np-tint', !!t.color);
+  },
+});
 
 registerApp({
   id: 'notepad',

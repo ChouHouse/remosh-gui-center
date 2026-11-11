@@ -2,9 +2,9 @@
 export const ERROR_TEXT = {
   'auth-failed': '登入失敗：帳號、密碼或金鑰不正確',
   'connect-failed': '無法連線到主機，請確認位置與連接埠',
-  'private-address': '部署在 Cloudflare 上的 Worker 連不到本機或內網位址，請改用主機的公開位址',
+  'private-address': '無法連線到本機或內網位址，請改用公開位址',
   'connect-timeout': '連線逾時',
-  'host-not-allowed': '這個 Worker 不允許連線到這台主機',
+  'host-not-allowed': '不允許連線到這台主機',
   'hostkey-changed': '主機金鑰與上次不同',
   'bad-key': '無法讀取這個私鑰檔（格式不支援，或不是私鑰）',
   'key-needs-passphrase': '這把私鑰有密碼保護，請輸入金鑰密碼',

@@ -27,8 +27,8 @@ function loadXterm() {
 // Single-quote a string for a POSIX shell.
 const quote = (s) => `'${s.replace(/'/g, `'\\''`)}'`;
 
-async function openTerminal({ path = null } = {}) {
-  const win = createWindow({ title: path ? P.base(path) : '終端機', appName: '終端機', iconHtml: terminalSvg(), width: 720, height: 440 });
+async function openTerminal({ path = null, cwd = null } = {}) {
+  const win = createWindow({ title: path ? P.base(path) : cwd ? P.base(cwd) : '終端機', appName: '終端機', iconHtml: terminalSvg(), width: 720, height: 440 });
   const host = h('div', { class: 'term-host' });
   win.body.append(host);
   let tid = null;
@@ -97,6 +97,8 @@ async function openTerminal({ path = null } = {}) {
     term.focus();
     // Opened on a file: run it from its own folder, like typing ./name.
     if (path) send(`cd -- ${quote(P.parent(path))} && ${quote('./' + P.base(path))}\n`);
+    // Opened from a folder in the file cabinet: start there.
+    else if (cwd) send(`cd -- ${quote(cwd)} && clear\n`);
   } catch (err) {
     await win.close(true);
     toast(`無法開啟終端機：${errText(err)}`, true);

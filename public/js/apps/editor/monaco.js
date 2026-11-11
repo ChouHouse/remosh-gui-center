@@ -1,14 +1,13 @@
 // Loads Monaco (the VS Code editor component) on demand and configures it.
-import { on } from '../../core/events.js';
-import { currentTint } from '../../shell/style.js';
+import { tintOf, registerTintTarget, reapplyTint } from '../../shell/style.js';
 export let monacoPromise = null;
 export const darkQuery = matchMedia('(prefers-color-scheme: dark)');
-// The editor follows the system light/dark setting; a tint from 設定 → 樣式
-// only colours its cursor, selection and active line number.
-export const themeName = () => (currentTint().color ? 'remosh-tint' : darkQuery.matches ? 'vs-dark' : 'vs');
+// The editor follows the system light/dark setting; its own tint (設定 → 樣式
+// → 編輯器) only colours the cursor, selection and active line number.
+export const themeName = () => (tintOf('editor').color ? 'remosh-tint' : darkQuery.matches ? 'vs-dark' : 'vs');
 
 function syncTheme(monaco) {
-  const t = currentTint();
+  const t = tintOf('editor');
   if (t.color) {
     monaco.editor.defineTheme('remosh-tint', {
       base: darkQuery.matches ? 'vs-dark' : 'vs',
@@ -24,6 +23,15 @@ function syncTheme(monaco) {
   }
   monaco.editor.setTheme(themeName());
 }
+
+registerTintTarget({
+  id: 'editor',
+  label: '編輯器',
+  description: '游標、選取範圍與目前行號的顏色',
+  apply() {
+    if (window.monaco) syncTheme(window.monaco); // before Monaco loads there is nothing to colour yet
+  },
+});
 
 export function loadMonaco() {
   if (monacoPromise) return monacoPromise;
@@ -48,8 +56,7 @@ export function loadMonaco() {
         d.setDiagnosticsOptions({ diagnosticCodesToIgnore: [2307, 2792, 7016, 2580, 2591, 2688] });
       }
       darkQuery.addEventListener('change', () => syncTheme(monaco));
-      on('settings:changed', () => syncTheme(monaco));
-      syncTheme(monaco);
+      reapplyTint('editor');
       resolve(monaco);
     }, reject);
   });

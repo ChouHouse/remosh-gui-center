@@ -20,7 +20,7 @@ const DEFAULTS = {
     sidebar: null, // file cabinet sidebar folders; null = the built-in list
   },
   style: {
-    tint: 'default', // colour scheme of the windows; see shell/style.js
+    tints: {}, // tint target ('files', 'editor', ...) -> tint id; see shell/style.js
     wallpaper: null, // file name in ~/.remosh-gui/wallpaper currently shown, or null
     wallpapers: [], // the last few uploads, most recently used first
   },
@@ -53,10 +53,23 @@ function normalise(obj) {
   };
 }
 
+const TINT_ID = /^[a-z-]{1,24}$/;
+function normaliseTints(st) {
+  const tints = {};
+  for (const [target, id] of Object.entries(st?.tints || {})) {
+    if (TINT_ID.test(target) && typeof id === 'string' && TINT_ID.test(id)) tints[target] = id;
+  }
+  // Files written before tints were per app had one `tint` for everything.
+  if (typeof st?.tint === 'string' && TINT_ID.test(st.tint)) {
+    for (const target of ['files', 'editor']) tints[target] ??= st.tint;
+  }
+  return tints;
+}
+
 function normaliseStyle(st) {
   const wallpapers = [...new Set((Array.isArray(st?.wallpapers) ? st.wallpapers : []).filter((n) => typeof n === 'string' && FILE_NAME.test(n)))].slice(0, MAX_WALLPAPERS);
   return {
-    tint: typeof st?.tint === 'string' && /^[a-z-]{1,24}$/.test(st.tint) ? st.tint : DEFAULTS.style.tint,
+    tints: normaliseTints(st),
     wallpaper: wallpapers.includes(st?.wallpaper) ? st.wallpaper : null,
     wallpapers,
   };
@@ -84,7 +97,7 @@ export async function loadSettings() {
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) raw = parsed;
     else throw new SyntaxError('not an object');
   } catch (err) {
-    if (err instanceof SyntaxError) toast(`~/${SETTINGS_DIR}/${SETTINGS_FILE} 的格式不正確，先使用預設設定`, true);
+    if (err instanceof SyntaxError) toast('設定檔的格式不正確，先使用預設設定', true);
     else if (err.code !== 'not-found') toast(`無法讀取設定檔：${err.message}`, true);
   }
   current = normalise(raw);
@@ -96,6 +109,7 @@ export async function saveSettings(next) {
   await ready; // never write before the file on the host has been read
   const clean = normalise(next);
   const file = { ...raw, version: 1, ...clean };
+  if (file.style) delete file.style.tint; // replaced by style.tints
   await rpc('mkdir', { path: settingsDir() });
   await rpc('write', { path: settingsPath(), data: toBase64(new TextEncoder().encode(JSON.stringify(file, null, 2) + '\n')) });
   raw = file;

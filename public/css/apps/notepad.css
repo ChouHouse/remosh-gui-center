@@ -5,3 +5,5 @@
   font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
 .np-text:disabled { opacity: .5; }
+html[data-np-tint] .np-text { caret-color: var(--np-tint); }
+html[data-np-tint] .np-text::selection { background: color-mix(in srgb, var(--np-tint) 38%, transparent); }

@@ -4,6 +4,10 @@ import { h } from '../core/dom.js';
 
 let closeCurrent = null;
 
+// The browser's own right-click menu is turned off everywhere; only menus
+// opened through showContextMenu (and the code editor's own) appear.
+document.addEventListener('contextmenu', (ev) => ev.preventDefault());
+
 export function showContextMenu(ev, items) {
   ev.preventDefault();
   closeCurrent?.();

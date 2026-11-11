@@ -399,7 +399,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   console.log('     task manager:', (await tm.locator('.tm-meta').textContent()).replace(/\s+/g, ' '), '|', meters.join(' | '));
   if (fs.existsSync('/.dockerenv')) {
     check((await page.textContent('#tm-scope')).startsWith('容器'), 'task manager reports the container scope');
-    check((await tm.locator('.tm-note').textContent()).includes('不是宿主機'), 'it says the figures are not the host\'s');
     if (cg && cg !== 'max') {
       const gb = (Number(cg) / 2 ** 30).toFixed(1) + ' GB';
       const hostGb = Math.round(Number(/MemTotal:\s+(\d+)/.exec(fs.readFileSync('/proc/meminfo', 'utf8'))[1]) / 2 ** 20);
@@ -524,7 +523,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await page.mouse.click(b.x + b.width - 30, b.y + b.height - 30, { button: 'right' });
   };
   await blank();
-  check((await menuLabels()).join('|') === '貼上|重新整理|內容', 'right-click on empty space', (await menuLabels()).join('|'));
+  check((await menuLabels()).join('|') === '新增資料夾|在這裡開啟終端機|貼上|重新整理|內容', 'right-click on empty space', (await menuLabels()).join('|'));
   await pick('貼上');
   await item('todo 複本.txt').waitFor();
   check(fs.readFileSync(home + '/docs/todo 複本.txt', 'utf8') === 'buy milk\neggs' && fs.existsSync(home + '/docs/todo.txt'), 'paste makes a copy under a free name');
@@ -551,6 +550,47 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.locator('.modal button', { hasText: '刪除' }).click();
   await item('todo 複本.txt').waitFor({ state: 'detached' });
   check(!fs.existsSync(home + '/project/todo 複本.txt'), 'delete removes the file on the host');
+
+  // ---- new folder, terminal here, and no browser menu
+  check(await page.evaluate(() => {
+    const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    document.querySelector('#dock').dispatchEvent(e);
+    return e.defaultPrevented;
+  }) && (await page.locator('.ctx-menu').count()) === 0, 'the browser\'s own right-click menu is disabled where we have none');
+  fs.rmSync(home + '/project/e2e 新資料夾', { recursive: true, force: true });
+  await blank();
+  await pick('新增資料夾');
+  await page.fill('.modal input', 'e2e 新資料夾');
+  await page.keyboard.press('Enter');
+  await item('e2e 新資料夾').waitFor();
+  const made = fs.statSync(home + '/project/e2e 新資料夾');
+  check(made.isDirectory() && (made.mode & 0o777) === 0o755 && made.uid === owner.uid, 'new folder is created on the host (755, owned by the user)');
+  await blank();
+  await pick('新增資料夾');
+  await page.fill('.modal input', 'e2e 新資料夾');
+  await page.keyboard.press('Enter');
+  check(await page.locator('.toast.err', { hasText: '已經有' }).first().waitFor({ timeout: 5000 }).then(() => true, () => false), 'a duplicate name is refused', (await page.locator('.toast').allTextContents()).join(' / '));
+  await item('e2e 新資料夾').click({ button: 'right' });
+  check((await menuLabels()).includes('在終端機開啟'), 'folders offer "open in terminal"');
+  await pick('在終端機開啟');
+  const tw0 = page.locator('.win', { has: page.locator('.term-host') });
+  await tw0.waitFor();
+  const termText = () => page.evaluate(() => (document.querySelector('.term-host .xterm-rows')?.textContent || '').replace(/\u00a0/g, ' '));
+  await page.waitForFunction(() => /[$#] *$/.test((document.querySelector('.term-host .xterm-rows')?.textContent || '').replace(/\u00a0/g, ' ').trimEnd() + ' '), null, { timeout: 15000 });
+  check((await termText()).includes('新資料夾') && !(await termText()).includes('M-'), 'non-ASCII folder names show properly in the prompt', (await termText()).trim().slice(0, 200));
+  await tw0.locator('.term-host').click();
+  await page.keyboard.type('pwd');
+  await page.keyboard.press('Enter');
+  // xterm draws spaces as non-breaking spaces, so compare with those normalised.
+  const inFolder = await page.waitForFunction((d) => document.querySelector('.term-host .xterm-rows')?.textContent.replace(/\u00a0/g, ' ').includes(d), home + '/project/e2e 新資料夾', { timeout: 15000 }).then(() => true, () => false);
+  check(inFolder, 'pwd in that terminal prints the folder', (await tw0.locator('.xterm-rows').textContent()).replace(/\u00a0/g, ' ').trim().slice(0, 300));
+  check((await tw0.locator('.titlebar .title').textContent()) === 'e2e 新資料夾 — 終端機', 'the terminal starts in that folder');
+  await tw0.locator('.traffic .close').click();
+  await toFinder();
+  await item('e2e 新資料夾').click({ button: 'right' });
+  await pick('刪除');
+  await page.locator('.modal button', { hasText: '刪除' }).click();
+  await item('e2e 新資料夾').waitFor({ state: 'detached' });
 
   // ---- sidebar right-click
   await page.locator('.sidebar h3').click({ button: 'right' });
@@ -597,7 +637,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await sw.waitFor();
   check((await sw.locator('.titlebar .title').textContent()) === '設定', 'settings window opens from the start menu');
   check((await sw.locator('.set-nav button').allTextContents()).join() === '動畫,檔案關聯,樣式', 'settings has the 動畫, 檔案關聯 and 樣式 categories');
-  check((await sw.locator('.set-path').textContent()) === '~/.remosh-gui/setting.json', 'it shows where settings are stored');
   check(await page.isChecked('#set-anim-enabled') && (await page.inputValue('#set-anim-speed')) === 'normal', 'defaults: animations on, normal speed');
   check(await page.isDisabled('#set-save'), 'nothing to save yet');
   await page.selectOption('#set-anim-speed', 'slow');
@@ -625,16 +664,36 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // ---- settings: 樣式 (tint and wallpaper), applied and saved at once
   await sw.locator('.set-nav button', { hasText: '樣式' }).click();
-  check((await sw.locator('.tint').count()) === 11, 'ten tints plus the default');
-  check((await sw.locator('.tint').allTextContents()).join() === '預設,深桃紅,淺桃紅,深藍,淺藍,深綠,淺綠,黃,橘,淺灰,稍深白', 'tint names');
-  await sw.locator('.tint[data-tint="blue-dark"]').click();
-  check(await waitSetting((st) => st.style?.tint === 'blue-dark'), 'choosing a tint saves it without pressing 儲存');
-  await sw.locator('.tint.current[data-tint="blue-dark"]').waitFor({ timeout: 5000 }).catch(() => {});
+  check((await sw.locator('.set-pane h4').allTextContents()).join() === '檔案櫃,編輯器,記事本,工作管理員', 'each tintable app has its own row of colours (the terminal has none)');
+  const filesTints = sw.locator('.tint-grid[data-target="files"]');
+  const editorTints = sw.locator('.tint-grid[data-target="editor"]');
+  check((await filesTints.locator('.tint').count()) === 11 && (await editorTints.locator('.tint').count()) === 11, 'ten tints plus the default, for each');
+  check((await filesTints.locator('.tint').allTextContents()).join() === '預設,深桃紅,淺桃紅,深藍,淺藍,深綠,淺綠,黃,橘,淺灰,稍深白', 'tint names');
+  await filesTints.locator('.tint[data-tint="blue-dark"]').click();
+  check(await waitSetting((st) => st.style?.tints?.files === 'blue-dark'), 'choosing a tint saves it without pressing 儲存');
+  await filesTints.locator('.tint.current[data-tint="blue-dark"]').waitFor({ timeout: 5000 }).catch(() => {});
   const cssVar = (n) => page.evaluate((name) => document.documentElement.style.getPropertyValue(name), n);
   check((await cssVar('--folder')) === '#1f5fbf' && (await cssVar('--folder-dark')) === '#174a96', 'the tint is the folder colour', await cssVar('--folder'));
   check((await cssVar('--surface')) === '' && (await sw.evaluate((el) => getComputedStyle(el).backgroundColor)) === 'rgb(255, 255, 255)', 'window surfaces keep following the system (no light/dark change)');
   check((await page.locator('.files .item svg path').nth(1).evaluate((el) => getComputedStyle(el).fill)) === 'rgb(31, 95, 191)', 'folder icons in the file cabinet are drawn in the tint');
-  check((await sw.locator('.tint.current').getAttribute('data-tint')) === 'blue-dark', 'the chosen tint is marked');
+  check((await filesTints.locator('.tint.current').getAttribute('data-tint')) === 'blue-dark', 'the chosen tint is marked');
+  check((await editorTints.locator('.tint.current').getAttribute('data-tint')) === 'default', 'the editor keeps its own (default) tint');
+  await editorTints.locator('.tint[data-tint="orange"]').click();
+  check(await waitSetting((st) => st.style.tints.editor === 'orange' && st.style.tints.files === 'blue-dark'), 'the editor tint is saved separately');
+  await editorTints.locator('.tint.current[data-tint="orange"]').waitFor({ timeout: 5000 }).catch(() => {});
+  check((await cssVar('--folder')) === '#1f5fbf', 'changing the editor tint leaves the folder colour alone');
+  await toFinder(); // bring the file cabinet (still in project/) in front of the settings window
+  await item('README.md').dblclick();
+  await sleep(250);
+  if (await page.locator('.modal .app-choice[data-app="editor"]').count()) await page.locator('.modal .app-choice[data-app="editor"]').click();
+  const tinted = page.locator('.win', { has: page.locator('.titlebar .title', { hasText: 'README.md — 編輯器' }) });
+  await tinted.locator('.monaco-editor .view-lines').click();
+  const cursorColour = await tinted.locator('.monaco-editor .cursors-layer .cursor').first().evaluate((el) => getComputedStyle(el).backgroundColor);
+  check(cursorColour === 'rgb(219, 122, 26)', 'the editor cursor uses the editor tint (orange), not the file cabinet one', cursorColour);
+  await tinted.locator('.traffic .close').click();
+  await page.locator('.dock-item', { hasText: '設定' }).click();
+  await editorTints.locator('.tint[data-tint="default"]').click();
+  await waitSetting((st) => st.style.tints.editor === 'default');
   check((await sw.locator('.wp-empty').count()) === 1 && (await sw.locator('.wp-list').count()) === 0, 'no wallpapers yet: one full-width note, no list');
   const paneW = (await sw.locator('.set-pane').boundingBox()).width;
   check((await sw.locator('.wp-empty').boundingBox()).width > paneW * 0.8, 'the note spans the pane');
@@ -665,8 +724,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.click('#wp-none');
   check(await waitSetting((st) => st.style.wallpaper === null && st.style.wallpapers.length === 5), '"no wallpaper" keeps the history');
   await page.waitForFunction(() => !document.querySelector('#desktop').style.backgroundImage);
-  await sw.locator('.tint[data-tint="default"]').click();
-  check(await waitSetting((st) => st.style.tint === 'default'), 'back to the default tint');
+  await filesTints.locator('.tint[data-tint="default"]').click();
+  check(await waitSetting((st) => st.style.tints.files === 'default'), 'back to the default tint');
   await page.waitForFunction(() => !document.documentElement.style.getPropertyValue('--folder'));
   fs.rmSync(shot, { force: true });
 

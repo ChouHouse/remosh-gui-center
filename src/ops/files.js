@@ -12,12 +12,17 @@ export async function realpath({ sftp }, msg) {
 // Creates one directory; succeeds quietly when it is already there.
 export async function mkdir({ sftp }, msg) {
   const path = reqPath(msg.path);
+  // Private by default (the settings folder); the page asks for 755 for ordinary folders.
+  const mode = Number.isInteger(msg.mode) && msg.mode >= 0 && msg.mode <= 0o777 ? msg.mode : 0o700;
   try {
-    await call(sftp, 'mkdir', path, { mode: 0o700 });
+    await call(sftp, 'mkdir', path, { mode });
     return { path, created: true };
   } catch (err) {
     const st = await call(sftp, 'stat', path).catch(() => null);
-    if (st && typeOf(st) === 'dir') return { path, created: false };
+    if (st) {
+      if (typeOf(st) === 'dir') return { path, created: false };
+      throw codeError('exists', 'A file with that name already exists');
+    }
     throw err;
   }
 }

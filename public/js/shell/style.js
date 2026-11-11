@@ -7,9 +7,18 @@ import { on } from '../core/events.js';
 import { toBase64, fromBase64 } from '../core/text-codec.js';
 import { getSettings, updateSettings, settingsDir, wallpaperDir, MAX_WALLPAPERS } from '../core/settings.js';
 
-// A tint is a colour, not a light/dark scheme: it colours the folder icons,
-// the selection highlight and the editor's cursor / selection. Light or dark
-// still follows the system.
+// ---- tints
+// A tint is a colour, not a light/dark scheme. Each app that can be tinted
+// registers a target and decides what the colour means for it:
+//
+//   registerTintTarget({
+//     id: 'files',                 key in settings (style.tints.files)
+//     label: '檔案櫃',              shown in 設定 → 樣式
+//     description: '…',            what the colour changes
+//     apply(tint) { … },           called now and whenever the choice changes;
+//   });                            tint = { id, label, color, shade } (color null = default)
+//
+// Read the current choice with tintOf(id); change it with setTint(id, tintId).
 const tint = (id, label, color, shade) => ({ id, label, color, shade });
 export const TINTS = [
   { id: 'default', label: '預設', color: null, shade: null },
@@ -24,20 +33,41 @@ export const TINTS = [
   tint('gray-light', '淺灰', '#c3c9d1', '#a3abb5'),
   tint('off-white', '稍深白', '#ece8dc', '#d3cdbb'),
 ];
-export const currentTint = () => TINTS.find((t) => t.id === getSettings().style.tint) || TINTS[0];
 
-function applyTint() {
-  const t = currentTint();
-  const root = document.documentElement;
-  if (t.color) {
-    root.style.setProperty('--folder', t.color); // folder front
-    root.style.setProperty('--folder-dark', t.shade); // folder tab
-    root.style.setProperty('--select', `color-mix(in srgb, ${t.shade} 26%, var(--surface))`);
-  } else {
-    for (const name of ['--folder', '--folder-dark', '--select']) root.style.removeProperty(name);
+const targets = new Map();
+const applied = new Map(); // target id -> tint id last applied, to skip no-op calls
+
+export const tintTargets = () => [...targets.values()];
+export const tintOf = (targetId) => TINTS.find((t) => t.id === getSettings().style.tints[targetId]) || TINTS[0];
+
+function applyTarget(target) {
+  const t = tintOf(target.id);
+  if (applied.get(target.id) === t.id) return;
+  applied.set(target.id, t.id);
+  try {
+    target.apply(t);
+  } catch (err) {
+    console.error(`tint target "${target.id}" failed`, err);
   }
-  root.dataset.tint = t.id;
 }
+
+export function registerTintTarget(target) {
+  if (targets.has(target.id)) throw new Error(`Tint target "${target.id}" is already registered`);
+  targets.set(target.id, target);
+  applyTarget(target);
+}
+
+// Call when a target becomes able to apply (e.g. the editor finished loading).
+export function reapplyTint(targetId) {
+  applied.delete(targetId);
+  const target = targets.get(targetId);
+  if (target) applyTarget(target);
+}
+
+export const setTint = (targetId, tintId) =>
+  updateSettings((s) => {
+    s.style.tints[targetId] = tintId;
+  });
 
 // ---- wallpaper
 const urls = new Map(); // file name -> object URL (kept for this session)
@@ -117,17 +147,11 @@ export const clearWallpaper = () =>
     s.style.wallpaper = null;
   });
 
-export const setTint = (id) =>
-  updateSettings((s) => {
-    s.style.tint = id;
-  });
-
 on('settings:changed', () => {
-  applyTint();
+  for (const target of targets.values()) applyTarget(target);
   applyWallpaper();
 });
 on('session:end', () => {
   for (const url of urls.values()) URL.revokeObjectURL(url);
   urls.clear();
 });
-applyTint();

@@ -20,7 +20,10 @@ export function termOpen({ client, session }, msg) {
   const cols = size(msg.cols, 80, 500);
   const rows = size(msg.rows, 24, 300);
   return new Promise((resolve, reject) => {
-    client.shell({ term: 'xterm-256color', cols, rows }, (err, stream) => {
+    // Ask for a UTF-8 locale so non-ASCII file names show properly in the prompt
+    // (the server applies it only if its AcceptEnv allows LANG / LC_*).
+    const env = { LANG: 'C.UTF-8', LC_CTYPE: 'C.UTF-8' };
+    client.shell({ term: 'xterm-256color', cols, rows }, { env }, (err, stream) => {
       if (err) return reject(codeError('exec-failed', err.message || 'Cannot open a shell on this host'));
       const tid = ++session.termSeq;
       session.terms.set(tid, stream);

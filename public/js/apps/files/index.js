@@ -11,9 +11,10 @@ import { conn, rpc } from '../../core/rpc.js';
 import { on, emit } from '../../core/events.js';
 import { getSettings, updateSettings } from '../../core/settings.js';
 import { createWindow } from '../../shell/wm.js';
-import { registerApp } from '../../shell/apps.js';
+import { registerApp, launchApp } from '../../shell/apps.js';
 import { openFile, openWith } from '../../shell/file-open.js';
 import { showContextMenu } from '../../shell/context-menu.js';
+import { registerTintTarget } from '../../shell/style.js';
 import { putFiles, takeFiles, clearFiles, cutPaths } from './clipboard.js';
 
 let finder = null;
@@ -337,12 +338,34 @@ function createFinder(home) {
     }
   }
 
+  async function newFolder() {
+    const answer = await dialog({
+      title: '新增資料夾',
+      message: '資料夾名稱：',
+      input: '新資料夾',
+      buttons: [{ label: '取消', value: false, cancel: true }, { label: '建立', value: true, default: true }],
+    });
+    const name = answer.value ? answer.text.trim() : '';
+    if (!answer.value) return;
+    if (!name || name === '.' || name === '..' || name.includes('/')) return toast('資料夾名稱不能是空的，也不能包含 /', true);
+    try {
+      const res = await rpc('mkdir', { path: P.join(st.path, name), mode: 0o755 });
+      if (!res.created) return toast(`已經有「${name}」這個資料夾`, true);
+    } catch (err) {
+      return toast(`無法建立「${name}」：${errText(err)}`, true);
+    }
+    emit('fs:changed', st.path);
+  }
+
   files.addEventListener('contextmenu', (ev) => {
     const el = ev.target.closest('.item');
     const e = el ? st.shown[Number(el.dataset.i)] : null;
     select(el ? Number(el.dataset.i) : -1);
     if (!e) {
       return showContextMenu(ev, [
+        { label: '新增資料夾', run: newFolder },
+        { label: '在這裡開啟終端機', run: () => launchApp('terminal', { cwd: st.path }) },
+        null,
         { label: '貼上', run: paste },
         { label: '重新整理', run: refresh },
         null,
@@ -354,6 +377,7 @@ function createFinder(home) {
     showContextMenu(ev, [
       { label: '開啟', run: () => open(e) },
       isFile(e) && { label: '開啟程式…', run: () => openWith(full, e.size) },
+      isDir(e) && { label: '在終端機開啟', run: () => launchApp('terminal', { cwd: full }) },
       isDir(e) && { label: '加到側邊欄', enabled: !paths.includes(full), run: () => setSidebar([...paths, full]) },
       null,
       { label: '複製', run: () => copyOrCut('copy', e) },
@@ -407,5 +431,22 @@ on('fs:changed', (dir) => {
   if (finder?.getPath() === dir) finder.navigate(dir, false);
 });
 on('session:resume', () => finder?.navigate(finder.getPath(), false));
+
+// What a tint means here: the folder icons and the selection highlight.
+registerTintTarget({
+  id: 'files',
+  label: '檔案櫃',
+  description: '資料夾圖示與選取的顏色',
+  apply(t) {
+    const root = document.documentElement;
+    if (t.color) {
+      root.style.setProperty('--folder', t.color); // folder front
+      root.style.setProperty('--folder-dark', t.shade); // folder tab
+      root.style.setProperty('--select', `color-mix(in srgb, ${t.shade} 26%, var(--surface))`);
+    } else {
+      for (const name of ['--folder', '--folder-dark', '--select']) root.style.removeProperty(name);
+    }
+  },
+});
 
 registerApp({ id: 'files', name: '檔案櫃', icon: folderSvg, startMenu: true, launch: openFinder });

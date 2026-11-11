@@ -26,7 +26,7 @@ input.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2
   flex: none; display: flex; align-items: center; gap: 12px; padding: 8px 12px;
   border-top: 1px solid var(--border); background: var(--surface-2);
 }
-.set-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font: 11.5px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.set-fill { flex: 1; }
 .set-status { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .set-save { padding: 6px 16px; border: 0; border-radius: 7px; background: var(--accent); color: var(--accent-text); font-weight: 600; }
 .set-save:disabled { opacity: .45; cursor: default; }
@@ -48,8 +48,9 @@ input.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2
 }
 .tint:hover { background: var(--surface-3); }
 .tint.current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.tint .chip { width: 24px; height: 24px; flex: none; display: flex; }
-.tint .chip svg { width: 100%; height: 100%; }
+.tint .chip { width: 18px; height: 18px; flex: none; border-radius: 50%; border: 2px solid; }
+.set-pane h4 { margin: 10px 0 2px; font-size: 12.5px; font-weight: 600; }
+.set-pane h4 + .set-desc { margin: 0 0 6px; }
 .wp-list { display: flex; flex-direction: column; gap: 6px; }
 .wp {
   display: flex; align-items: center; gap: 12px; padding: 6px; min-width: 0;

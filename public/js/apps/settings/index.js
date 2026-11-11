@@ -8,12 +8,12 @@ import { h } from '../../core/dom.js';
 import { errText } from '../../core/errors.js';
 import { toast } from '../../core/ui.js';
 import { fmtTime } from '../../core/format.js';
-import { settingsSvg, folderSvg } from '../../core/icons.js';
+import { settingsSvg } from '../../core/icons.js';
 import { on } from '../../core/events.js';
-import { getSettings, saveSettings, SETTINGS_DIR, SETTINGS_FILE } from '../../core/settings.js';
+import { getSettings, saveSettings } from '../../core/settings.js';
 import { createWindow } from '../../shell/wm.js';
 import { registerApp, getApp, appsForExt } from '../../shell/apps.js';
-import { TINTS, setTint, uploadWallpaper, useWallpaper, clearWallpaper, wallpaperUrl } from '../../shell/style.js';
+import { TINTS, tintTargets, setTint, uploadWallpaper, useWallpaper, clearWallpaper, wallpaperUrl } from '../../shell/style.js';
 
 const row = (title, desc, control) =>
   h('div', { class: 'set-row' }, h('div', { class: 'set-text' }, h('b', null, title), h('small', null, desc)), control);
@@ -78,7 +78,7 @@ const CATEGORIES = [
       draw();
       return h('div', null,
         h('h2', null, '檔案關聯'),
-        h('p', { class: 'set-desc' }, '副檔名在第一次開啟該類檔案時才會登記到這裡；這裡只能修改或移除。'),
+        h('p', { class: 'set-desc' }, '每種檔案要用哪個程式開啟。'),
         list);
     },
   },
@@ -89,17 +89,24 @@ const CATEGORIES = [
     // once (a wallpaper is a file on the host, not just a value).
     render(draft) {
       const fail = (what) => (err) => toast(`${what}：${errText(err)}`, true);
-      const swatches = h('div', { class: 'tint-grid' }, TINTS.map((t) =>
-        h('button', {
-          type: 'button',
-          class: 'tint' + (draft.style.tint === t.id ? ' current' : ''),
-          'data-tint': t.id,
-          'aria-pressed': String(draft.style.tint === t.id),
-          onclick: () => setTint(t.id).catch(fail('無法儲存色調')),
-        },
-        // A small folder in that colour: this is what changes in the file cabinet.
-        h('span', { class: 'chip', html: folderSvg(), style: t.color ? `--folder:${t.color};--folder-dark:${t.shade}` : '--folder:#4a9bea;--folder-dark:#2f7fd1' }),
-        t.label)));
+      // One row of swatches per app that registered itself as tintable.
+      const tintSections = tintTargets().flatMap((target) => {
+        const chosen = draft.style.tints[target.id] || 'default';
+        return [
+          h('h4', null, target.label),
+          h('p', { class: 'set-desc' }, target.description),
+          h('div', { class: 'tint-grid', 'data-target': target.id }, TINTS.map((t) =>
+            h('button', {
+              type: 'button',
+              class: 'tint' + (chosen === t.id ? ' current' : ''),
+              'data-tint': t.id,
+              'aria-pressed': String(chosen === t.id),
+              onclick: () => setTint(target.id, t.id).catch(fail('無法儲存色調')),
+            },
+            h('span', { class: 'chip', style: `background:${t.color || '#4a9bea'};border-color:${t.shade || '#2f7fd1'}` }),
+            t.label))),
+        ];
+      });
 
       const picker = h('input', { type: 'file', accept: 'image/*', id: 'wp-file', hidden: true });
       const upload = h('button', { type: 'button', id: 'wp-upload', onclick: () => picker.click() }, '上傳壁紙…');
@@ -136,12 +143,11 @@ const CATEGORIES = [
         : h('p', { class: 'wp-empty' }, '還沒有上傳過壁紙。');
       return h('div', null,
         h('h2', null, '樣式'),
-        h('p', { class: 'set-desc' }, '這一頁的變更會立刻套用並儲存。'),
+        h('p', { class: 'set-desc' }, '變更會立即套用。'),
         h('h3', null, '色調'),
-        h('p', { class: 'set-desc' }, '檔案櫃的資料夾與選取顏色，以及編輯器的游標與選取顏色。'),
-        swatches,
+        tintSections,
         h('h3', null, '壁紙'),
-        h('p', { class: 'set-desc' }, '保留最近 5 張，存在主機的 ~/.remosh-gui/wallpaper。改用舊的那張，它就會排到最前面。'),
+        h('p', { class: 'set-desc' }, '最多保留 5 張。'),
         thumbs,
         h('div', { class: 'wp-actions' }, picker, upload,
           h('button', { type: 'button', id: 'wp-none', disabled: !draft.style.wallpaper, onclick: () => clearWallpaper().catch(fail('無法儲存')) }, '不使用壁紙')));
@@ -166,8 +172,7 @@ function openSettings() {
   win.body.append(
     h('div', { class: 'set-main' }, nav, pane),
     h('div', { class: 'set-foot' },
-      h('span', { class: 'set-path', title: '設定存放在這台主機上你的家目錄' }, `~/${SETTINGS_DIR}/${SETTINGS_FILE}`),
-      status, saveBtn));
+      h('span', { class: 'set-fill' }), status, saveBtn));
 
   const refresh = () => {
     const dirty = JSON.stringify(draft) !== saved;
