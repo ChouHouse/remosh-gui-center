@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ssh-desk",
+  "main": "src/worker.js",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "alias": {
+    // native addon, cannot load in a Worker; ssh2 falls back without it
+    "cpu-features": "./src/stubs/unavailable.js"
+  },
+  "define": {
+    // ssh2 references these for Windows agent helpers that are never used here
+    "__dirname": "\"/\"",
+    "__filename": "\"/worker.js\""
+  },
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "vars": {
+    // Optional comma-separated allowlist of SSH targets, e.g. "example.com,10.0.0.5:2222".
+    // Empty = any host may be reached through this Worker.
+    "ALLOWED_HOSTS": ""
+  }
+}

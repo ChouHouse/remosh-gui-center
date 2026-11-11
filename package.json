@@ -1,0 +1,19 @@
+{
+  "name": "ssh-desk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloudflare Worker: SSH/SFTP file desktop with Monaco editor windows",
+  "scripts": {
+    "postinstall": "node scripts/strip-native.mjs",
+    "assets": "node scripts/copy-monaco.mjs",
+    "dev": "npm run assets && wrangler dev --ip 0.0.0.0 --port 3000",
+    "deploy": "npm run assets && wrangler deploy"
+  },
+  "dependencies": {
+    "ssh2": "^1.16.0"
+  },
+  "devDependencies": {
+    "monaco-editor": "^0.52.2",
+    "wrangler": "^4"
+  }
+}

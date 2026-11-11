@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SSH Desk</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div id="desktop" hidden>
+  <header id="menubar">
+    <span class="brand">SSH Desk</span>
+    <span id="active-title"></span>
+    <span class="spacer"></span>
+    <span id="conn-label"></span>
+    <button id="disconnect" type="button">中斷連線</button>
+  </header>
+  <main id="windows"></main>
+  <nav id="dock" aria-label="工作列"></nav>
+</div>
+
+<div id="login" class="overlay">
+  <form id="login-form" class="card" autocomplete="on">
+    <h1>SSH Desk</h1>
+    <p class="sub" id="login-sub">連線到 SSH 主機，瀏覽並編輯上面的檔案</p>
+    <div class="row">
+      <label class="grow">主機位置
+        <input id="f-host" name="host" required placeholder="example.com" autocapitalize="off" spellcheck="false">
+      </label>
+      <label class="port">連接埠
+        <input id="f-port" name="port" type="number" min="1" max="65535" value="22" required>
+      </label>
+    </div>
+    <label>帳號
+      <input id="f-user" name="username" required autocomplete="username" autocapitalize="off" spellcheck="false">
+    </label>
+    <label><span id="pass-label">密碼</span>
+      <input id="f-pass" name="password" type="password" autocomplete="current-password">
+    </label>
+    <div class="keyrow">
+      <input type="file" id="f-key" hidden>
+      <button type="button" id="key-pick">選擇私鑰檔…</button>
+      <span id="key-name">未選擇（選填，改用金鑰登入）</span>
+      <button type="button" id="key-clear" hidden>移除</button>
+    </div>
+    <div id="login-error" class="error" role="alert" hidden></div>
+    <div id="hostkey-warn" class="warn" hidden>
+      <strong>主機金鑰和上次不同</strong>
+      <p>這台主機回報的金鑰指紋與瀏覽器記住的不一樣。可能是主機重灌或換了金鑰，也可能有人攔截連線。</p>
+      <p class="fp">上次：<code id="fp-old"></code><br>這次：<code id="fp-new"></code></p>
+      <button type="button" id="trust-new">信任新的金鑰並繼續</button>
+    </div>
+    <button type="submit" id="login-btn" class="primary">登入</button>
+    <p class="note">密碼與私鑰只用於連線，不會被儲存；私鑰會傳到 Worker 進行登入。</p>
+  </form>
+</div>
+
+<div id="toasts" aria-live="polite"></div>
+
+<script src="/vs/loader.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
