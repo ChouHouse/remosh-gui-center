@@ -13,6 +13,7 @@ import { getSettings, updateSettings } from '../../core/settings.js';
 import { createWindow } from '../../shell/wm.js';
 import { registerApp, launchApp, getApp } from '../../shell/apps.js';
 import { makeDraggable, registerDropTarget } from '../../shell/drag.js';
+import { attachMarquee } from '../../shell/marquee.js';
 import { acceptsDrop, dropAction, dropInto } from '../../shell/file-drop.js';
 import { shortcutKind, readShortcut } from '../../shell/shortcuts.js';
 import { isPinned, pinApp } from '../../shell/start-menu.js';
@@ -31,6 +32,7 @@ function createFinder(home, startPath = home) {
     entries: [],
     shown: [],
     selected: -1,
+    sel: new Set(),
     token: 0,
     view: store.get('view', 'grid'),
     showHidden: store.get('showHidden', false),
@@ -115,6 +117,7 @@ function createFinder(home, startPath = home) {
       st.path = path;
       st.entries = res.entries;
       st.selected = -1;
+      st.sel = new Set();
       render();
       files.scrollTop = 0;
     } catch (err) {
@@ -193,7 +196,8 @@ function createFinder(home, startPath = home) {
     st.shown = listable.filter((e) => st.showHidden || !e.name.startsWith('.')).sort(cmp);
     files.className = 'files ' + st.view;
     const hidden = listable.length - st.shown.length;
-    status.textContent = `${st.shown.length} 個項目` + (hidden ? `（另有 ${hidden} 個隱藏項目）` : '');
+    st.statusBase = `${st.shown.length} 個項目` + (hidden ? `（另有 ${hidden} 個隱藏項目）` : '');
+    status.textContent = st.statusBase;
     if (!st.shown.length) {
       files.replaceChildren(h('div', { class: 'empty' }, hidden ? '這個資料夾只有隱藏檔' : '這個資料夾是空的'));
       return;
@@ -221,18 +225,35 @@ function createFinder(home, startPath = home) {
     files.replaceChildren(
       h('div', { class: 'list-head' }, head('name', '名稱'), head('mtime', '修改日期'), head('size', '大小'), head('kind', '種類')),
       h('div', { class: 'items' }, items));
-    select(st.selected);
+    paint();
   }
 
+  // ---- selection: st.sel holds the selected names, st.selected is the item
+  // last clicked (the cursor for the keyboard and the anchor for Shift).
+  function paint() {
+    for (const el of files.querySelectorAll('.item')) el.classList.toggle('selected', st.sel.has(st.shown[Number(el.dataset.i)]?.name));
+    if (st.statusBase != null && !files.querySelector('.state')) status.textContent = st.statusBase + (st.sel.size > 1 ? `，已選取 ${st.sel.size} 個` : '');
+  }
+  // Select exactly one item (or none with -1).
   function select(i) {
     st.selected = i;
-    files.querySelectorAll('.item.selected').forEach((el) => el.classList.remove('selected'));
-    const el = files.querySelector(`.item[data-i="${i}"]`);
-    if (el) {
-      el.classList.add('selected');
-      el.scrollIntoView({ block: 'nearest' });
-    }
+    st.sel = new Set(st.shown[i] ? [st.shown[i].name] : []);
+    paint();
+    files.querySelector(`.item[data-i="${i}"]`)?.scrollIntoView({ block: 'nearest' });
   }
+  function toggle(i) {
+    const name = st.shown[i].name;
+    if (st.sel.has(name)) st.sel.delete(name);
+    else st.sel.add(name);
+    st.selected = i;
+    paint();
+  }
+  function selectRange(from, to) {
+    const [a, b] = from < to ? [from, to] : [to, from];
+    st.sel = new Set(st.shown.slice(a, b + 1).map((e) => e.name));
+    paint();
+  }
+  const chosen = () => st.shown.filter((e) => st.sel.has(e.name));
 
   function open(e) {
     if (!e) return;
@@ -244,7 +265,11 @@ function createFinder(home, startPath = home) {
 
   files.addEventListener('click', (ev) => {
     const el = ev.target.closest('.item');
-    select(el ? Number(el.dataset.i) : -1);
+    const i = el ? Number(el.dataset.i) : -1;
+    if (i < 0) return select(-1);
+    if (ev.shiftKey && st.selected >= 0) selectRange(st.selected, i);
+    else if (ev.ctrlKey || ev.metaKey) toggle(i);
+    else select(i);
   });
   files.addEventListener('dblclick', (ev) => {
     const el = ev.target.closest('.item');
@@ -269,9 +294,11 @@ function createFinder(home, startPath = home) {
       const keep = st.shown[st.selected]?.name;
       const top = files.scrollTop;
       st.entries = res.entries;
-      st.selected = -1;
-      render();
-      if (keep != null) select(st.shown.findIndex((e) => e.name === keep));
+      render(); // the selection is by name, so it survives
+      st.selected = keep == null ? -1 : st.shown.findIndex((e) => e.name === keep);
+      const still = new Set(st.shown.map((e) => e.name));
+      st.sel = new Set([...st.sel].filter((name) => still.has(name)));
+      paint();
       files.scrollTop = top;
     } catch {
       /* keep what is shown; a manual refresh will report the problem */
@@ -302,10 +329,14 @@ function createFinder(home, startPath = home) {
     emit('fs:changed', st.path);
   }
 
-  async function copyOrCut(mode, e) {
-    await putFiles(mode, [P.join(st.path, e.name)]);
+  // Copy or cut one entry or a list of them.
+  async function copyOrCut(mode, what) {
+    const list = [what].flat();
+    if (!list.length) return;
+    await putFiles(mode, list.map((e) => P.join(st.path, e.name)));
     render(); // cut items are dimmed
-    toast(mode === 'cut' ? `已剪下「${e.name}」，到目的資料夾按貼上` : `已複製「${e.name}」`);
+    const which = list.length > 1 ? `${list.length} 個項目` : `「${list[0].name}」`;
+    toast(mode === 'cut' ? `已剪下${which}，到目的資料夾按貼上` : `已複製${which}`);
   }
 
   async function paste() {
@@ -336,18 +367,23 @@ function createFinder(home, startPath = home) {
     else render();
   }
 
-  async function remove(e) {
-    const dirLike = e.type === 'dir';
+  // Delete one entry or a list of them (asks once).
+  async function remove(what) {
+    const list = [what].flat();
+    if (!list.length) return;
+    const dirLike = list.some((e) => e.type === 'dir');
     const ok = await dialog({
-      title: `確定要刪除「${e.name}」嗎？`,
+      title: list.length > 1 ? `確定要刪除這 ${list.length} 個項目嗎？` : `確定要刪除「${list[0].name}」嗎？`,
       message: dirLike ? '資料夾裡的所有內容都會一起刪除，而且無法復原。' : '刪除後無法復原。',
       buttons: [{ label: '取消', value: false, cancel: true, default: true }, { label: '刪除', value: true, danger: true }],
     });
     if (!ok) return;
-    try {
-      await rpc('remove', { path: P.join(st.path, e.name) });
-    } catch (err) {
-      toast(`無法刪除「${e.name}」：${errText(err)}`, true);
+    for (const e of list) {
+      try {
+        await rpc('remove', { path: P.join(st.path, e.name) });
+      } catch (err) {
+        toast(`無法刪除「${e.name}」：${errText(err)}`, true);
+      }
     }
     emit('fs:changed', st.path);
   }
@@ -406,7 +442,24 @@ function createFinder(home, startPath = home) {
     const el = ev.target.closest('.item');
     const e = el && st.shown[Number(el.dataset.i)];
     if (!e) return null;
-    return { type: 'file', name: e.name, icon: isDir(e) ? folderSvg() : fileSvg(e.name), data: { path: P.join(st.path, e.name), isDir: isDir(e), size: e.size } };
+    const icon = isDir(e) ? folderSvg() : fileSvg(e.name);
+    const path = P.join(st.path, e.name);
+    // Dragging one of several selected items takes the whole selection along.
+    const group = st.sel.has(e.name) && st.sel.size > 1 ? chosen() : [e];
+    return {
+      type: 'file',
+      name: group.length > 1 ? `${group.length} 個項目` : e.name,
+      icon,
+      data: { path, paths: group.map((g) => P.join(st.path, g.name)), isDir: isDir(e), size: e.size },
+    };
+  });
+  attachMarquee(files, {
+    itemSelector: '.item',
+    onChange(elements, { additive, first }) {
+      if (first) st.marqueeBase = additive ? new Set(st.sel) : new Set();
+      st.sel = new Set([...st.marqueeBase, ...elements.map((el) => st.shown[Number(el.dataset.i)].name)]);
+      paint();
+    },
   });
   const offDrop = registerDropTarget(files, {
     accepts: acceptsDrop,
@@ -414,7 +467,8 @@ function createFinder(home, startPath = home) {
     onDrop(payload, drop) {
       const el = drop.target?.closest?.('.item');
       const onto = el && files.contains(el) ? st.shown[Number(el.dataset.i)] : null;
-      const dir = onto && isDir(onto) && P.join(st.path, onto.name) !== payload.data?.path ? P.join(st.path, onto.name) : st.path;
+      const dragged = payload.data?.paths || [];
+      const dir = onto && isDir(onto) && !dragged.includes(P.join(st.path, onto.name)) ? P.join(st.path, onto.name) : st.path;
       dropInto(dir, payload, drop);
     },
   });
@@ -422,6 +476,17 @@ function createFinder(home, startPath = home) {
   files.addEventListener('contextmenu', (ev) => {
     const el = ev.target.closest('.item');
     const e = el ? st.shown[Number(el.dataset.i)] : null;
+    // Right-click inside a multi-selection acts on all of it.
+    if (e && st.sel.has(e.name) && st.sel.size > 1) {
+      const list = chosen();
+      return showContextMenu(ev, [
+        { label: `複製 ${list.length} 個項目`, run: () => copyOrCut('copy', list) },
+        { label: `剪下 ${list.length} 個項目`, run: () => copyOrCut('cut', list) },
+        { label: '貼上', run: paste },
+        null,
+        { label: `刪除 ${list.length} 個項目`, danger: true, run: () => remove(list) },
+      ]);
+    }
     select(el ? Number(el.dataset.i) : -1);
     if (!e) {
       return showContextMenu(ev, [
@@ -465,15 +530,18 @@ function createFinder(home, startPath = home) {
 
   files.addEventListener('keydown', (ev) => {
     const n = st.shown.length;
-    const cur = st.shown[st.selected];
     const mod = ev.ctrlKey || ev.metaKey;
-    if (mod && !ev.altKey && !ev.shiftKey && 'cxv'.includes(ev.key.toLowerCase())) {
+    const picked = chosen();
+    if (mod && !ev.altKey && !ev.shiftKey && 'acxv'.includes(ev.key.toLowerCase())) {
       const k = ev.key.toLowerCase();
       if (k === 'v') paste();
-      else if (cur) copyOrCut(k === 'x' ? 'cut' : 'copy', cur);
+      else if (k === 'a') {
+        st.sel = new Set(st.shown.map((e) => e.name));
+        paint();
+      } else if (picked.length) copyOrCut(k === 'x' ? 'cut' : 'copy', picked);
       else return;
-    } else if (ev.key === 'Delete' && cur) remove(cur);
-    else if (ev.key === 'F2' && cur) rename(cur);
+    } else if (ev.key === 'Delete' && picked.length) remove(picked);
+    else if (ev.key === 'F2' && picked.length === 1) rename(picked[0]);
     else if (ev.key === 'Enter') open(st.shown[st.selected]);
     else if (ev.key === 'Backspace') navigate(P.parent(st.path));
     else if (n && (ev.key === 'ArrowDown' || ev.key === 'ArrowRight')) select(Math.min(n - 1, st.selected + 1));

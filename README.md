@@ -110,6 +110,14 @@ Built-in payload types are `file` (`data.path`) and `app` (`data.id`);
 `shell/file-drop.js` holds the move / copy / shortcut rules shared by the file
 cabinet and the desktop.
 
+### Selection
+
+The file cabinet and the desktop support several selected items: Ctrl+click,
+Shift+click (file cabinet), Ctrl+A, and a rubber-band box drawn from empty
+space (`shell/marquee.js`, `attachMarquee(container, { itemSelector, onChange })`).
+Copy, cut, delete and drag act on the whole selection; a drag payload lists
+every file in `data.paths`.
+
 ### System colour and light/dark
 
 `shell/style.js` owns the one system colour and the light/dark mode chosen in

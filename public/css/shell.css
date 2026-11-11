@@ -239,3 +239,9 @@ body.dragging-item, body.dragging-item * { cursor: grabbing !important; user-sel
 }
 #kept-sessions button:hover { background: var(--surface-3); }
 #kept-sessions span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- rubber-band selection (shell/marquee.js) ---------- */
+.marquee {
+  position: absolute; z-index: 6; pointer-events: none; border-radius: 2px;
+  border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent);
+}

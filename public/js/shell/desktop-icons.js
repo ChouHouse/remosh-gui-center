@@ -15,6 +15,7 @@ import { settingsDir, whenSettingsReady } from '../core/settings.js';
 import { getApp, launchApp } from './apps.js';
 import { showContextMenu } from './context-menu.js';
 import { makeDraggable, registerDropTarget } from './drag.js';
+import { attachMarquee } from './marquee.js';
 import { acceptsDrop, dropAction, dropInto } from './file-drop.js';
 import { openFile } from './file-open.js';
 import { desktopDir, shortcutKind, displayName, readShortcut, writeText } from './shortcuts.js';
@@ -119,7 +120,7 @@ function placeAt(name, clientX, clientY) {
   saveConfig();
 }
 let listed = ''; // signature of the last listing, to skip redraws
-let selected = null;
+let sel = new Set(); // paths of the selected icons
 let timer = 0;
 let active = false;
 const resolved = new Map(); // `${name}|${mtime}|${size}` -> { shortcut, icon }
@@ -150,7 +151,7 @@ function render() {
   const cells = layout();
   layer.replaceChildren(...items.map((it, i) =>
     h('div', {
-      class: 'desk-item' + (it.path === selected ? ' selected' : ''),
+      class: 'desk-item' + (sel.has(it.path) ? ' selected' : ''),
       'data-i': i,
       title: it.label,
       style: `left:${PAD + cells.get(it.entry.name).col * CELL}px;top:${PAD + cells.get(it.entry.name).row * CELL}px`,
@@ -193,17 +194,23 @@ function open(it) {
   return openFile(it.path, it.entry.size);
 }
 
-async function remove(it) {
+// Delete one icon or a list of them (asks once).
+async function remove(what) {
+  const list = [what].flat();
+  if (!list.length) return;
+  const one = list.length === 1 ? list[0] : null;
   const ok = await dialog({
-    title: `確定要刪除「${it.label}」嗎？`,
-    message: it.kind ? '只會刪除這個捷徑，不會影響它指向的東西。' : isDir(it.entry) ? '資料夾裡的所有內容都會一起刪除，而且無法復原。' : '刪除後無法復原。',
+    title: one ? `確定要刪除「${one.label}」嗎？` : `確定要刪除這 ${list.length} 個項目嗎？`,
+    message: list.every((it) => it.kind) ? '只會刪除捷徑，不會影響它指向的東西。' : list.some((it) => isDir(it.entry)) ? '資料夾裡的所有內容都會一起刪除，而且無法復原。' : '刪除後無法復原。',
     buttons: [{ label: '取消', value: false, cancel: true, default: true }, { label: '刪除', value: true, danger: true }],
   });
   if (!ok) return;
-  try {
-    await rpc('remove', { path: it.path });
-  } catch (err) {
-    toast(`無法刪除「${it.label}」：${errText(err)}`, true);
+  for (const it of list) {
+    try {
+      await rpc('remove', { path: it.path });
+    } catch (err) {
+      toast(`無法刪除「${it.label}」：${errText(err)}`, true);
+    }
   }
   emit('fs:changed', desktopDir());
 }
@@ -212,24 +219,42 @@ const itemAt = (ev) => {
   const el = ev.target.closest?.('.desk-item');
   return el ? items[Number(el.dataset.i)] : null;
 };
-const select = (it) => {
-  selected = it?.path || null;
-  for (const el of layer.children) el.classList.toggle('selected', items[Number(el.dataset.i)]?.path === selected);
+const paint = () => {
+  for (const el of layer.querySelectorAll('.desk-item')) el.classList.toggle('selected', sel.has(items[Number(el.dataset.i)]?.path));
 };
-layer.addEventListener('click', (ev) => select(itemAt(ev)));
+const setSel = (paths) => {
+  sel = new Set(paths);
+  paint();
+};
+const chosen = () => items.filter((it) => sel.has(it.path));
+layer.addEventListener('click', (ev) => {
+  const it = itemAt(ev);
+  if (!it) return setSel([]);
+  if (ev.ctrlKey || ev.metaKey || ev.shiftKey) setSel(sel.has(it.path) ? [...sel].filter((p) => p !== it.path) : [...sel, it.path]);
+  else setSel([it.path]);
+});
 layer.addEventListener('dblclick', (ev) => {
   const it = itemAt(ev);
   if (it) open(it);
 });
 layer.addEventListener('keydown', (ev) => {
-  const it = items.find((x) => x.path === selected);
-  if (!it) return;
-  if (ev.key === 'Enter') open(it);
-  else if (ev.key === 'Delete') remove(it);
+  const list = chosen();
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'a') {
+    ev.preventDefault();
+    return setSel(items.map((it) => it.path));
+  }
+  if (!list.length) return;
+  if (ev.key === 'Enter') open(list[0]);
+  else if (ev.key === 'Delete') remove(list);
 });
 layer.addEventListener('contextmenu', (ev) => {
   const it = itemAt(ev);
-  select(it);
+  // Right-click inside a multi-selection acts on all of it.
+  if (it && sel.has(it.path) && sel.size > 1) {
+    const list = chosen();
+    return showContextMenu(ev, [{ label: `刪除 ${list.length} 個項目`, danger: true, run: () => remove(list) }]);
+  }
+  setSel(it ? [it.path] : []);
   if (!it) {
     return showContextMenu(ev, [
       { label: '重新整理', run: () => load(true) },
@@ -247,20 +272,63 @@ layer.addEventListener('contextmenu', (ev) => {
 
 makeDraggable(layer, (ev) => {
   const it = itemAt(ev);
-  return it && { type: 'file', name: it.label, icon: it.icon, data: { path: it.path, isDir: isDir(it.entry), size: it.entry.size } };
+  if (!it) return null;
+  // Dragging one of several selected icons takes the whole selection along.
+  const group = sel.has(it.path) && sel.size > 1 ? chosen() : [it];
+  return {
+    type: 'file',
+    name: group.length > 1 ? `${group.length} 個項目` : it.label,
+    icon: it.icon,
+    data: { path: it.path, paths: group.map((g) => g.path), isDir: isDir(it.entry), size: it.entry.size },
+  };
 });
+attachMarquee(layer, {
+  itemSelector: '.desk-item',
+  onChange(elements, { additive, first }) {
+    if (first) marqueeBase = additive ? new Set(sel) : new Set();
+    setSel([...marqueeBase, ...elements.map((el) => items[Number(el.dataset.i)].path)]);
+  },
+});
+
+// Move a group of icons together: the dragged one goes to the cell under the
+// pointer, the rest keep their distance from it.
+function placeGroup(names, lead, clientX, clientY) {
+  const rect = layer.getBoundingClientRect();
+  const { cols, rows } = gridSize();
+  const cells = layout();
+  const from = cells.get(lead);
+  const dc = Math.max(0, Math.min(cols - 1, Math.floor((clientX - rect.left - PAD) / CELL))) - from.col;
+  const dr = Math.max(0, Math.min(rows - 1, Math.floor((clientY - rect.top - PAD) / CELL))) - from.row;
+  const moving = new Set(names);
+  const targets = new Map(names.map((n) => {
+    const c = cells.get(n);
+    return [n, { col: Math.max(0, Math.min(cols - 1, c.col + dc)), row: Math.max(0, Math.min(rows - 1, c.row + dr)) }];
+  }));
+  const wanted = new Set([...targets.values()].map((p) => `${p.col},${p.row}`));
+  // Icons in the way give up their cell and are placed automatically again.
+  for (const [other, p] of cells) if (!moving.has(other) && wanted.has(`${p.col},${p.row}`)) placed.delete(other);
+  for (const [n, p] of targets) placed.set(n, p);
+  render();
+  saveConfig();
+}
+let marqueeBase = new Set();
+
 registerDropTarget(layer, {
   accepts: acceptsDrop,
   action: dropAction,
   async onDrop(payload, drop) {
     // An icon already on the desktop is just being put somewhere else.
-    if (payload.type === 'file' && P.parent(payload.data.path) === desktopDir() && !drop.ctrlKey && !drop.altKey) {
+    const paths = payload.data?.paths || [];
+    if (payload.type === 'file' && paths.every((p) => P.parent(p) === desktopDir()) && !drop.ctrlKey && !drop.altKey) {
+      if (paths.length > 1) return placeGroup(paths.map((p) => P.base(p)), P.base(payload.data.path), drop.clientX, drop.clientY);
       return placeAt(P.base(payload.data.path), drop.clientX, drop.clientY);
     }
-    const name = await dropInto(desktopDir(), payload, drop);
-    if (!name) return;
+    const names = await dropInto(desktopDir(), payload, drop);
+    if (!names.length) return;
     await load(true);
-    if (items.some((it) => it.entry.name === name)) placeAt(name, drop.clientX, drop.clientY); // lands where it was dropped
+    // What was dropped lands where it was dropped (several: from that cell on).
+    const present = names.filter((n) => items.some((it) => it.entry.name === n));
+    if (present.length) placeAt(present[0], drop.clientX, drop.clientY);
   },
 });
 
@@ -296,7 +364,7 @@ on('session:end', () => {
   clearInterval(timer);
   items = [];
   listed = '';
-  selected = null;
+  sel = new Set();
   placed = new Map();
   configSeen = '';
   clearTimeout(saveTimer);
