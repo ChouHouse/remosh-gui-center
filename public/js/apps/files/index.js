@@ -5,7 +5,7 @@ import { store } from '../../core/store.js';
 import { errText } from '../../core/errors.js';
 import { toast, dialog } from '../../core/ui.js';
 import { fmtSize, fmtTime } from '../../core/format.js';
-import { P, freeName } from '../../core/path.js';
+import { P, freeName, isInvisible } from '../../core/path.js';
 import { ICON, folderSvg, fileSvg } from '../../core/icons.js';
 import { conn, rpc } from '../../core/rpc.js';
 import { on, emit } from '../../core/events.js';
@@ -189,9 +189,10 @@ function createFinder(home, startPath = home) {
       else if (key === 'kind') r = kind(a).localeCompare(kind(b), 'zh-Hant');
       return (r || a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })) * dir;
     };
-    st.shown = st.entries.filter((e) => st.showHidden || !e.name.startsWith('.')).sort(cmp);
+    const listable = st.entries.filter((e) => !isInvisible(e.name)); // internal files are never shown
+    st.shown = listable.filter((e) => st.showHidden || !e.name.startsWith('.')).sort(cmp);
     files.className = 'files ' + st.view;
-    const hidden = st.entries.length - st.shown.length;
+    const hidden = listable.length - st.shown.length;
     status.textContent = `${st.shown.length} 個項目` + (hidden ? `（另有 ${hidden} 個隱藏項目）` : '');
     if (!st.shown.length) {
       files.replaceChildren(h('div', { class: 'empty' }, hidden ? '這個資料夾只有隱藏檔' : '這個資料夾是空的'));

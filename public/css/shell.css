@@ -201,12 +201,9 @@ body.dragging-item, body.dragging-item * { cursor: grabbing !important; user-sel
 #start-menu .sm-empty { margin: 0; padding: 8px 10px; color: var(--muted); }
 
 /* ---------- desktop icons: columns from the top left, behind the windows ---------- */
-#desktop-icons {
-  position: absolute; inset: 0; z-index: 0; padding: 12px; outline: none;
-  display: grid; grid-auto-flow: column; grid-template-rows: repeat(auto-fill, 92px); grid-auto-columns: 92px;
-  gap: 4px; align-content: start; justify-content: start;
-}
+#desktop-icons { position: absolute; inset: 0; z-index: 0; outline: none; overflow: hidden; }
 .desk-item {
+  position: absolute; width: 92px; height: 92px; box-sizing: border-box;
   display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px 4px; min-width: 0;
   border-radius: 8px; border: 1px solid transparent; text-align: center; color: #ffffff;
 }

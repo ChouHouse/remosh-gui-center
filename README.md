@@ -147,8 +147,11 @@ npm run deploy   # publish to Cloudflare
 - **Start menu** (bottom left): pinned apps and 所有應用程式; right-click an app to
   pin or unpin it, or drag it onto the desktop. Click the user for full screen
   and 登出.
-- **Desktop**: shows whatever is in `~/.remosh-gui/desktop`, in columns from the
-  top left. Drop a file or folder on it to move it there (Ctrl = copy, Alt =
+- **Desktop**: shows whatever is in `~/.remosh-gui/desktop`. New icons fill
+  columns from the top left; an icon dragged to another grid cell stays there
+  (positions are an array of `{ name, col, row }` in
+  `desktop/config.inv-remosh_gui-config`). Files whose extension starts with
+  `inv-` are internal and never listed anywhere in the GUI. Drop a file or folder on it to move it there (Ctrl = copy, Alt =
   shortcut). Shortcuts are one-line text files: `name.remosh_gui-app` holds
   `app:<id>`, `name.remosh_gui-lnk` holds `lnk:<path>`.
 - **Windows**: drag to the left or right edge for half the screen, to the top to

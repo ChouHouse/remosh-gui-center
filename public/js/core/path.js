@@ -36,3 +36,7 @@ export function freeName(name, taken) {
     if (!taken.has(candidate)) return candidate;
   }
 }
+
+// Files whose extension starts with "inv-" (e.g. config.inv-remosh_gui-config)
+// are internal: no part of the GUI lists them. A terminal still does.
+export const isInvisible = (name) => /\.inv-[^./]*$/.test(name);

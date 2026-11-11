@@ -854,13 +854,51 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await deskItem('src').waitFor();
   check((await deskItem('src').locator('.lnk-badge').count()) === 1, 'a shortcut shows its target\'s icon with an arrow, and hides the extension');
   const boxes = await page.locator('.desk-item').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => [Math.round(r.left), Math.round(r.top)]));
-  check(boxes[0][0] < 30 && boxes[0][1] < 30 && boxes.every((b, i) => i === 0 || (b[0] === boxes[0][0] && b[1] > boxes[i - 1][1])), 'desktop icons fill a column from the top left', JSON.stringify(boxes));
+  const onGrid = boxes.every((b) => (b[0] - 12) % 96 === 0 && (b[1] - 12) % 96 === 0) && new Set(boxes.map(String)).size === boxes.length;
+  const dropCell = [12 + Math.floor((300 - 12) / 96) * 96, 12 + Math.floor((420 - 12) / 96) * 96];
+  check(onGrid && String(await deskItem('src').evaluate((el) => [el.offsetLeft, el.offsetTop])) === String(dropCell), 'icons sit on a grid, one per cell; the last one dropped is where it was dropped', JSON.stringify(boxes));
+  fs.writeFileSync(desk + '/fresh.txt', 'x');
+  give(desk + '/fresh.txt');
+  await deskItem('fresh.txt').waitFor({ timeout: 9000 });
+  const freshAt = await deskItem('fresh.txt').evaluate((el) => [el.offsetLeft, el.offsetTop]);
+  check(freshAt[0] === 12 && !boxes.some((b) => String(b) === String(freshAt)), 'a file that appears on its own takes the first free cell from the top left', JSON.stringify(freshAt));
+  fs.rmSync(desk + '/fresh.txt');
+  await deskItem('fresh.txt').waitFor({ state: 'detached', timeout: 9000 });
   await deskItem('src').dblclick();
   await page.waitForFunction(() => document.querySelectorAll('.win[data-app="檔案櫃"]').length === 2);
   const viaLnk = page.locator('.win[data-app="檔案櫃"]').nth(1);
   await viaLnk.locator('.files .item').first().waitFor();
   check((await viaLnk.locator('.statusbar .path').textContent()) === home + '/project/src', 'opening the shortcut opens the folder it points at');
   await viaLnk.locator('.traffic .close').click();
+  // free placement: an icon stays in the grid cell it is dropped on
+  const cfg = desk + '/config.inv-remosh_gui-config';
+  await beginDrag(deskItem('drag-b.txt'), 500, 300);
+  await endDrag();
+  await sleep(200);
+  let placedAt = await deskItem('drag-b.txt').boundingBox();
+  check(placedAt.x === 12 + 5 * 96 && placedAt.y === 12 + 3 * 96, 'a desktop icon dropped elsewhere snaps to that grid cell', JSON.stringify(placedAt));
+  let saved2 = null;
+  for (let i = 0; i < 50 && !saved2; i++) {
+    try {
+      const list = JSON.parse(fs.readFileSync(cfg, 'utf8'));
+      if (Array.isArray(list) && list.some((x) => x.name === 'drag-b.txt' && x.col === 5 && x.row === 3)) saved2 = list;
+    } catch { /* not written yet */ }
+    if (!saved2) await sleep(100);
+  }
+  check(!!saved2 && saved2.every((x) => typeof x.name === 'string' && Number.isInteger(x.col) && Number.isInteger(x.row)), 'places are saved as an array of { name, col, row } in desktop/config.inv-remosh_gui-config', fs.existsSync(cfg) ? fs.readFileSync(cfg, 'utf8') : 'missing');
+  check((await page.locator('.desk-item .name').allTextContents()).every((n) => !n.includes('config')), 'the config file is not shown on the desktop');
+  await page.locator('#desktop-icons').click({ button: 'right', position: { x: 300, y: 600 } });
+  await pick('重新整理');
+  await sleep(600);
+  placedAt = await deskItem('drag-b.txt').boundingBox();
+  check(placedAt.x === 12 + 5 * 96 && placedAt.y === 12 + 3 * 96, 'the place survives a reload');
+  const aBefore = await deskItem('drag-a.txt').boundingBox();
+  await beginDrag(deskItem('drag-a.txt'), 500, 300);
+  await endDrag();
+  await sleep(200);
+  const swapA = await deskItem('drag-a.txt').boundingBox();
+  const swapB = await deskItem('drag-b.txt').boundingBox();
+  check(swapA.x === 12 + 5 * 96 && swapA.y === 12 + 3 * 96 && swapB.x === aBefore.x && swapB.y === aBefore.y, 'dropping onto an occupied cell swaps the two icons', JSON.stringify([swapA, swapB, aBefore]));
   // an app dragged out of the start menu becomes an app shortcut
   await page.click('#start-btn');
   await page.click('#sm-all-btn');
@@ -894,6 +932,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const appRow = deskWin.locator('.files .item', { has: page.locator('.name', { hasText: /^工作管理員\.remosh_gui-app$/ }) });
   await appRow.waitFor();
   check((await deskWin.locator('.statusbar .path').textContent()) === desk, 'the desktop folder opens in a file cabinet');
+  await deskWin.locator('button[title="顯示隱藏檔"]').click();
+  await sleep(200);
+  const listedNames = await deskWin.locator('.files .item .name').allTextContents();
+  check(fs.existsSync(cfg) && !listedNames.some((n) => n.includes('.inv-')), '.inv-* files stay invisible in the file cabinet even with hidden files shown', listedNames.join(','));
+  check(require('node:child_process').execSync('ls -a ' + JSON.stringify(desk)).toString().includes('config.inv-remosh_gui-config'), 'a terminal still lists it');
+  await deskWin.locator('button[title="顯示隱藏檔"]').click();
   await appRow.click({ button: 'right' });
   check((await menuLabels()).includes('釘選到開始') && !(await menuLabels()).includes('開啟程式…'), 'file cabinet right-click on an app shortcut offers "pin to start"', (await menuLabels()).join('|'));
   await page.keyboard.press('Escape');

@@ -1,8 +1,11 @@
-// The desktop: icons for whatever is in ~/.remosh-gui/desktop, laid out in
-// columns from the top left. Files and folders can be dropped here (move,
+// The desktop: icons for whatever is in ~/.remosh-gui/desktop. New icons fill
+// columns from the top left; an icon dragged somewhere stays in that grid cell,
+// remembered in desktop/config.inv-remosh_gui-config as an array of
+// { name, col, row } (an invisible file: the GUI never lists it). Files and folders can be dropped here (move,
 // Ctrl = copy, Alt = shortcut) and apps become app shortcuts.
 import { $, h } from '../core/dom.js';
-import { P } from '../core/path.js';
+import { P, isInvisible } from '../core/path.js';
+import { fromBase64 } from '../core/text-codec.js';
 import { errText } from '../core/errors.js';
 import { toast, dialog } from '../core/ui.js';
 import { folderSvg, fileSvg } from '../core/icons.js';
@@ -14,13 +17,107 @@ import { showContextMenu } from './context-menu.js';
 import { makeDraggable, registerDropTarget } from './drag.js';
 import { acceptsDrop, dropAction, dropInto } from './file-drop.js';
 import { openFile } from './file-open.js';
-import { desktopDir, shortcutKind, displayName, readShortcut } from './shortcuts.js';
+import { desktopDir, shortcutKind, displayName, readShortcut, writeText } from './shortcuts.js';
 import { isPinned, pinApp } from './start-menu.js';
 
 const layer = h('div', { id: 'desktop-icons', tabindex: '0', 'aria-label': '桌面' });
 $('#windows').prepend(layer);
 
 let items = []; // { entry, path, label, icon, kind, shortcut }
+
+// ---- placement
+const CONFIG_NAME = 'config.inv-remosh_gui-config';
+const CELL = 96; // px per grid cell
+const PAD = 12;
+let placed = new Map(); // file name -> { col, row }, only icons the user has put somewhere
+let configSeen = ''; // mtime|size of the config last read
+let saveTimer = 0;
+let savePending = false; // positions changed here and are not on the host yet
+const gridSize = () => ({
+  cols: Math.max(1, Math.floor((layer.clientWidth - PAD) / CELL)),
+  rows: Math.max(1, Math.floor((layer.clientHeight - PAD) / CELL)),
+});
+
+// Where every icon goes: remembered cells first, the rest fill the free cells
+// column by column from the top left.
+function layout() {
+  const { cols, rows } = gridSize();
+  const used = new Set();
+  const cells = new Map();
+  for (const it of items) {
+    const p = placed.get(it.entry.name);
+    if (p && p.col < cols && p.row < rows && !used.has(`${p.col},${p.row}`)) {
+      cells.set(it.entry.name, p);
+      used.add(`${p.col},${p.row}`);
+    }
+  }
+  let col = 0;
+  let row = 0;
+  for (const it of items) {
+    if (cells.has(it.entry.name)) continue;
+    while (used.has(`${col},${row}`)) {
+      if (++row >= rows) {
+        row = 0;
+        col++;
+      }
+    }
+    cells.set(it.entry.name, { col, row });
+    used.add(`${col},${row}`);
+  }
+  return cells;
+}
+
+function saveConfig() {
+  savePending = true;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    const names = new Set(items.map((it) => it.entry.name));
+    const list = [...placed].filter(([name]) => names.has(name)).map(([name, p]) => ({ name, col: p.col, row: p.row }));
+    try {
+      await writeText(P.join(desktopDir(), CONFIG_NAME), JSON.stringify(list, null, 2) + '\n');
+    } catch (err) {
+      toast(`無法記住圖示位置：${errText(err)}`, true);
+    }
+    savePending = false;
+  }, 300);
+}
+
+async function readConfig(entry) {
+  if (savePending) return; // what is in memory is newer than the file
+  const stamp = entry ? `${entry.mtime}|${entry.size}` : '';
+  if (stamp === configSeen) return;
+  configSeen = stamp;
+  if (!entry) return;
+  try {
+    const res = await rpc('read', { path: P.join(desktopDir(), CONFIG_NAME) });
+    const list = JSON.parse(new TextDecoder().decode(fromBase64(res.data)));
+    if (!Array.isArray(list)) return;
+    placed = new Map(list
+      .filter((x) => typeof x?.name === 'string' && Number.isInteger(x.col) && Number.isInteger(x.row) && x.col >= 0 && x.row >= 0)
+      .map((x) => [x.name, { col: x.col, row: x.row }]));
+  } catch {
+    /* unreadable or not JSON: keep the positions already known */
+  }
+}
+
+// Put `name` in the cell under a point; whatever was there takes its old place.
+function placeAt(name, clientX, clientY) {
+  const rect = layer.getBoundingClientRect();
+  const { cols, rows } = gridSize();
+  const col = Math.max(0, Math.min(cols - 1, Math.floor((clientX - rect.left - PAD) / CELL)));
+  const row = Math.max(0, Math.min(rows - 1, Math.floor((clientY - rect.top - PAD) / CELL)));
+  const cells = layout();
+  const from = cells.get(name);
+  for (const [other, p] of cells) {
+    if (other !== name && p.col === col && p.row === row) {
+      if (from) placed.set(other, from);
+      else placed.delete(other); // a newcomer took its cell: it goes back to automatic placement
+    }
+  }
+  placed.set(name, { col, row });
+  render();
+  saveConfig();
+}
 let listed = ''; // signature of the last listing, to skip redraws
 let selected = null;
 let timer = 0;
@@ -50,8 +147,14 @@ async function resolve(entry, path) {
 }
 
 function render() {
+  const cells = layout();
   layer.replaceChildren(...items.map((it, i) =>
-    h('div', { class: 'desk-item' + (it.path === selected ? ' selected' : ''), 'data-i': i, title: it.label },
+    h('div', {
+      class: 'desk-item' + (it.path === selected ? ' selected' : ''),
+      'data-i': i,
+      title: it.label,
+      style: `left:${PAD + cells.get(it.entry.name).col * CELL}px;top:${PAD + cells.get(it.entry.name).row * CELL}px`,
+    },
       h('span', { class: 'ico', html: it.icon }), h('span', { class: 'name' }, it.label))));
 }
 
@@ -60,10 +163,13 @@ async function load(force) {
   try {
     const dir = desktopDir();
     const { entries } = await rpc('list', { path: dir });
-    const signature = entries.map((e) => `${e.name}|${e.type}|${e.size}|${e.mtime}`).sort().join('\n');
-    if (!force && signature === listed) return;
-    const next = await Promise.all(entries
-      .filter((e) => !e.name.startsWith('.'))
+    const config = entries.find((e) => e.name === CONFIG_NAME);
+    const stale = !savePending && (config ? `${config.mtime}|${config.size}` : '') !== configSeen;
+    await readConfig(config);
+    const shown = entries.filter((e) => !isInvisible(e.name) && !e.name.startsWith('.'));
+    const signature = shown.map((e) => `${e.name}|${e.type}|${e.size}|${e.mtime}`).sort().join('\n');
+    if (!force && !stale && signature === listed) return;
+    const next = await Promise.all(shown
       .sort((a, b) => isDir(b) - isDir(a) || a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
       .map(async (entry) => {
         const path = P.join(dir, entry.name);
@@ -146,8 +252,28 @@ makeDraggable(layer, (ev) => {
 registerDropTarget(layer, {
   accepts: acceptsDrop,
   action: dropAction,
-  onDrop: (payload, drop) => dropInto(desktopDir(), payload, drop),
+  async onDrop(payload, drop) {
+    // An icon already on the desktop is just being put somewhere else.
+    if (payload.type === 'file' && P.parent(payload.data.path) === desktopDir() && !drop.ctrlKey && !drop.altKey) {
+      return placeAt(P.base(payload.data.path), drop.clientX, drop.clientY);
+    }
+    const name = await dropInto(desktopDir(), payload, drop);
+    if (!name) return;
+    await load(true);
+    if (items.some((it) => it.entry.name === name)) placeAt(name, drop.clientX, drop.clientY); // lands where it was dropped
+  },
 });
+
+// A renamed icon keeps its place.
+on('fs:moved', (from, to) => {
+  if (!active || P.parent(from) !== desktopDir() || P.parent(to) !== desktopDir()) return;
+  const p = placed.get(P.base(from));
+  if (!p) return;
+  placed.delete(P.base(from));
+  placed.set(P.base(to), p);
+  saveConfig();
+});
+new ResizeObserver(() => active && render()).observe(layer);
 
 on('fs:changed', (dir) => {
   if (active && dir === desktopDir()) load(true);
@@ -171,6 +297,9 @@ on('session:end', () => {
   items = [];
   listed = '';
   selected = null;
+  placed = new Map();
+  configSeen = '';
+  clearTimeout(saveTimer);
   resolved.clear();
   render();
 });
