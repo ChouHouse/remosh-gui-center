@@ -9,6 +9,13 @@ export const setActiveTitle = (t) => {
 };
 export const wm = { wins: [], z: 10, focused: null, cascade: 0 };
 
+// Called after a window opens, closes, is minimised or takes the focus.
+const watchers = new Set();
+export const onWindowsChange = (fn) => watchers.add(fn);
+const changed = () => {
+  for (const fn of watchers) fn();
+};
+
 // title is the short name (shown in the taskbar); the title bar shows
 // "title — appName" so every window says which app it belongs to.
 export function createWindow({ title, appName, iconHtml, width, height }) {
@@ -76,6 +83,7 @@ export function createWindow({ title, appName, iconHtml, width, height }) {
       win.dockEl.classList.add('active');
       setActiveTitle(fullTitle(win.title));
     }
+    changed();
     win.onFocus?.();
   };
   win.minimize = () => {
@@ -89,6 +97,7 @@ export function createWindow({ title, appName, iconHtml, width, height }) {
       setActiveTitle('');
       focusTop();
     }
+    changed();
   };
   let animTimer = null;
   win.toggleMax = () => {
@@ -127,6 +136,7 @@ export function createWindow({ title, appName, iconHtml, width, height }) {
       setActiveTitle('');
       focusTop();
     }
+    changed();
     return true;
   };
 

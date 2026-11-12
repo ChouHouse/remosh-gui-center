@@ -3,6 +3,7 @@
 // is a copy of the window taken at that moment; it does not keep updating.
 import { h } from '../core/dom.js';
 import { wm, winLayer, dockItems } from './wm.js';
+import { groupOf, grouping } from './dock.js';
 
 const SHOW_AFTER_MS = 450;
 const MAX_W = 240;
@@ -88,34 +89,42 @@ function copyScroll(win, copy) {
   });
 }
 
-function show(win) {
-  hide();
-  if (!wm.wins.includes(win) || document.body.classList.contains('dragging')) return;
+// The windows an entry stands for: itself, or its whole app when entries are merged.
+const membersOf = (win) => (grouping() ? groupOf(win) : [win]);
+
+function card(win) {
   const { w, h: hgt } = windowSize(win);
-  if (!w || !hgt) return;
+  if (!w || !hgt) return null;
   const scale = Math.min(MAX_W / w, MAX_H / hgt);
   const copy = snapshot(win, w, hgt, scale);
   const stage = h('div', { class: 'win-preview-stage' }, copy);
   Object.assign(stage.style, { width: Math.round(w * scale) + 'px', height: Math.round(hgt * scale) + 'px' });
-  popup = h('div', { class: 'win-preview' },
+  const el = h('div', { class: 'win-preview-card' },
     h('div', { class: 'win-preview-title' },
       h('span', { class: 'ico', html: win.dockEl.querySelector('.ico').innerHTML }),
       h('span', { class: 'lbl' }, win.title)),
     stage);
-  popup.addEventListener('pointerenter', () => {
-    clearTimeout(hideTimer);
-    peek(win);
+  el.addEventListener('pointerenter', () => peek(win));
+  el.addEventListener('click', () => {
+    hide();
+    win.focus();
   });
+  return { el, win, copy };
+}
+
+function show(win) {
+  hide();
+  if (!wm.wins.includes(win) || document.body.classList.contains('dragging')) return;
+  const cards = membersOf(win).map(card).filter(Boolean);
+  if (!cards.length) return;
+  popup = h('div', { class: 'win-preview' }, cards.map((c) => c.el));
+  popup.addEventListener('pointerenter', () => clearTimeout(hideTimer));
   popup.addEventListener('pointerleave', () => {
     peek(null);
     hideSoon();
   });
-  popup.addEventListener('click', () => {
-    hide();
-    win.focus();
-  });
   document.body.append(popup);
-  copyScroll(win, copy);
+  for (const c of cards) copyScroll(c.win, c.copy);
   const item = win.dockEl.getBoundingClientRect();
   const dock = document.getElementById('dock').getBoundingClientRect();
   const pw = popup.offsetWidth;
@@ -146,10 +155,21 @@ dockItems.addEventListener('pointerout', (ev) => {
   clearTimeout(timer);
   if (!ev.relatedTarget?.closest?.('.dock-item')) hideSoon();
 });
-// A click acts on the window itself; the picture gets out of the way.
+// A click acts on the window itself; the picture gets out of the way. An
+// entry that stands for several windows cannot know which one is meant, so
+// its click brings up the pictures to choose from.
 dockItems.addEventListener('pointerdown', (ev) => {
+  const win = winOf(ev.target);
+  if (win && membersOf(win).length > 1) return;
   muted = ev.target.closest?.('.dock-item') || null;
   hide();
+}, true);
+dockItems.addEventListener('click', (ev) => {
+  const win = winOf(ev.target);
+  if (!win || membersOf(win).length < 2) return;
+  ev.stopPropagation();
+  clearTimeout(timer);
+  if (shownFor !== win) show(win);
 }, true);
 dockItems.addEventListener('wheel', hide, { passive: true });
 window.addEventListener('blur', hide);

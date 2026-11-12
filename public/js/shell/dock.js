@@ -5,7 +5,7 @@ import { on } from '../core/events.js';
 import { errText } from '../core/errors.js';
 import { toast } from '../core/ui.js';
 import { getSettings } from '../core/settings.js';
-import { wm, dockItems } from './wm.js';
+import { wm, dockItems, onWindowsChange } from './wm.js';
 import { listApps, getApp, launchApp } from './apps.js';
 import { showContextMenu } from './context-menu.js';
 import { setTaskbar } from './taskbar.js';
@@ -28,7 +28,48 @@ function renderPins() {
   pins.replaceChildren(...pinnedIds().map(getApp).filter(Boolean).map((app) =>
     h('button', { type: 'button', class: 'dock-item dock-pin', 'data-pin': app.id, title: app.name, 'aria-label': `開啟 ${app.name}`, onclick: () => launchApp(app.id) },
       h('span', { class: 'ico', html: app.icon() }))));
+  sync();
 }
+
+// Windows of the same app, in the order of their entries.
+export const groupOf = (win) =>
+  [...dockItems.children].map(winOf).filter((w) => w && w.el.dataset.app === win.el.dataset.app);
+export const grouping = () => getSettings().taskbar.group;
+
+// Keeps the bar in step with the open windows:
+//  - a pinned launcher steps aside while its app is open (the app's own entry
+//    is there instead) and comes back when the last window closes;
+//  - with "合併視窗" on, the windows of one app share its first entry.
+function sync() {
+  const running = new Set(wm.wins.map((w) => appOf(w)?.id));
+  let shown = 0;
+  for (const el of pins.children) {
+    el.hidden = running.has(el.dataset.pin);
+    if (!el.hidden) shown++;
+  }
+  pins.hidden = !shown;
+  const seen = new Set();
+  for (const el of dockItems.children) {
+    const win = winOf(el);
+    if (!win) continue;
+    const key = win.el.dataset.app;
+    const members = grouping() ? groupOf(win) : [win];
+    const follower = grouping() && seen.has(key);
+    seen.add(key);
+    el.classList.toggle('grouped', follower);
+    el.classList.toggle('active', members.includes(wm.focused));
+    let badge = el.querySelector('.grp');
+    if (!follower && members.length > 1) {
+      if (!badge) el.append((badge = h('span', { class: 'grp' })));
+      badge.textContent = `${key} · ${members.length}`;
+      el.dataset.count = members.length;
+    } else {
+      badge?.remove();
+      delete el.dataset.count;
+    }
+  }
+}
+onWindowsChange(sync);
 on('settings:changed', renderPins);
 renderPins();
 
@@ -60,7 +101,10 @@ dock.addEventListener('contextmenu', (ev) => {
       app && (pinnedIds().includes(app.id)
         ? { label: '從工作列取消釘選', run: () => unpin(app.id) }
         : { label: '釘選到工作列', run: () => pin(app.id) }),
-      { label: '關閉應用程式', danger: true, run: () => win.close() },
+      { label: '關閉應用程式', danger: true, run: async () => {
+        // One at a time: each may ask about unsaved changes.
+        for (const w of grouping() ? groupOf(win) : [win]) if ((await w.close()) === false) break;
+      } },
     ].filter((item) => item !== false && item !== undefined));
   }
   if (ev.target.closest('#clock')) {
@@ -81,14 +125,21 @@ dockItems.addEventListener('pointerdown', (ev) => {
       moving = true;
       item.classList.add('reordering');
     }
-    const prev = item.previousElementSibling;
-    const next = item.nextElementSibling;
+    // Entries folded into a group are not on show: step over them.
+    const step = (el, dir) => {
+      do el = el[dir]; while (el?.classList.contains('grouped'));
+      return el;
+    };
+    const prev = step(item, 'previousElementSibling');
+    const next = step(item, 'nextElementSibling');
     const mid = (el) => {
       const r = el.getBoundingClientRect();
       return r.left + r.width / 2;
     };
     if (prev && e.clientX < mid(prev)) prev.before(item);
     else if (next && e.clientX > mid(next)) next.after(item);
+    else return;
+    sync();
   };
   const up = () => {
     window.removeEventListener('pointermove', move);

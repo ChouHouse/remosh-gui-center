@@ -26,6 +26,7 @@ const DEFAULTS = {
     align: 'left', // 'left' | 'center' (a floating dock)
     clock: true, // show the time
     pinned: [], // app ids kept on the taskbar as launchers
+    group: false, // one entry per app instead of one per window
   },
   start: {
     pinned: null, // app ids pinned to the start menu, in order; null = every app
@@ -74,6 +75,7 @@ function normalise(obj) {
       labels: obj?.taskbar?.labels !== false,
       align: obj?.taskbar?.align === 'center' ? 'center' : 'left',
       clock: obj?.taskbar?.clock !== false,
+      group: obj?.taskbar?.group === true,
       pinned: [...new Set((Array.isArray(obj?.taskbar?.pinned) ? obj.taskbar.pinned : []).filter((v) => typeof v === 'string' && /^[a-z0-9-]{1,32}$/.test(v)))].slice(0, 20),
     },
   };

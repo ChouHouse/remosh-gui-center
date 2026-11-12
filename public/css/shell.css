@@ -339,10 +339,13 @@ html[data-taskbar-autohide="on"].start-open #dock, html[data-taskbar-autohide="o
 
 /* ---------- taskbar previews (shell/preview.js) ---------- */
 .win-preview {
-  position: fixed; z-index: 90000; padding: 8px; cursor: pointer;
+  position: fixed; z-index: 90000; padding: 4px; cursor: pointer;
   background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow);
   animation: win-preview-in var(--anim, .2s) ease;
 }
+.win-preview { display: flex; gap: 10px; max-width: calc(100vw - 12px); overflow: hidden; }
+.win-preview-card { flex: none; padding: 4px; border-radius: 7px; }
+.win-preview-card:hover { background: var(--surface-3); }
 .win-preview-title { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; max-width: 240px; font-size: 12px; }
 .win-preview-title .ico { width: 16px; height: 16px; flex: none; }
 .win-preview-title .ico svg, .win-preview-title .ico img { width: 100%; height: 100%; }
@@ -364,7 +367,11 @@ html.peeking #windows > .win.peek-target.minimized { display: flex; }
 
 /* ---------- pinned launchers and reordering (shell/dock.js) ---------- */
 #dock-pins { flex: none; display: flex; align-items: center; gap: 6px; }
-#dock-pins:empty { display: none; }
+#dock-pins:empty, #dock-pins[hidden], .dock-item[hidden], .dock-item.grouped { display: none; }
+/* A merged entry names the app and how many windows it stands for. */
+.dock-item[data-count] .lbl { display: none; }
+.dock-item .grp { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--dock-font); }
+html[data-taskbar-labels="off"] .dock-item .grp { font-size: 11px; color: var(--muted); }
 .dock-pin .lbl { display: none; }
 .dock-pin { padding: 0 6px; }
 .dock-item.reordering { opacity: .6; cursor: grabbing; }
