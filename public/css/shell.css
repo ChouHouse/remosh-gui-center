@@ -299,8 +299,8 @@ html[data-taskbar-align="center"] #dock-items:empty { padding: 0; border-right: 
 html[data-taskbar-align="center"][data-taskbar-clock="off"] #dock-items { border-right: 0; padding-right: 0; }
 html[data-taskbar-align="center"][data-taskbar-clock="off"] #dock-items:empty { border-left: 0; }
 html[data-taskbar-align="center"] #clock { align-items: center; }
-html[data-taskbar-align="center"] #show-desktop { position: fixed; right: 0; bottom: 0; height: var(--dock-h); margin: 0; }
-html[data-taskbar-align="center"][data-taskbar-autohide="on"] #show-desktop { display: none; }
+/* No "show desktop" strip on the floating dock. */
+html[data-taskbar-align="center"] #show-desktop { display: none; }
 html[data-taskbar-align="center"] #start-menu { left: 50%; translate: -50% 0; transform-origin: bottom center; bottom: calc(var(--dock-h, 54px) + 16px); }
 html[data-taskbar-align="center"] #calendar { left: 50%; right: auto; translate: -50% 0; bottom: calc(var(--dock-h, 54px) + 16px); }
 html[data-taskbar-clock="off"] #clock { display: none; }
