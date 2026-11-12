@@ -296,7 +296,7 @@ html[data-taskbar-align="center"] #dock-items {
 html[data-taskbar-align="center"] #dock-items:empty { padding: 0; border-right: 0; }
 html[data-taskbar-align="center"][data-taskbar-clock="off"] #dock-items { border-right: 0; padding-right: 0; }
 html[data-taskbar-align="center"][data-taskbar-clock="off"] #dock-items:empty { border-left: 0; }
-html[data-taskbar-align="center"] #clock { align-items: center; padding: 0 6px; align-self: center; height: var(--dock-item-h); }
+html[data-taskbar-align="center"] #clock { align-items: center; }
 html[data-taskbar-align="center"] #show-desktop { position: fixed; right: 0; bottom: 0; height: var(--dock-h); margin: 0; }
 html[data-taskbar-align="center"][data-taskbar-autohide="on"] #show-desktop { display: none; }
 html[data-taskbar-align="center"] #start-menu { left: 50%; translate: -50% 0; transform-origin: bottom center; bottom: calc(var(--dock-h, 54px) + 16px); }
@@ -317,7 +317,8 @@ html[data-taskbar-autohide="on"].dock-shown #dock,
 html[data-taskbar-autohide="on"].start-open #dock, html[data-taskbar-autohide="on"].cal-open #dock { transform: none; }
 
 /* ---------- calendar (click the clock) ---------- */
-#clock { cursor: default; border-radius: 8px; }
+/* Same box as a taskbar entry, in every layout. */
+#clock { cursor: default; border-radius: 8px; align-self: center; height: var(--dock-item-h); padding: 0 8px; }
 #clock:hover, #clock[aria-expanded="true"] { background: var(--surface-3); }
 #calendar {
   position: absolute; right: 10px; bottom: calc(var(--dock-h, 54px) + 6px); z-index: 40; width: 252px; padding: 10px;
