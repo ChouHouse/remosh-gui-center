@@ -14,28 +14,34 @@ import { getSettings, updateSettings, settingsDir, wallpaperDir, animationMs, MA
 // an app that wants the value itself calls systemColor() / effectiveMode() and
 // listens for `settings:changed`. An app that does neither keeps its own look
 // (the code editor does, apart from following light/dark).
-const colour = (id, label, color, shade, ink) => ({ id, label, color, shade, ink });
+// Every colour has a deep and a pale version, and the appearance picks: the
+// pale one on a dark desktop, the deep one on a light desktop.
 const WHITE = '#ffffff';
+const tone = (color, shade, ink) => ({ color, shade, ink });
 export const COLORS = [
-  { id: 'default', label: '預設', color: null, shade: null, ink: null },
-  colour('pink-dark', '深桃紅', '#d6337f', '#a81f5f', WHITE),
-  colour('pink-light', '淺桃紅', '#ff9cc4', '#f070a4', '#3a0f22'),
-  colour('blue-dark', '深藍', '#1f5fbf', '#174a96', WHITE),
-  colour('blue-light', '淺藍', '#7db8f5', '#4a9bea', '#0b2545'),
-  colour('green-dark', '深綠', '#1f8a4c', '#166a39', WHITE),
-  colour('green-light', '淺綠', '#8fdcae', '#5fc48a', '#0d3320'),
-  colour('yellow', '黃', '#f5cc3d', '#dba91a', '#3a2c00'),
-  colour('orange', '橘', '#f59a3d', '#db7a1a', '#3a1c00'),
-  colour('gray-light', '淺灰', '#c3c9d1', '#a3abb5', '#1f2429'),
-  colour('off-white', '稍深白', '#ece8dc', '#d3cdbb', '#2a2822'),
+  { id: 'default', label: '預設' },
+  { id: 'pink', label: '桃紅', deep: tone('#d6337f', '#a81f5f', WHITE), pale: tone('#ff9cc4', '#f070a4', '#3a0f22') },
+  { id: 'blue', label: '藍', deep: tone('#1f5fbf', '#174a96', WHITE), pale: tone('#7db8f5', '#4a9bea', '#0b2545') },
+  { id: 'green', label: '綠', deep: tone('#1f8a4c', '#166a39', WHITE), pale: tone('#8fdcae', '#5fc48a', '#0d3320') },
+  { id: 'yellow', label: '黃', deep: tone('#a87900', '#805c00', WHITE), pale: tone('#f5cc3d', '#dba91a', '#3a2c00') },
+  { id: 'orange', label: '橘', deep: tone('#c9620e', '#9c4a08', WHITE), pale: tone('#f59a3d', '#db7a1a', '#3a1c00') },
+  { id: 'gray', label: '灰', deep: tone('#5b6470', '#434a54', WHITE), pale: tone('#c3c9d1', '#a3abb5', '#1f2429') },
 ];
+// Names used by earlier versions, when deep and pale were separate choices.
+const OLD_IDS = { 'gray-light': 'gray', 'off-white': 'gray' };
+const colourId = (id) => OLD_IDS[id] || String(id).replace(/-(dark|light)$/, '');
 export const MODES = [['auto', '跟隨裝置'], ['light', '淺色'], ['dark', '深色']];
 
 const darkQuery = matchMedia('(prefers-color-scheme: dark)');
-export const systemColor = () => COLORS.find((c) => c.id === getSettings().style.color) || COLORS[0];
 export const effectiveMode = () => {
   const mode = getSettings().style.mode;
   return mode === 'auto' ? (darkQuery.matches ? 'dark' : 'light') : mode;
+};
+// { id, label, color, shade, ink }; the three colour values are null for the default.
+export const systemColor = () => {
+  const c = COLORS.find((x) => x.id === colourId(getSettings().style.color)) || COLORS[0];
+  const t = c.deep ? (effectiveMode() === 'dark' ? c.pale : c.deep) : tone(null, null, null);
+  return { id: c.id, label: c.label, ...t };
 };
 
 let lastLook = '';
@@ -44,7 +50,7 @@ function applyAppearance() {
   const root = document.documentElement;
   const { mode, color, controls } = getSettings().style;
   // Cross-fade when the look actually changes (and animations are on).
-  const look = `${mode}|${color}`;
+  const look = `${effectiveMode()}|${color}`;
   if (lastLook && look !== lastLook && animationMs() > 0) {
     root.classList.add('theme-fade');
     clearTimeout(fadeTimer);
@@ -87,6 +93,7 @@ export const setControls = (side) =>
   }, now);
 // Fires when the device switches between light and dark.
 export const onDeviceModeChange = (fn) => darkQuery.addEventListener('change', fn);
+darkQuery.addEventListener('change', () => applyAppearance()); // the colour's tone follows
 
 // ---- wallpaper
 const urls = new Map(); // file name -> object URL (kept for this session)

@@ -288,7 +288,9 @@ html[data-taskbar-align="center"] #dock {
   position: absolute; left: 0; right: 0; bottom: 8px; margin: 0 auto; width: max-content; max-width: calc(100% - 24px);
   padding: 0 8px; gap: 8px; border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 6px 20px rgba(20, 30, 50, .22);
 }
-html[data-taskbar-align="center"][data-taskbar-autohide="off"] #windows { margin-bottom: calc(var(--dock-h) + 16px); }
+/* Windows may pass behind the floating dock; only a maximised or snapped one stops above it. */
+html[data-taskbar-align="center"][data-taskbar-autohide="off"] :is(.win.maximized, .win.snapped) { height: calc(100% - var(--dock-h) - 16px) !important; }
+html[data-taskbar-align="center"][data-taskbar-autohide="off"] .snap-preview { max-height: calc(100% - var(--dock-h) - 16px); }
 html[data-taskbar-align="center"] #dock-items {
   flex: 0 1 auto; height: var(--dock-item-h); padding: 0 8px;
   border-left: 1px solid var(--border); border-right: 1px solid var(--border);
@@ -359,3 +361,10 @@ html.peeking #windows > .win.peek-target.minimized { display: flex; }
   position: fixed; top: 14px; left: 50%; translate: -50% 0; z-index: 200000; padding: 8px 16px;
   background: var(--surface); border: 1px solid var(--border); border-radius: 999px; box-shadow: var(--shadow); font-size: 13px;
 }
+
+/* ---------- pinned launchers and reordering (shell/dock.js) ---------- */
+#dock-pins { flex: none; display: flex; align-items: center; gap: 6px; }
+#dock-pins:empty { display: none; }
+.dock-pin .lbl { display: none; }
+.dock-pin { padding: 0 6px; }
+.dock-item.reordering { opacity: .6; cursor: grabbing; }

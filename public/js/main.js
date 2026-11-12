@@ -12,6 +12,7 @@ import './apps/taskman/index.js';
 import './apps/settings/index.js';
 import './shell/clock.js';
 import './shell/taskbar.js';
+import './shell/dock.js';
 import './shell/preview.js';
 import './shell/navigation.js';
 import './shell/desktop-icons.js';

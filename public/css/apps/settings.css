@@ -86,3 +86,5 @@ input.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2
 .acc-field input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .acc-users { display: flex; flex-wrap: wrap; gap: 6px; }
 .acc-user { padding: 3px 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); }
+.colour-row .chip { width: 20px; height: 20px; flex: none; border-radius: 50%; border: 1px solid var(--border); }
+.colour-row select { padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; }

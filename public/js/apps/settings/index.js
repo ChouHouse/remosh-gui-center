@@ -14,7 +14,7 @@ import { getSettings, saveSettings } from '../../core/settings.js';
 import { createWindow } from '../../shell/wm.js';
 import { registerApp, getApp, appsForExt } from '../../shell/apps.js';
 import { setTaskbar } from '../../shell/taskbar.js';
-import { COLORS, MODES, setColor, setMode, setControls, uploadWallpaper, useWallpaper, clearWallpaper, wallpaperUrl } from '../../shell/style.js';
+import { COLORS, systemColor, MODES, setColor, setMode, setControls, uploadWallpaper, useWallpaper, clearWallpaper, wallpaperUrl } from '../../shell/style.js';
 
 const row = (title, desc, control) =>
   h('div', { class: 'set-row' }, h('div', { class: 'set-text' }, h('b', null, title), h('small', null, desc)), control);
@@ -106,16 +106,12 @@ const CATEGORIES = [
       const fail = (what) => (err) => toast(`${what}：${errText(err)}`, true);
       const modes = segmented('set-mode', '模式', MODES, draft.style.mode, setMode);
       const controls = segmented('set-controls', '視窗按鈕', [['left', '左上'], ['right', '右上']], draft.style.controls, setControls);
-      const colours = h('div', { class: 'tint-grid' }, COLORS.map((c) =>
-        h('button', {
-          type: 'button',
-          class: 'tint' + (draft.style.color === c.id ? ' current' : ''),
-          'data-tint': c.id,
-          'aria-pressed': String(draft.style.color === c.id),
-          onclick: () => setColor(c.id).catch(fail('無法儲存顏色')),
-        },
-        h('span', { class: 'chip', style: `background:${c.color || '#0a64d6'};border-color:${c.shade || '#0a4ea8'}` }),
-        c.label)));
+      const now = systemColor();
+      const colourPick = h('select', { id: 'set-color', 'aria-label': '顏色' },
+        COLORS.map((c) => h('option', { value: c.id, selected: c.id === now.id }, c.label)));
+      colourPick.addEventListener('change', () => setColor(colourPick.value).catch(fail('無法儲存顏色')));
+      const colours = h('div', { class: 'look-row colour-row' },
+        h('span', { class: 'chip', style: `background:${now.color || 'var(--accent)'}` }), colourPick);
 
       const picker = h('input', { type: 'file', accept: 'image/*', id: 'wp-file', hidden: true });
       const upload = h('button', { type: 'button', id: 'wp-upload', onclick: () => picker.click() }, '上傳壁紙…');
@@ -263,8 +259,15 @@ const CATEGORIES = [
 
 let win = null;
 
-function openSettings() {
-  if (win) return win.focus();
+let showCategory = null;
+
+// args.category opens on that page (e.g. 'taskbar').
+function openSettings(args) {
+  if (win) {
+    win.focus();
+    if (args?.category) showCategory(args.category);
+    return;
+  }
   win = createWindow({ title: '設定', appName: '設定', iconHtml: settingsSvg(), width: 660, height: 440 });
   const draft = getSettings();
   let saved = JSON.stringify(draft);
@@ -330,8 +333,13 @@ function openSettings() {
   win.destroy = () => {
     off();
     win = null;
+    showCategory = null;
   };
-  show(active);
+  showCategory = (id) => {
+    const cat = CATEGORIES.find((c) => c.id === id);
+    if (cat && cat !== active) show(cat);
+  };
+  show(CATEGORIES.find((c) => c.id === args?.category) || active);
   refresh();
 }
 

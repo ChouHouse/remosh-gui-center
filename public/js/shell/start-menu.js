@@ -143,6 +143,22 @@ $('#sm-user').addEventListener('click', () => {
   $('#sm-user').setAttribute('aria-expanded', String(!row.hidden));
   if (!row.hidden) $('#disconnect').focus();
 });
+// The account card closes as soon as anything else in the menu is used.
+startMenu.addEventListener('pointerdown', (ev) => {
+  if (ev.target.closest('#sm-user, #sm-logout-row')) return;
+  $('#sm-logout-row').hidden = true;
+  $('#sm-user').setAttribute('aria-expanded', 'false');
+}, true);
+// Right-click the start button: the usual tools and the account actions.
+startBtn.addEventListener('contextmenu', (ev) => {
+  closeStart();
+  showContextMenu(ev, [
+    ...['tasks', 'terminal', 'settings'].map(getApp).filter(Boolean).map((app) => ({ label: app.name, run: () => launchApp(app.id) })),
+    null,
+    { label: '切換使用者', run: () => host.add() },
+    { label: '登出', danger: true, run: () => logout() },
+  ]);
+});
 // Other signed-in users: one click switches to them, no password needed.
 function renderSessions() {
   $('#sm-sessions').replaceChildren(...otherSessions().map((s) =>
