@@ -339,3 +339,9 @@ html[data-taskbar-autohide="on"].start-open #dock, html[data-taskbar-autohide="o
 .win { transition: opacity var(--anim, .2s) ease; }
 html.peeking #windows > .win:not(.peek-target) { opacity: 0; pointer-events: none; }
 html.peeking #windows > .win.peek-target.minimized { display: flex; }
+
+/* Shown while a dropped connection is being brought back (shell/login.js). */
+#reconnecting {
+  position: fixed; top: 14px; left: 50%; translate: -50% 0; z-index: 200000; padding: 8px 16px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px; box-shadow: var(--shadow); font-size: 13px;
+}

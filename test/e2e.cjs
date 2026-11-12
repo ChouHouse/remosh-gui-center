@@ -207,6 +207,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.mouse.move(600, 300);
   await page.waitForSelector('.win-preview', { state: 'detached' });
   check(await page.evaluate(() => !document.documentElement.classList.contains('peeking') && getComputedStyle(document.querySelector('#windows > .win.minimized')).display === 'none'), 'leaving puts everything back');
+
+  // ---- a dropped connection comes back by itself, without asking for the password
+  await page.evaluate(() => import('/js/core/rpc.js').then((m) => m.conn.ws.close()));
+  await page.waitForFunction(() => import('/js/core/rpc.js').then((m) => m.conn.ws?.readyState === 1 && document.querySelector('#reconnecting').hidden));
+  check(await page.isHidden('#login') && await page.evaluate(() => import('/js/core/rpc.js').then((m) => m.rpc('ping')).then(() => true, () => false)), 'a dropped connection is restored without the login form');
   check(true, 'the preview goes away when the pointer leaves');
   await fileDock.click();
   await page.mouse.move(600, 300);

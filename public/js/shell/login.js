@@ -52,6 +52,36 @@ export function showLogin(message, relogin) {
   (fHost.value && fUser.value ? fPass : fHost.value ? fUser : fHost).focus();
 }
 
+// What the user last logged in with. Kept in memory only, for as long as this
+// page is open, so a dropped connection can be brought back without asking;
+// forgotten at logout. Nothing is written to the browser's storage.
+let saved = null;
+
+// Opens a connection and logs in; throws when that does not work.
+async function connectWith(creds) {
+  let ws;
+  try {
+    await ensureGate(); // the access cookie may have expired since the page loaded
+    ws = await openSocket();
+    conn.ws = ws;
+    const res = await rpc('connect', creds);
+    const resume = !!conn.info; // set when the previous session dropped rather than logged out
+    conn.info = res;
+    conn.closing = false;
+    clearInterval(conn.pingTimer);
+    conn.pingTimer = setInterval(() => rpc('ping').catch(() => {}), 25000);
+    saved = creds;
+    loginEl.hidden = true;
+    emit(resume ? 'session:resume' : 'session:start');
+  } catch (err) {
+    if (ws) {
+      if (conn.ws === ws) conn.ws = null;
+      ws.close();
+    }
+    throw err;
+  }
+}
+
 async function doLogin() {
   const host = fHost.value.trim();
   const port = Number(fPort.value) || 22;
@@ -60,31 +90,16 @@ async function doLogin() {
   loginErr.hidden = true;
   btn.disabled = true;
   btn.textContent = '連線中…';
-  let ws;
   try {
-    await ensureGate(); // the access cookie may have expired since the page loaded
-    ws = await openSocket();
-    conn.ws = ws;
-    const res = await rpc('connect', {
+    await connectWith({
       host,
       port,
       username,
       ...(keyText ? { privateKey: keyText, passphrase: fPass.value } : { password: fPass.value }),
     });
     store.set('last', { host, port, username });
-    const resume = !!conn.info; // set when the previous session dropped rather than logged out
-    conn.info = res;
-    conn.closing = false;
-    clearInterval(conn.pingTimer);
-    conn.pingTimer = setInterval(() => rpc('ping').catch(() => {}), 25000);
     fPass.value = '';
-    loginEl.hidden = true;
-    emit(resume ? 'session:resume' : 'session:start');
   } catch (err) {
-    if (ws) {
-      conn.ws = null;
-      ws.close();
-    }
     loginErr.textContent = errText(err);
     loginErr.hidden = false;
   } finally {
@@ -93,13 +108,47 @@ async function doLogin() {
   }
 }
 
+// The connection dropped: log in again quietly. Only when that fails (the
+// password no longer works, or the host stays unreachable) is the user asked.
+const RETRY_WAITS_MS = [0, 2000, 5000];
+const NO_RETRY = new Set(['auth-failed', 'bad-key', 'key-needs-passphrase', 'key-bad-passphrase', 'host-not-allowed', 'private-address']);
+const banner = h('div', { id: 'reconnecting', hidden: true, role: 'status' }, '連線中斷，正在重新連線…');
+document.body.append(banner);
+let reconnecting = false;
+async function reconnect() {
+  if (reconnecting) return;
+  const creds = saved;
+  if (!creds) return showLogin('連線已中斷，請重新輸入密碼登入。開著的視窗會保留。', true);
+  reconnecting = true;
+  banner.hidden = false;
+  let ok = false;
+  for (const wait of RETRY_WAITS_MS) {
+    await new Promise((r) => setTimeout(r, wait));
+    if (saved !== creds) break; // logged out meanwhile
+    try {
+      await connectWith(creds);
+      ok = true;
+      break;
+    } catch (err) {
+      if (NO_RETRY.has(err.code)) break;
+    }
+  }
+  banner.hidden = true;
+  reconnecting = false;
+  if (!ok && saved === creds) {
+    saved = null;
+    showLogin('連線已中斷，自動重新連線沒有成功，請重新輸入密碼登入。開著的視窗會保留。', true);
+  }
+}
+
 form.addEventListener('submit', (ev) => {
   ev.preventDefault();
   doLogin();
 });
 
-on('conn:lost', () => showLogin('連線已中斷，請重新輸入密碼登入。開著的視窗會保留。', true));
+on('conn:lost', reconnect);
 on('session:end', () => {
+  saved = null;
   setKey('', '');
   showLogin();
 });
