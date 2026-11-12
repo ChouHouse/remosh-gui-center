@@ -12,6 +12,7 @@ import { decodeText, encodeText, toBase64, fromBase64 } from '../../core/text-co
 import { createWindow, wm } from '../../shell/wm.js';
 import { attachMenuBar } from '../../shell/menubar.js';
 import { registerApp } from '../../shell/apps.js';
+import { registerDropTarget } from '../../shell/drag.js';
 import { loadMonaco, themeName, NAME_LANG, EXT_LANG } from './monaco.js';
 
 const editors = new Map(); // key (remote path, or an id for an unsaved new file) -> editor record
@@ -38,6 +39,20 @@ function setMinimap(on) {
   applyPrefs();
 }
 
+async function openDropped(paths) {
+  let folders = 0;
+  for (const path of paths) {
+    try {
+      const { entry } = await rpc('stat', { path });
+      if (entry.type === 'dir') folders++;
+      else await openEditor(path, entry.size);
+    } catch (err) {
+      toast(`無法開啟「${P.base(path)}」：${errText(err)}`, true);
+    }
+  }
+  if (folders) toast(folders === paths.length ? 'Procoder 不能開啟資料夾' : `略過了 ${folders} 個資料夾`);
+}
+
 // With a path: open that remote file. Without: a new, unsaved document.
 async function openEditor(path = null, size = 0) {
   const existing = path && editors.get(path);
@@ -58,7 +73,15 @@ async function openEditor(path = null, size = 0) {
   win.body.append(menubar, host, h('div', { class: 'statusbar' }, sState, sPath, h('span', { class: 'spacer' }), sPos, sWrap, sEol, sEnc, sLang));
   const ed = { path, key: path || `\0untitled-${++untitledSeq}`, win, editor: null, model: null, saving: false };
   editors.set(ed.key, ed);
+  // Files dragged onto the window (from the file cabinet or the desktop) open
+  // here too, each in its own window. Any kind of file; folders are left out.
+  const offDrop = registerDropTarget(win.el, {
+    accepts: (payload) => payload.type === 'file' && !payload.data.isDir,
+    action: () => '用 Procoder 開啟',
+    onDrop: (payload) => openDropped(payload.data.paths || [payload.data.path]),
+  });
   win.destroy = () => {
+    offDrop();
     editors.delete(ed.key);
     ed.editor?.dispose();
     ed.model?.dispose();
