@@ -634,6 +634,7 @@ function createFinder(home, startPath = home) {
     ev.preventDefault();
   });
 
+  win.onNavigate = go; // mouse side buttons, Alt+←/→ (shell/navigation.js)
   win.onFocus = () => {
     if (!win.el.contains(document.activeElement)) files.focus({ preventScroll: true });
   };

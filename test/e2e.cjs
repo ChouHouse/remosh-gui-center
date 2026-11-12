@@ -160,6 +160,51 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.click('button[title="下一頁"]');
   await page.waitForFunction(() => [...document.querySelectorAll('.files .item .name')].some((e) => e.textContent === 'math.ts'));
   check(true, 'back / forward work');
+
+  // ---- back / forward from the mouse side buttons and the keyboard go to the window in front
+  const hasFile = (name) => page.waitForFunction((n) => [...document.querySelectorAll('.files .item .name')].some((e) => e.textContent === n), name);
+  const sideClick = (button) => page.evaluate((b) => {
+    const el = document.querySelector('.files');
+    return ['mousedown', 'mouseup', 'auxclick'].map((t) => !el.dispatchEvent(new MouseEvent(t, { button: b, bubbles: true, cancelable: true })));
+  }, button);
+  const urlBefore = page.url();
+  const prevented = await sideClick(3);
+  await hasFile('README.md');
+  check(prevented.every(Boolean), 'the mouse back button is kept away from the browser');
+  await sideClick(4);
+  await hasFile('math.ts');
+  check(true, 'mouse side buttons go back / forward in the file cabinet');
+  await page.locator('.files').focus();
+  await page.keyboard.press('Alt+ArrowLeft');
+  await hasFile('README.md');
+  await page.keyboard.press('Alt+ArrowRight');
+  await hasFile('math.ts');
+  check(page.url() === urlBefore, 'Alt+←/→ go back / forward and the page stays where it is');
+
+  // ---- taskbar preview
+  const fileDock = page.locator('.dock-item').first();
+  await fileDock.hover();
+  await page.waitForSelector('.win-preview .win-preview-stage > .win');
+  const pv = await page.evaluate(() => {
+    const p = document.querySelector('.win-preview');
+    const r = p.getBoundingClientRect();
+    const s = p.querySelector('.win-preview-stage').getBoundingClientRect();
+    return { title: p.querySelector('.lbl').textContent, bottom: r.bottom, dockTop: document.querySelector('#dock').getBoundingClientRect().top,
+      w: s.width, h: s.height, names: p.querySelectorAll('.files .item .name').length, ids: p.querySelectorAll('[id]').length };
+  });
+  check(pv.bottom <= pv.dockTop && pv.w <= 242 && pv.h <= 162 && pv.w > 100, 'hovering a taskbar entry shows a small preview above it', JSON.stringify(pv));
+  check(pv.names > 0 && pv.ids === 0 && pv.title.length > 0, 'the preview shows the window content and its title', JSON.stringify(pv));
+  await fileDock.click();
+  check((await page.locator('.win-preview').count()) === 0 && await page.locator('.win.minimized').count() === 1, 'clicking the entry removes the preview');
+  await page.mouse.move(600, 300);
+  await fileDock.hover();
+  await page.waitForSelector('.win-preview .win-preview-stage > .win');
+  check(await page.evaluate(() => document.querySelector('.win-preview-stage > .win').getBoundingClientRect().width > 100), 'a minimised window can be previewed too');
+  await page.mouse.move(600, 300);
+  await page.waitForSelector('.win-preview', { state: 'detached' });
+  check(true, 'the preview goes away when the pointer leaves');
+  await fileDock.click();
+  await page.mouse.move(600, 300);
   await page.click('button[title="列表檢視"]');
   check(await page.isVisible('.files.list .list-head'), 'list view shows column headers');
   await page.click('button[title="圖示檢視"]');
