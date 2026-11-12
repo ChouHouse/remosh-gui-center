@@ -283,27 +283,58 @@ html[data-taskbar-size="large"] { --dock-h: 68px; --dock-item-h: 52px; --dock-ic
 html[data-taskbar-size="small"] #clock-date { display: none; }
 html[data-taskbar-labels="off"] .dock-item { padding: 0 6px; gap: 4px; }
 html[data-taskbar-labels="off"] .dock-item .lbl { display: none; }
-/* Centred = a floating dock that wraps what is in it:  start | windows | clock  */
-html[data-taskbar-align="center"] #dock {
-  position: absolute; left: 0; right: 0; bottom: 8px; margin: 0 auto; width: max-content; max-width: calc(100% - 24px);
+/* #dock-main groups the start button, the pins and the open windows. It only
+   becomes a box of its own for the floating dock on the left. */
+#dock-main { display: contents; }
+
+/* 貼齊底部 + 置中: start and entries in the middle, the clock keeps its corner. */
+html[data-taskbar-float="off"][data-taskbar-align="center"] #dock { justify-content: center; }
+html[data-taskbar-float="off"][data-taskbar-align="center"] #dock-items { flex: 0 1 auto; max-width: calc(100% - 320px); }
+html[data-taskbar-float="off"][data-taskbar-align="center"] #clock { position: absolute; right: 18px; top: 0; bottom: 0; margin: auto 0; }
+html[data-taskbar-float="off"][data-taskbar-align="center"] #show-desktop { position: absolute; right: 0; top: 0; bottom: 0; margin: 0; }
+html[data-taskbar-float="off"][data-taskbar-align="center"] #start-menu { left: 50%; translate: -50% 0; transform-origin: bottom center; }
+
+/* 懸浮: the bar leaves the edge and wraps what is in it. Windows may pass
+   behind it; only a maximised or snapped one stops above it. */
+html[data-taskbar-float="on"] #dock { position: absolute; bottom: 8px; }
+html[data-taskbar-float="on"][data-taskbar-autohide="off"] :is(.win.maximized, .win.snapped) { height: calc(100% - var(--dock-h) - 16px) !important; }
+html[data-taskbar-float="on"][data-taskbar-autohide="off"] .snap-preview { max-height: calc(100% - var(--dock-h) - 16px); }
+html[data-taskbar-float="on"] #show-desktop { display: none; }
+html[data-taskbar-float="on"] #start-menu, html[data-taskbar-float="on"] #calendar { bottom: calc(var(--dock-h, 54px) + 16px); }
+html[data-taskbar-float="on"] #dock-items { flex: 0 1 auto; height: var(--dock-item-h); }
+html[data-taskbar-float="on"] #clock { align-items: center; }
+
+/* 懸浮 + 置中: one box in the middle,  start | windows | clock  */
+html[data-taskbar-float="on"][data-taskbar-align="center"] #dock {
+  left: 0; right: 0; margin: 0 auto; width: max-content; max-width: calc(100% - 24px);
   padding: 0 8px; gap: 8px; border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 6px 20px rgba(20, 30, 50, .22);
 }
-/* Windows may pass behind the floating dock; only a maximised or snapped one stops above it. */
-html[data-taskbar-align="center"][data-taskbar-autohide="off"] :is(.win.maximized, .win.snapped) { height: calc(100% - var(--dock-h) - 16px) !important; }
-html[data-taskbar-align="center"][data-taskbar-autohide="off"] .snap-preview { max-height: calc(100% - var(--dock-h) - 16px); }
-html[data-taskbar-align="center"] #dock-items {
-  flex: 0 1 auto; height: var(--dock-item-h); padding: 0 8px;
-  border-left: 1px solid var(--border); border-right: 1px solid var(--border);
-}
-html[data-taskbar-align="center"] #dock-items:empty { padding: 0; border-right: 0; }
-html[data-taskbar-align="center"][data-taskbar-clock="off"] #dock-items { border-right: 0; padding-right: 0; }
+html[data-taskbar-float="on"][data-taskbar-align="center"] #dock-items { padding: 0 8px; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+html[data-taskbar-float="on"][data-taskbar-align="center"] #dock-items:empty { padding: 0; border-right: 0; }
+html[data-taskbar-float="on"][data-taskbar-align="center"][data-taskbar-clock="off"] #dock-items { border-right: 0; padding-right: 0; }
 /* Nothing open and no clock: the empty area must not leave a gap at the end. */
-html[data-taskbar-align="center"][data-taskbar-clock="off"] #dock-items:empty { display: none; }
-html[data-taskbar-align="center"] #clock { align-items: center; }
-/* No "show desktop" strip on the floating dock. */
-html[data-taskbar-align="center"] #show-desktop { display: none; }
-html[data-taskbar-align="center"] #start-menu { left: 50%; translate: -50% 0; transform-origin: bottom center; bottom: calc(var(--dock-h, 54px) + 16px); }
-html[data-taskbar-align="center"] #calendar { left: 50%; right: auto; translate: -50% 0; bottom: calc(var(--dock-h, 54px) + 16px); }
+html[data-taskbar-float="on"][data-taskbar-align="center"][data-taskbar-clock="off"] #dock-items:empty { display: none; }
+html[data-taskbar-float="on"][data-taskbar-align="center"] #start-menu { left: 50%; translate: -50% 0; transform-origin: bottom center; }
+html[data-taskbar-float="on"][data-taskbar-align="center"] #calendar { left: 50%; right: auto; translate: -50% 0; }
+
+/* 懸浮 + 靠左: two boxes, start and windows on the left, the clock on the right.
+   The bar itself is only their invisible frame, so what is between them stays clickable. */
+html[data-taskbar-float="on"][data-taskbar-align="left"] #dock {
+  left: 12px; right: 12px; padding: 0; gap: 12px; justify-content: space-between;
+  background: none; border: 0; backdrop-filter: none; pointer-events: none;
+}
+html[data-taskbar-float="on"][data-taskbar-align="left"] :is(#dock-main, #clock) {
+  pointer-events: auto; height: var(--dock-h); background: var(--bar); backdrop-filter: blur(14px);
+  border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 6px 20px rgba(20, 30, 50, .22);
+}
+html[data-taskbar-float="on"][data-taskbar-align="left"] #dock-main { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 0 8px; }
+html[data-taskbar-float="on"][data-taskbar-align="left"] #dock-items { padding-left: 8px; border-left: 1px solid var(--border); }
+html[data-taskbar-float="on"][data-taskbar-align="left"] #dock-items:empty { display: none; }
+html[data-taskbar-float="on"][data-taskbar-align="left"] #clock { flex: none; padding: 0 14px; }
+html[data-taskbar-float="on"][data-taskbar-align="left"] #clock:hover,
+html[data-taskbar-float="on"][data-taskbar-align="left"] #clock[aria-expanded="true"] { background: var(--surface); }
+html[data-taskbar-float="on"][data-taskbar-align="left"] #start-menu { left: 12px; }
+html[data-taskbar-float="on"][data-taskbar-align="left"] #calendar { right: 12px; }
 html[data-taskbar-clock="off"] #clock { display: none; }
 /* More entries than fit: no scroll bar; the wheel scrolls it from script (shell/taskbar.js). */
 #dock-items { scrollbar-width: none; overflow-x: hidden; }
@@ -315,7 +346,9 @@ html[data-taskbar-autohide="on"] #dock {
 }
 /* Shown while the pointer is on it and for 3 s after it leaves (shell/taskbar.js),
    and while the start menu or the calendar is open. */
-html[data-taskbar-autohide="on"][data-taskbar-align="center"] #dock { left: 0; right: 0; bottom: 8px; transform: translateY(calc(100% + 4px)); }
+html[data-taskbar-autohide="on"][data-taskbar-float="on"] #dock { bottom: 8px; transform: translateY(calc(100% + 4px)); }
+html[data-taskbar-autohide="on"][data-taskbar-float="on"][data-taskbar-align="center"] #dock { left: 0; right: 0; }
+html[data-taskbar-autohide="on"][data-taskbar-float="on"][data-taskbar-align="left"] #dock { left: 12px; right: 12px; }
 html[data-taskbar-autohide="on"].dock-shown #dock,
 html[data-taskbar-autohide="on"].start-open #dock, html[data-taskbar-autohide="on"].cal-open #dock { transform: none; }
 

@@ -23,7 +23,8 @@ const DEFAULTS = {
     autoHide: false, // slide away until the pointer reaches the bottom edge
     size: 'medium', // 'small' | 'medium' | 'large'
     labels: true, // show window titles next to the icons
-    align: 'left', // 'left' | 'center' (a floating dock)
+    float: false, // off: a bar along the bottom edge; on: a floating dock
+    align: 'left', // 'left' | 'center'
     clock: true, // show the time
     pinned: [], // app ids kept on the taskbar as launchers
     group: false, // one entry per app instead of one per window
@@ -73,6 +74,8 @@ function normalise(obj) {
       autoHide: obj?.taskbar?.autoHide === true,
       size: ['small', 'medium', 'large'].includes(obj?.taskbar?.size) ? obj.taskbar.size : DEFAULTS.taskbar.size,
       labels: obj?.taskbar?.labels !== false,
+      // Before there was a separate switch, 'center' meant the floating dock.
+      float: typeof obj?.taskbar?.float === 'boolean' ? obj.taskbar.float : obj?.taskbar?.align === 'center',
       align: obj?.taskbar?.align === 'center' ? 'center' : 'left',
       clock: obj?.taskbar?.clock !== false,
       group: obj?.taskbar?.group === true,

@@ -10,6 +10,7 @@ function apply() {
   root.dataset.taskbarSize = t.size;
   root.dataset.taskbarLabels = t.labels ? 'on' : 'off';
   root.dataset.taskbarAlign = t.align;
+  root.dataset.taskbarFloat = t.float ? 'on' : 'off';
   root.dataset.taskbarAutohide = t.autoHide ? 'on' : 'off';
   root.dataset.taskbarClock = t.clock ? 'on' : 'off';
 }
