@@ -283,13 +283,25 @@ html[data-taskbar-size="large"] { --dock-h: 68px; --dock-item-h: 52px; --dock-ic
 html[data-taskbar-size="small"] #clock-date { display: none; }
 html[data-taskbar-labels="off"] .dock-item { padding: 0 6px; gap: 4px; }
 html[data-taskbar-labels="off"] .dock-item .lbl { display: none; }
-/* Centred = dock mode: the start button and the entries sit together in the
-   middle; the clock keeps its corner. */
-html[data-taskbar-align="center"] #dock { justify-content: center; }
-html[data-taskbar-align="center"] #dock-items { flex: 0 1 auto; max-width: calc(100% - 300px); }
-html[data-taskbar-align="center"] #clock { position: absolute; right: 18px; top: 0; bottom: 0; }
-html[data-taskbar-align="center"] #show-desktop { position: absolute; right: 0; top: 0; bottom: 0; margin: 0; }
-html[data-taskbar-align="center"] #start-menu { left: 50%; translate: -50% 0; transform-origin: bottom center; }
+/* Centred = a floating dock that wraps what is in it:  start | windows | clock  */
+html[data-taskbar-align="center"] #dock {
+  position: absolute; left: 0; right: 0; bottom: 8px; margin: 0 auto; width: max-content; max-width: calc(100% - 24px);
+  padding: 0 8px; gap: 8px; border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 6px 20px rgba(20, 30, 50, .22);
+}
+html[data-taskbar-align="center"][data-taskbar-autohide="off"] #windows { margin-bottom: calc(var(--dock-h) + 16px); }
+html[data-taskbar-align="center"] #dock-items {
+  flex: 0 1 auto; height: var(--dock-item-h); padding: 0 8px;
+  border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+}
+html[data-taskbar-align="center"] #dock-items:empty { padding: 0; border-right: 0; }
+html[data-taskbar-align="center"][data-taskbar-clock="off"] #dock-items { border-right: 0; padding-right: 0; }
+html[data-taskbar-align="center"][data-taskbar-clock="off"] #dock-items:empty { border-left: 0; }
+html[data-taskbar-align="center"] #clock { align-items: center; padding: 0 6px; align-self: center; height: var(--dock-item-h); }
+html[data-taskbar-align="center"] #show-desktop { position: fixed; right: 0; bottom: 0; height: var(--dock-h); margin: 0; }
+html[data-taskbar-align="center"][data-taskbar-autohide="on"] #show-desktop { display: none; }
+html[data-taskbar-align="center"] #start-menu { left: 50%; translate: -50% 0; transform-origin: bottom center; bottom: calc(var(--dock-h, 54px) + 16px); }
+html[data-taskbar-align="center"] #calendar { left: 50%; right: auto; translate: -50% 0; bottom: calc(var(--dock-h, 54px) + 16px); }
+html[data-taskbar-clock="off"] #clock { display: none; }
 /* More entries than fit: no scroll bar; the wheel scrolls it from script (shell/taskbar.js). */
 #dock-items { scrollbar-width: none; overflow-x: hidden; }
 #dock-items::-webkit-scrollbar { display: none; }
@@ -300,6 +312,7 @@ html[data-taskbar-autohide="on"] #dock {
 }
 /* Shown while the pointer is on it and for 3 s after it leaves (shell/taskbar.js),
    and while the start menu or the calendar is open. */
+html[data-taskbar-autohide="on"][data-taskbar-align="center"] #dock { left: 0; right: 0; bottom: 8px; transform: translateY(calc(100% + 4px)); }
 html[data-taskbar-autohide="on"].dock-shown #dock,
 html[data-taskbar-autohide="on"].start-open #dock, html[data-taskbar-autohide="on"].cal-open #dock { transform: none; }
 

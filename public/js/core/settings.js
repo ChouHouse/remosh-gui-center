@@ -23,7 +23,8 @@ const DEFAULTS = {
     autoHide: false, // slide away until the pointer reaches the bottom edge
     size: 'medium', // 'small' | 'medium' | 'large'
     labels: true, // show window titles next to the icons
-    align: 'left', // 'left' | 'center'
+    align: 'left', // 'left' | 'center' (a floating dock)
+    clock: true, // show the time
   },
   start: {
     pinned: null, // app ids pinned to the start menu, in order; null = every app
@@ -71,6 +72,7 @@ function normalise(obj) {
       size: ['small', 'medium', 'large'].includes(obj?.taskbar?.size) ? obj.taskbar.size : DEFAULTS.taskbar.size,
       labels: obj?.taskbar?.labels !== false,
       align: obj?.taskbar?.align === 'center' ? 'center' : 'left',
+      clock: obj?.taskbar?.clock !== false,
     },
   };
 }

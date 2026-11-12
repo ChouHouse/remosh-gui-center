@@ -11,6 +11,7 @@ function apply() {
   root.dataset.taskbarLabels = t.labels ? 'on' : 'off';
   root.dataset.taskbarAlign = t.align;
   root.dataset.taskbarAutohide = t.autoHide ? 'on' : 'off';
+  root.dataset.taskbarClock = t.clock ? 'on' : 'off';
 }
 
 // Shows at once and is saved in the background.
@@ -45,6 +46,13 @@ const hideDockLater = () => {
 };
 dock.addEventListener('pointerenter', showDock);
 dock.addEventListener('pointerleave', hideDockLater);
+// The floating dock does not span the bottom edge, so the edge itself counts too.
+window.addEventListener('pointermove', (ev) => {
+  if (ev.clientY < window.innerHeight - 3 || document.documentElement.dataset.taskbarAutohide !== 'on') return;
+  if (document.documentElement.classList.contains('dock-shown')) return;
+  showDock();
+  hideDockLater();
+}, { passive: true });
 
 let wasAutoHide = false;
 on('settings:changed', () => {

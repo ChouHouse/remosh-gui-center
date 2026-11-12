@@ -176,7 +176,8 @@ const CATEGORIES = [
         row('自動隱藏', '滑鼠移到畫面底部才出現', autoHide),
         row('大小', '', segmented('tb-size', '大小', [['small', '小'], ['medium', '中'], ['large', '大']], t.size, (size) => setTaskbar({ size }))),
         row('項目顯示', '', segmented('tb-labels', '項目顯示', [[true, '圖示與文字'], [false, '只顯示圖示']], t.labels, (labels) => setTaskbar({ labels }))),
-        row('對齊', '', segmented('tb-align', '對齊', [['left', '靠左'], ['center', '置中']], t.align, (align) => setTaskbar({ align }))));
+        row('對齊', '', segmented('tb-align', '對齊', [['left', '靠左'], ['center', '置中懸浮']], t.align, (align) => setTaskbar({ align }))),
+        row('時間', '', segmented('tb-clock', '時間', [[true, '顯示'], [false, '隱藏']], t.clock, (clock) => setTaskbar({ clock }))));
     },
   },
   {
