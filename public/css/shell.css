@@ -323,7 +323,7 @@ html[data-taskbar-autohide="on"].start-open #dock, html[data-taskbar-autohide="o
 
 /* ---------- taskbar previews (shell/preview.js) ---------- */
 .win-preview {
-  position: fixed; z-index: 90000; pointer-events: none; padding: 8px;
+  position: fixed; z-index: 90000; padding: 8px; cursor: pointer;
   background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow);
   animation: win-preview-in var(--anim, .2s) ease;
 }
@@ -335,3 +335,7 @@ html[data-taskbar-autohide="on"].start-open #dock, html[data-taskbar-autohide="o
 .win-preview-stage > .win { display: flex; min-width: 0; min-height: 0; }
 @keyframes win-preview-in { from { opacity: 0; translate: 0 6px; } }
 @media (prefers-reduced-motion: reduce) { .win-preview { animation: none; } }
+/* Peek: pointer on a preview shows only that window. */
+.win { transition: opacity var(--anim, .2s) ease; }
+html.peeking #windows > .win:not(.peek-target) { opacity: 0; pointer-events: none; }
+html.peeking #windows > .win.peek-target.minimized { display: flex; }

@@ -200,8 +200,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await fileDock.hover();
   await page.waitForSelector('.win-preview .win-preview-stage > .win');
   check(await page.evaluate(() => document.querySelector('.win-preview-stage > .win').getBoundingClientRect().width > 100), 'a minimised window can be previewed too');
+  await page.locator('.win-preview').hover();
+  await page.waitForTimeout(400);
+  check(await page.evaluate(() => !!document.querySelector('.win-preview') && document.documentElement.classList.contains('peeking')
+    && getComputedStyle(document.querySelector('#windows > .win.minimized')).display === 'flex'), 'the pointer can move onto the preview, which then shows that window alone');
   await page.mouse.move(600, 300);
   await page.waitForSelector('.win-preview', { state: 'detached' });
+  check(await page.evaluate(() => !document.documentElement.classList.contains('peeking') && getComputedStyle(document.querySelector('#windows > .win.minimized')).display === 'none'), 'leaving puts everything back');
   check(true, 'the preview goes away when the pointer leaves');
   await fileDock.click();
   await page.mouse.move(600, 300);

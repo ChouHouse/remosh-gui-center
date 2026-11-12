@@ -13,8 +13,29 @@ let popup = null;
 let shownFor = null;
 let muted = null; // entry that was just clicked: nothing until the pointer has left it
 
+let hideTimer = 0;
+let peeked = null;
+
+// Peek: while the pointer is on the picture only that window is shown on the
+// desktop (also when it is minimised); everything comes back afterwards.
+function peek(win) {
+  if (peeked === win) return;
+  peeked?.el.classList.remove('peek-target');
+  peeked = win;
+  win?.el.classList.add('peek-target');
+  document.documentElement.classList.toggle('peeking', !!win);
+}
+
+// Leaving the entry or the picture: a moment to cross the gap between them.
+function hideSoon() {
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(hide, 220);
+}
+
 function hide() {
   clearTimeout(timer);
+  clearTimeout(hideTimer);
+  peek(null);
   popup?.remove();
   popup = null;
   shownFor = null;
@@ -81,6 +102,18 @@ function show(win) {
       h('span', { class: 'ico', html: win.dockEl.querySelector('.ico').innerHTML }),
       h('span', { class: 'lbl' }, win.title)),
     stage);
+  popup.addEventListener('pointerenter', () => {
+    clearTimeout(hideTimer);
+    peek(win);
+  });
+  popup.addEventListener('pointerleave', () => {
+    peek(null);
+    hideSoon();
+  });
+  popup.addEventListener('click', () => {
+    hide();
+    win.focus();
+  });
   document.body.append(popup);
   copyScroll(win, copy);
   const item = win.dockEl.getBoundingClientRect();
@@ -99,7 +132,9 @@ const winOf = (target) => {
 dockItems.addEventListener('pointerover', (ev) => {
   if (ev.pointerType === 'touch') return;
   const win = winOf(ev.target);
-  if (!win || win === shownFor || win.dockEl === muted) return;
+  if (!win || win.dockEl === muted) return;
+  clearTimeout(hideTimer);
+  if (win === shownFor) return;
   clearTimeout(timer);
   // Moving along the bar with a preview already up: the next one comes at once.
   timer = setTimeout(() => show(win), shownFor ? 80 : SHOW_AFTER_MS);
@@ -108,8 +143,8 @@ dockItems.addEventListener('pointerout', (ev) => {
   const el = ev.target.closest?.('.dock-item');
   if (!el || el.contains(ev.relatedTarget)) return;
   if (el === muted) muted = null;
-  if (!ev.relatedTarget?.closest?.('.dock-item')) hide();
-  else clearTimeout(timer);
+  clearTimeout(timer);
+  if (!ev.relatedTarget?.closest?.('.dock-item')) hideSoon();
 });
 // A click acts on the window itself; the picture gets out of the way.
 dockItems.addEventListener('pointerdown', (ev) => {
