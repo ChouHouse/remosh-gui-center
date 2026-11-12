@@ -1,4 +1,4 @@
-// WebSocket connection to the Worker and the request/response helper.
+// WebSocket connection to the server and the request/response helper.
 import { appError, ERROR_TEXT } from './errors.js';
 import { emit } from './events.js';
 
@@ -29,7 +29,7 @@ export function openSocket() {
       } catch {
         return;
       }
-      // Pushed by the Worker (e.g. terminal output): re-emit as `remote:<event>`.
+      // Pushed by the server (e.g. terminal output): re-emit as `remote:<event>`.
       if (msg.event) return emit('remote:' + msg.event, msg);
       const p = conn.pending.get(msg.id);
       if (!p) return;

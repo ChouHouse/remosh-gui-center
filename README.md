@@ -1,20 +1,9 @@
-# SSH Desk
+# Remosh GUI Center
 
-A Cloudflare Worker that logs in to an SSH server and shows its files as a small
-desktop in the browser: a Finder-style file browser, and every file you open
-gets its own Monaco window (the editor component of VS Code, not the whole
-workbench) with an entry in the taskbar at the bottom.
-
-## Two ways to run it
-
-The same code runs on both; the start command picks the platform.
-
-| | Cloudflare Worker | Docker (Remosh GUI Center) |
-| --- | --- | --- |
-| Start | `npm run deploy` | `docker run ... ghcr.io/chouhouse/remosh-gui-center` |
-| Entry | `src/index.js` + `src/platform/worker.js` | `server/main.js` + `src/platform/node.js` |
-| SSH targets | public addresses only | anything the container can reach, LAN included |
-| SSH ciphers | AES-CTR + HMAC-SHA2 | everything ssh2 supports |
+A desktop in the browser for SSH hosts. A small Node server logs in to an SSH
+server and shows its files as a desktop: a file cabinet, a code editor
+(Procoder, built on Monaco), a terminal, a task manager and settings, with a
+taskbar at the bottom. It ships as a Docker image.
 
 ## Docker
 
@@ -35,8 +24,8 @@ docker run -d \
 | `PORT` | Port inside the container. | `8080` |
 
 The image is based on `ccp-base-debian`, runs as a non-root user, and keeps
-the tunnel token in `/ccp/flags` like Remosh. `WEB_PASSWORD` works on the
-Worker too (`wrangler secret put WEB_PASSWORD`).
+the tunnel token in `/ccp/flags` like Remosh. It can reach anything the
+container can reach, LAN addresses included.
 
 The access password is checked by the server: `/ws` is refused without the
 cookie it sets (HttpOnly, 12 hours), and five wrong tries from one address
@@ -45,21 +34,20 @@ lock it for a minute.
 ## How it works
 
 ```
-browser ──WebSocket /ws──▶ Worker ──▶ Durable Object ──TCP (cloudflare:sockets)──▶ SSH server
-  UI + Monaco               routing     ssh2 client + SFTP, one per connection
+browser ──WebSocket /ws──▶ Node server ──TCP──▶ SSH server
+  UI + Monaco               ssh2 client + SFTP, one session per connection
 ```
 
 Nothing is bundled for the browser: the page loads native ES modules.
 
 ```
-server/main.js          Node entry (Docker): static files, /ws, /api/gate
+server/main.js          entry: static files, /ws, /api/gate
 docker/                 run.sh, cloudflared supervisor
-src/                    shared by both entries
-  index.js              fetch handler, and SessionDO (the Durable Object per connection)
+src/
   session.js            one SSH/SFTP session per WebSocket, login, op dispatch
-  ssh.js                socket adapter, algorithms, run-a-command helper
+  net.js                opens the TCP connection to the SSH server
+  ssh.js                run-a-command helper
   gate.js               optional access password (WEB_PASSWORD)
-  platform/             worker.js / node.js: how each runtime opens TCP
   util.js               shared helpers
   ops/                  one handler per request name
     index.js            the registry (files, manage, stats, process, terminal, account)
@@ -134,16 +122,14 @@ Apps do not import each other. They talk through `core/events.js`
 
 Log in with a password or a private key file (OpenSSH / PEM / PPK; RSA, ECDSA
 or Ed25519, optionally passphrase-protected). Neither is stored; the key text is
-sent to the Worker over the WebSocket for the login and kept only in memory. Host keys are not remembered or checked, so a host that is recreated with a new key
+sent to the server over the WebSocket for the login and kept only in memory. Host keys are not remembered or checked, so a host that is recreated with a new key
 connects without a warning (and a changed key is not detected).
 
 ## Run
 
 ```bash
 npm install
-npm run dev      # Worker runtime, http://localhost:3000
-npm run assets && WEB_PASSWORD=secret npm start   # Node server, http://localhost:8080
-npm run deploy   # publish to Cloudflare
+npm run assets && WEB_PASSWORD=secret npm start   # http://localhost:8080
 ```
 
 ## Desktop
@@ -198,29 +184,6 @@ npm run deploy   # publish to Cloudflare
   follow the account, and they are read back at login. Add a setting in
   `core/settings.js` and a category in `apps/settings/index.js`.
 
-## Deploying to Cloudflare
-
-```bash
-npx wrangler login   # or set CLOUDFLARE_API_TOKEN
-npm run deploy
-```
-
-Works on the Workers Free plan. How the project fits the platform limits:
-
-| Limit | Platform | This project |
-| --- | --- | --- |
-| CPU time | Worker: 10 ms (Free) / 30 s (Paid) for the whole connection. Durable Object: 30 s, renewed by every incoming message | The SSH session runs in a Durable Object (`SessionDO`), so each request from the page gets a fresh budget |
-| Durable Objects on Free | SQLite-backed classes only | `new_sqlite_classes` migration; nothing is stored |
-| WebSocket message | 32 MiB received | Largest is a 5 MB file as base64, about 7 MiB |
-| Worker size | 3 MB gzip (Free) | about 150 KiB gzip |
-| Static assets | 20,000 files, 25 MiB each | about 260 files, largest 5.7 MB |
-| Outbound TCP | No loopback, private or Cloudflare addresses; no port 25 | The SSH host needs a public address; the login form says so when a private one fails |
-
-Connections are dropped when Cloudflare updates the runtime or the Worker is
-redeployed; the page then asks for the password again and keeps the open
-windows. A terminal that prints continuously while the page sends nothing can
-use up the 30 s CPU budget between messages (the page pings every 25 s).
-
 ## Editor shortcuts
 
 Everything Monaco ships with (Ctrl+C / Ctrl+V / Ctrl+X, Ctrl+Z / Ctrl+Y,
@@ -249,19 +212,18 @@ analysed on its own — imports of other remote files are not resolved.
 
 ## Limits worth knowing
 
-- Workers cannot run ssh2's AES-GCM / ChaCha20 code, so the connection
-  negotiates AES-CTR with HMAC-SHA2. A server that only allows AEAD ciphers
-  will refuse the handshake.
 - **Restrict who can use it.** With `ALLOWED_HOSTS` empty, anyone who can open
-  the page can use the Worker to try logins against any SSH server. Set
-  `ALLOWED_HOSTS` in `wrangler.jsonc` and/or put the Worker behind Cloudflare
-  Access.
+  the page can use the server to try logins against any SSH server it can
+  reach, the container's own network included. Set `WEB_PASSWORD`, and
+  `ALLOWED_HOSTS` where the targets are known.
+- A dropped connection is logged in again by the page (the login is kept in
+  memory while the page is open); a running terminal does not come back.
 
 ## Tests
 
 ```bash
-node test/ws-smoke.mjs ws://127.0.0.1:3000/ws <host> <port> <user> <password>
-NODE_PATH=<playwright>/node_modules node test/e2e.cjs http://127.0.0.1:3000 <host> <port> <user> <password> <home>
+node test/ws-smoke.mjs ws://127.0.0.1:8080/ws <host> <port> <user> <password>
+NODE_PATH=<playwright>/node_modules node test/e2e.cjs http://127.0.0.1:8080 <host> <port> <user> <password> <home>
 ```
 
 Both expect the test account's home to contain `project/src/math.ts`,

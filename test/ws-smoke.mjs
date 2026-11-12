@@ -1,4 +1,4 @@
-// Smoke test for the Worker's WebSocket API against a real SSH server.
+// Smoke test for the server's WebSocket API against a real SSH server.
 // usage: node test/ws-smoke.mjs ws://127.0.0.1:3000/ws host port user password
 const [url, host, port, username, password] = process.argv.slice(2);
 const ws = new WebSocket(url);

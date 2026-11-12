@@ -1,5 +1,5 @@
 // 終端機: an interactive shell on the SSH host (xterm.js in the page, an SSH
-// PTY channel in the Worker). Opening a file with it makes the file executable
+// PTY channel on the server). Opening a file with it makes the file executable
 // (chmod 777) and runs it as ./name from its own folder.
 import { h } from '../../core/dom.js';
 import { errText } from '../../core/errors.js';

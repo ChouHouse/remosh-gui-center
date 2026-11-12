@@ -1,13 +1,10 @@
 {
-  "name": "ssh-desk",
+  "name": "remosh-gui-center",
   "version": "0.1.0",
   "private": true,
-  "description": "SSH/SFTP desktop in the browser: Cloudflare Worker or Docker (Node)",
+  "description": "A desktop in the browser for SSH hosts (Docker / Node)",
   "scripts": {
-    "postinstall": "node scripts/strip-native.mjs",
     "assets": "node scripts/copy-assets.mjs",
-    "dev": "npm run assets && wrangler dev --ip 0.0.0.0 --port 3000",
-    "deploy": "npm run assets && wrangler deploy",
     "start": "node server/main.js"
   },
   "dependencies": {
@@ -16,9 +13,6 @@
     "monaco-editor": "^0.52.2",
     "ssh2": "^1.16.0",
     "ws": "^8.22.2"
-  },
-  "devDependencies": {
-    "wrangler": "^4"
   },
   "type": "module",
   "engines": {

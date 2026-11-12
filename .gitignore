@@ -1,6 +1,4 @@
 node_modules/
-.wrangler/
-.dev.vars
 public/vs/
 public/xterm/
 *.log

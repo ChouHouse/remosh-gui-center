@@ -111,7 +111,7 @@ async function doLogin() {
 // The connection dropped: log in again quietly. Only when that fails (the
 // password no longer works, or the host stays unreachable) is the user asked.
 const RETRY_WAITS_MS = [0, 2000, 5000];
-const NO_RETRY = new Set(['auth-failed', 'bad-key', 'key-needs-passphrase', 'key-bad-passphrase', 'host-not-allowed', 'private-address']);
+const NO_RETRY = new Set(['auth-failed', 'bad-key', 'key-needs-passphrase', 'key-bad-passphrase', 'host-not-allowed']);
 const banner = h('div', { id: 'reconnecting', hidden: true, role: 'status' }, '連線中斷，正在重新連線…');
 document.body.append(banner);
 let reconnecting = false;

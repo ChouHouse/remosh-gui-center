@@ -34,7 +34,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY scripts ./scripts
 COPY public ./public
-# 只裝執行時需要的套件（不含 wrangler），把 Monaco / xterm 的靜態檔複製到 public，
+# 只裝執行時需要的套件，把 Monaco / xterm 的靜態檔複製到 public，
 # 複製完就移除這兩個只在建置時需要的套件
 RUN npm ci --omit=dev --no-audit --no-fund && \
     npm run assets && \

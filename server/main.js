@@ -1,5 +1,5 @@
 // ssh-desk: Node entry, used by the Docker image (`node server/main.js`).
-// Serves public/ and the same /ws and /api/gate as the Worker entry.
+// Serves public/, /ws and /api/gate.
 //
 // Environment:
 //   PORT           port to listen on (default 8080)
@@ -11,7 +11,6 @@ import { dirname, extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { Session } from '../src/session.js';
-import { nodePlatform } from '../src/platform/node.js';
 import { createGate, handleGateApi } from '../src/gate.js';
 
 const PUBLIC = join(dirname(fileURLToPath(import.meta.url)), '..', 'public');
@@ -100,7 +99,7 @@ server.on('upgrade', async (req, socket, head) => {
     const origin = req.headers.origin;
     if (origin && new URL(origin).host !== req.headers.host) return refuse(403, 'Forbidden');
     if (!(await gate.check(req.headers.cookie))) return refuse(401, 'Unauthorized');
-    wss.handleUpgrade(req, socket, head, (ws) => new Session(ws, env, nodePlatform));
+    wss.handleUpgrade(req, socket, head, (ws) => new Session(ws, env));
   } catch {
     refuse(400, 'Bad Request');
   }

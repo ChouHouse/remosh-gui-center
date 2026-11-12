@@ -2,8 +2,7 @@
 // With it set, the page must log in here before it may open the WebSocket.
 //
 // Stateless: the cookie is "<expiry>.<HMAC(expiry)>" keyed from the password,
-// so it works across Worker isolates and changing the password logs everyone out.
-// Uses only WebCrypto, which both Workers and Node provide.
+// so nothing has to be stored and changing the password logs everyone out.
 const COOKIE = 'remosh_gate';
 const TTL_SECONDS = 12 * 60 * 60;
 const enc = new TextEncoder();

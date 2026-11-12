@@ -1,4 +1,4 @@
-// Turns the Worker's raw `stats` output into one sample.
+// Turns the server's raw `stats` output into one sample.
 // Container (cgroup) figures are preferred over /proc totals, which describe
 // the Docker host when the SSH target is a container.
 export function parseStats(out) {

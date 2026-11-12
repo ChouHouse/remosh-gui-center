@@ -1,4 +1,4 @@
-// Browser end-to-end test. Needs a running `wrangler dev` and a reachable SSH
+// Browser end-to-end test. Needs the server running (`npm start`) and a reachable SSH
 // account whose home contains project/src/math.ts and docs/ (see README).
 //   NODE_PATH=<dir with playwright>/node_modules node test/e2e.cjs \
 //     http://127.0.0.1:3000 127.0.0.1 2222 user password /home/user

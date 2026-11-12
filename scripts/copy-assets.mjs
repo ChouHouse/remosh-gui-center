@@ -1,5 +1,5 @@
 // Copies the prebuilt Monaco editor (the editor core of VS Code) into public/vs
-// so it is served as a static asset next to the Worker.
+// so the server can hand it out as static files.
 import { cpSync, rmSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
