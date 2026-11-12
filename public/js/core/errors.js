@@ -18,7 +18,7 @@ export const ERROR_TEXT = {
   'too-deep': '資料夾層數太深',
   'no-terminal': '這個終端機已經關閉',
   'permission-denied': '權限不足',
-  'too-large': '檔案太大（上限 5 MB）',
+  'too-large': '檔案太大',
   'not-a-file': '這不是一般檔案',
   'exec-failed': '這台主機不允許執行指令，無法讀取資源資訊',
   'not-connected': '連線已中斷',

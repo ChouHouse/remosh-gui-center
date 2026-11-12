@@ -202,7 +202,9 @@ Each editor window has two menus: 檔案 (undo, redo, save, save as, close) and
 editor window and are remembered in the browser.
 
 Files are read and written as UTF-8 (BOM kept) or Big5, with the original line
-endings; binary files and files over 5 MB are not opened.
+endings; binary files are not opened. Large files travel in pieces
+(`core/file-io.js`, `readChunk` / `writeChunk`), so there is no fixed limit;
+above 200 MB the window asks before opening.
 
 ## Language features
 

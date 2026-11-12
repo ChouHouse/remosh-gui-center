@@ -3,12 +3,12 @@ import { h } from '../../core/dom.js';
 import { store } from '../../core/store.js';
 import { errText } from '../../core/errors.js';
 import { toast, dialog } from '../../core/ui.js';
-import { fmtSize } from '../../core/format.js';
 import { P } from '../../core/path.js';
 import { fileSvg } from '../../core/icons.js';
 import { conn, rpc } from '../../core/rpc.js';
+import { readFile, writeFile } from '../../core/file-io.js';
 import { on, emit } from '../../core/events.js';
-import { decodeText, encodeText, toBase64, fromBase64 } from '../../core/text-codec.js';
+import { decodeText, encodeText } from '../../core/text-codec.js';
 import { createWindow, wm } from '../../shell/wm.js';
 import { attachMenuBar } from '../../shell/menubar.js';
 import { registerApp } from '../../shell/apps.js';
@@ -53,11 +53,12 @@ async function openDropped(paths) {
   if (folders) toast(folders === paths.length ? 'Procoder 不能開啟資料夾' : `略過了 ${folders} 個資料夾`);
 }
 
+const LARGE_FILE_BYTES = 200 * 1024 * 1024; // above this the user is asked first
+
 // With a path: open that remote file. Without: a new, unsaved document.
 async function openEditor(path = null, size = 0) {
   const existing = path && editors.get(path);
   if (existing) return existing.win.focus();
-  if (size > 5 * 1024 * 1024) return toast(`「${P.base(path)}」太大（${fmtSize(size)}），Procoder 的上限是 5 MB`, true);
 
   let name = path ? P.base(path) : UNTITLED; // both change on "save as"
   const win = createWindow({ title: name, appName: 'Procoder', iconHtml: fileSvg(name), width: 820, height: 560 });
@@ -87,15 +88,38 @@ async function openEditor(path = null, size = 0) {
     ed.model?.dispose();
   };
 
+  // A very large file is not opened straight away: the window says so and
+  // waits for the user to insist.
+  if (size > LARGE_FILE_BYTES) {
+    const go = await new Promise((resolve) => {
+      const open = h('button', { type: 'button', class: 'ed-large-open', onclick: () => resolve(true) }, '仍要開啟');
+      host.replaceChildren(h('div', { class: 'ed-large' },
+        h('p', null, `此檔案大小超過上限 (${Math.round(size / 1024 / 1024)} MB)`), open));
+      win.onClose = () => {
+        resolve(false);
+        return true;
+      };
+      open.focus();
+    });
+    win.onClose = null;
+    if (!go || editors.get(ed.key) !== ed) return;
+  }
+  const loading = h('div', { class: 'editor-loading' }, '開啟中…');
+  host.replaceChildren(loading);
+
   let monaco, res;
   try {
-    [monaco, res] = await Promise.all([loadMonaco(), path ? rpc('read', { path }) : null]);
+    [monaco, res] = await Promise.all([loadMonaco(), path ? readFile(path, {
+      onProgress: (done, total) => {
+        loading.textContent = `開啟中… ${Math.floor((done / total) * 100)}%`;
+      },
+    }) : null]);
   } catch (err) {
     await win.close(true);
     return toast(`無法開啟「${name}」：${errText(err)}`, true);
   }
   if (editors.get(ed.key) !== ed) return; // closed while loading
-  const decoded = res ? decodeText(fromBase64(res.data)) : { text: '', encoding: 'UTF-8', bom: false };
+  const decoded = res ? decodeText(res.bytes) : { text: '', encoding: 'UTF-8', bom: false };
   if (!decoded) {
     await win.close(true);
     return toast(`「${name}」不是文字檔，無法在 Procoder 中開啟`, true);
@@ -151,7 +175,7 @@ async function openEditor(path = null, size = 0) {
     ed.saving = true;
     refresh();
     try {
-      const r = await rpc('write', { path: ed.path, data: toBase64(bytes), expectMtime: ed.mtime, force: !!force });
+      const r = await writeFile(ed.path, bytes, { expectMtime: ed.mtime, force });
       ed.mtime = r.mtime;
       ed.savedVersion = version;
       return true;
@@ -242,7 +266,7 @@ async function openEditor(path = null, size = 0) {
     ed.saving = true;
     refresh();
     try {
-      const r = await rpc('write', { path: target, data: toBase64(bytes) });
+      const r = await writeFile(target, bytes);
       // The window now edits the new file, like "Save As" in a desktop editor.
       ed.mtime = r.mtime;
       ed.savedVersion = version;
