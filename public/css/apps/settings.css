@@ -70,3 +70,19 @@ input.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2
 .wp-actions button:disabled { opacity: .45; cursor: default; }
 .look-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 8px; }
 .look-row > span { width: 64px; color: var(--muted); }
+.acc-me { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.acc-me .avatar {
+  width: 34px; height: 34px; flex: none; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent); color: var(--accent-text); font-weight: 700; text-transform: uppercase;
+}
+.acc-me span:last-child { display: flex; flex-direction: column; }
+.acc-me small { color: var(--muted); }
+.acc-form { display: grid; gap: 8px; max-width: 320px; }
+.acc-form .set-save { justify-self: start; }
+.acc-field { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+.acc-field input {
+  padding: 6px 9px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font-size: 13px; user-select: text;
+}
+.acc-field input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.acc-users { display: flex; flex-wrap: wrap; gap: 6px; }
+.acc-user { padding: 3px 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); }

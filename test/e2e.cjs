@@ -24,7 +24,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const owner = fs.statSync(home);
   const give = (path) => fs.chownSync(path, owner.uid, owner.gid);
   const scratch = ['/project/m1.txt', '/project/m2.txt', '/project/drag-a.txt', '/project/drag-b.txt', '/project/ren-a.txt', '/project/ren-b.txt', '/project/poll-new.txt', '/docs/todo.txt', '/docs/todo 複本.txt', '/project/todo 複本.txt', '/project/hello.sh', '/project/src/copy.py'];
+  const { execSync: sh } = require('node:child_process');
   process.on('exit', () => {
+    try { sh('chpasswd', { input: `${user}:${password}\n` }); } catch { /* not root */ }
+    try { sh('userdel -r e2etmpuser 2>/dev/null'); } catch { /* was not created */ }
     for (const f of scratch) fs.rmSync(home + f, { force: true });
     fs.rmSync(home + '/.remosh-gui', { recursive: true, force: true });
     if (realSettings) {
@@ -949,6 +952,47 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check((await page.textContent('.modal p')).includes('只會刪除捷徑'), 'deleting a shortcut says the target is safe');
   await page.locator('.modal button', { hasText: '刪除' }).click();
   check(await exists(desk + '/src.remosh_gui-lnk', false) && fs.existsSync(home + '/project/src/math.ts'), 'the shortcut is gone, the folder untouched');
+  // ---- list view: column widths can be dragged
+  await toFinder();
+  await fwin.locator('button[title="列表檢視"]').click();
+  const colBox = (k) => fwin.locator(`.list-head .col:has(.col-resize[data-col="${k}"])`).boundingBox();
+  const filesWidth = (await fwin.locator('.files').boundingBox()).width;
+  let nameW = (await colBox('name')).width;
+  check(nameW === 260 && nameW < filesWidth * 0.6 && (await colBox('size')).width === 90, 'list columns have set widths; the name column no longer takes all the room', JSON.stringify({ nameW, filesWidth }));
+  check((await fwin.locator('.files').evaluate((el) => getComputedStyle(el).scrollbarWidth)) === 'thin', 'scroll bars are the thin themed kind');
+  const grip = await fwin.locator('.col-resize[data-col="name"]').boundingBox();
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2 + 100, grip.y + grip.height / 2, { steps: 4 });
+  await page.mouse.up();
+  nameW = (await colBox('name')).width;
+  const cellW = (await fwin.locator('.files .item .namecell').first().boundingBox()).width;
+  check(nameW === 360 && cellW === 360 && (await fwin.locator('.marquee').count()) === 0, 'dragging a column edge resizes that column, header and rows together', JSON.stringify({ nameW, cellW }));
+  check(JSON.parse(await page.evaluate(() => localStorage.getItem('sshdesk.cols'))).name === 360, 'the widths are remembered');
+  const grip2 = await fwin.locator('.col-resize[data-col="name"]').boundingBox();
+  await page.mouse.move(grip2.x + grip2.width / 2, grip2.y + grip2.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip2.x + grip2.width / 2 - 100, grip2.y + grip2.height / 2, { steps: 4 });
+  await page.mouse.up();
+  await fwin.locator('button[title="圖示檢視"]').click();
+  // ---- sidebar: drag to reorder, drop a folder to add
+  const sideOrder = () => fwin.locator('.sidebar button[data-path]').evaluateAll((els) => els.map((e) => e.dataset.path));
+  const homeBtn = await fwin.locator(`.sidebar button[title="${home}"]`).boundingBox();
+  await beginDrag(fwin.locator('.sidebar button[title="/tmp"]'), homeBtn.x + 30, homeBtn.y + 2);
+  check((await ghost()) === 'tmp|移動', 'sidebar places can be dragged');
+  await endDrag();
+  await page.waitForFunction(() => document.querySelector('.sidebar button[data-path]').dataset.path === '/tmp');
+  check((await sideOrder()).join() === ['/tmp', home, '/', '/etc', '/var'].join() && await waitSetting((st) => st.files.sidebar?.[0] === '/tmp'), 'dropping one above another reorders the list, and the order is saved', (await sideOrder()).join());
+  const sideBox = await fwin.locator('.sidebar').boundingBox();
+  await beginDrag(item('src'), sideBox.x + 40, sideBox.y + sideBox.height - 12);
+  check((await ghost()) === 'src|加到側邊欄', 'a folder can be dragged onto the sidebar');
+  await endDrag();
+  await fwin.locator(`.sidebar button[title="${home}/project/src"]`).waitFor();
+  check((await sideOrder()).pop() === home + '/project/src', 'and is added where it was dropped');
+  await fwin.locator('.sidebar h3').click({ button: 'right' });
+  await pick('還原成預設');
+  await page.waitForFunction((h0) => document.querySelector('.sidebar button[data-path]').dataset.path === h0, home);
+
   // ---- multi-selection and rubber-band selection (file cabinet and desktop)
   await toFinder();
   for (const n of ['m1.txt', 'm2.txt']) {
@@ -1081,7 +1125,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   };
   await sw.waitFor();
   check((await sw.locator('.titlebar .ttext').textContent()) === '設定', 'settings window opens from the start menu');
-  check((await sw.locator('.set-nav button').allTextContents()).join() === '動畫,檔案關聯,樣式', 'settings has the 動畫, 檔案關聯 and 樣式 categories');
+  check((await sw.locator('.set-nav button').allTextContents()).join() === '動畫,檔案關聯,樣式,工作列,帳號', 'settings categories');
   check(await page.isChecked('#set-anim-enabled') && (await page.inputValue('#set-anim-speed')) === 'normal', 'defaults: animations on, normal speed');
   check(await page.isDisabled('#set-save'), 'nothing to save yet');
   await page.selectOption('#set-anim-speed', 'slow');
@@ -1225,6 +1269,102 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.waitForFunction(() => !document.documentElement.style.getPropertyValue('--folder'));
   fs.rmSync(shot, { force: true });
 
+  // ---- settings: 工作列
+  await sw.locator('.set-nav button', { hasText: '工作列' }).click();
+  const dockBoxNow = () => page.locator('#dock').boundingBox();
+  const tbData = (k) => page.evaluate((key) => document.documentElement.dataset[key], k);
+  check((await dockBoxNow()).height === 54 && (await sw.locator('#tb-size .current').getAttribute('data-value')) === 'medium', 'the taskbar starts at the medium size (54 px)');
+  await sw.locator('#tb-size button[data-value="large"]').click();
+  await page.waitForFunction(() => document.documentElement.dataset.taskbarSize === 'large');
+  const largeIcon = await page.locator('.dock-item .ico').first().boundingBox();
+  check((await dockBoxNow()).height === 68 && largeIcon.width === 36, 'large: taller bar, bigger icons');
+  await sw.locator('#tb-size button[data-value="small"]').click();
+  await page.waitForFunction(() => document.documentElement.dataset.taskbarSize === 'small');
+  check((await dockBoxNow()).height === 42, 'small');
+  await sw.locator('#tb-size button[data-value="medium"]').click();
+  await page.waitForFunction(() => document.documentElement.dataset.taskbarSize === 'medium');
+  await sw.locator('#tb-labels button[data-value="false"]').click();
+  await page.waitForFunction(() => document.documentElement.dataset.taskbarLabels === 'off');
+  check(await page.locator('.dock-item .lbl').first().isHidden() && await page.locator('.dock-item .ico').first().isVisible(), 'icons only');
+  await sw.locator('#tb-labels button[data-value="true"]').click();
+  await page.waitForFunction(() => document.documentElement.dataset.taskbarLabels === 'on');
+  const leftX = (await page.locator('.dock-item').first().boundingBox()).x;
+  await sw.locator('#tb-align button[data-value="center"]').click();
+  await page.waitForFunction(() => document.documentElement.dataset.taskbarAlign === 'center');
+  const firstC = await page.locator('.dock-item').first().boundingBox();
+  const lastC = await page.locator('.dock-item').last().boundingBox();
+  const itemsBox = await page.locator('#dock-items').boundingBox();
+  check(firstC.x > leftX + 100 && Math.abs((firstC.x - itemsBox.x) - (itemsBox.x + itemsBox.width - lastC.x - lastC.width)) < 3, 'centred entries', JSON.stringify([leftX, firstC.x]));
+  await sw.locator('#tb-align button[data-value="left"]').click();
+  await page.waitForFunction(() => document.documentElement.dataset.taskbarAlign === 'left');
+  await page.check('#tb-autohide');
+  await page.waitForFunction(() => document.documentElement.dataset.taskbarAutohide === 'on');
+  await page.mouse.move(640, 300);
+  await sleep(450);
+  const hiddenDock = await dockBoxNow();
+  check(hiddenDock.y >= 794 && (await page.locator('#windows').boundingBox()).height === 800, 'auto-hide: the bar slides away and windows get the whole screen', JSON.stringify(hiddenDock));
+  await page.mouse.move(640, 799);
+  await page.waitForFunction(() => document.querySelector('#dock').getBoundingClientRect().top <= 747, null, { timeout: 3000 }).catch(() => {});
+  check((await dockBoxNow()).y <= 747, 'it comes back when the pointer reaches the bottom edge');
+  await page.mouse.move(640, 300);
+  await page.uncheck('#tb-autohide');
+  await page.waitForFunction(() => document.documentElement.dataset.taskbarAutohide === 'off');
+  check(await waitSetting((st) => st.taskbar && st.taskbar.size === 'medium' && st.taskbar.labels === true && st.taskbar.align === 'left' && st.taskbar.autoHide === false), 'taskbar settings are saved');
+  // more entries than fit: no scroll bar, the wheel scrolls sideways
+  await page.evaluate(() => {
+    const st0 = document.createElement('style');
+    st0.id = 'e2e-narrow';
+    st0.textContent = '#dock-items{max-width:150px!important}';
+    document.head.append(st0);
+  });
+  await sleep(400); // let the narrowed bar lay out before scrolling over it
+  const di = await page.locator('#dock-items').boundingBox();
+  await page.mouse.move(di.x + 40, di.y + 20);
+  await sleep(200);
+  await page.mouse.wheel(0, 300);
+  await page.waitForFunction(() => document.querySelector('#dock-items').scrollLeft > 0, null, { timeout: 4000 }).catch(() => {});
+  const dockScroll = await page.locator('#dock-items').evaluate((el) => [el.scrollLeft, el.scrollWidth > el.clientWidth, getComputedStyle(el).scrollbarWidth]);
+  check(dockScroll[0] > 0 && dockScroll[1] && dockScroll[2] === 'none', 'an overfull taskbar hides its scroll bar and scrolls with the wheel', JSON.stringify(dockScroll));
+  await page.evaluate(() => document.querySelector('#e2e-narrow').remove());
+  // calendar from the clock
+  await page.click('#clock');
+  const now = new Date();
+  check(await page.isVisible('#calendar') && (await page.textContent('#cal-title')) === `${now.getFullYear()} 年 ${now.getMonth() + 1} 月`, 'clicking the clock opens a calendar for this month');
+  check((await page.locator('#calendar .day').count()) === 42 && (await page.textContent('#calendar .day.today')) === String(now.getDate()), 'six weeks, today marked');
+  const calBox = await page.locator('#calendar').boundingBox();
+  check(calBox.x + calBox.width > 1240 && calBox.y + calBox.height < 750, 'it opens above the clock');
+  await page.locator('#calendar .cal-nav').last().click();
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  check((await page.textContent('#cal-title')) === `${nextMonth.getFullYear()} 年 ${nextMonth.getMonth() + 1} 月` && (await page.locator('#calendar .day.today').count()) <= 1, 'next month');
+  await page.click('#cal-today');
+  check((await page.textContent('#cal-title')) === `${now.getFullYear()} 年 ${now.getMonth() + 1} 月`, '"today" returns');
+  await page.keyboard.press('Escape');
+  check(await page.isHidden('#calendar'), 'Escape closes it');
+  // ---- settings: 帳號 (change password)
+  await sw.locator('.set-nav button', { hasText: '帳號' }).click();
+  await page.waitForSelector('#acc-user');
+  check((await page.textContent('#acc-user')) === user && (await page.locator('#acc-create').count()) === 0, 'account page shows who is signed in; no "create account" without root or sudo');
+  const tempPw = 'Tmp-Passw0rd-9x';
+  const changePw = async (oldPw, newPw) => {
+    await page.fill('#acc-old', oldPw);
+    await page.fill('#acc-new', newPw);
+    await page.fill('#acc-new2', newPw);
+    await page.click('#acc-change');
+  };
+  await changePw('not-my-password', tempPw);
+  check(await page.locator('.toast.err', { hasText: '密碼沒有變更' }).first().waitFor({ timeout: 15000 }).then(() => true, () => false), 'a wrong current password changes nothing');
+  await changePw(password, tempPw);
+  check(await page.locator('.toast', { hasText: '密碼已變更' }).first().waitFor({ timeout: 15000 }).then(() => true, () => false) && (await page.inputValue('#acc-new')) === '', 'the password can be changed');
+  await sleep(4200); // let that toast go, so the next one is new
+  await changePw(tempPw, password);
+  check(await page.locator('.toast', { hasText: '密碼已變更' }).first().waitFor({ timeout: 15000 }).then(() => true, () => false), 'the new password is the one in force (it is needed to change it back)');
+  await page.fill('#acc-new', 'a');
+  await page.fill('#acc-new2', 'b');
+  await page.click('#acc-change');
+  check(await page.locator('.toast.err', { hasText: '不一樣' }).first().waitFor({ timeout: 3000 }).then(() => true, () => false), 'mismatched confirmation is caught before anything is sent');
+  await page.fill('#acc-new', '');
+  await page.fill('#acc-new2', '');
+
   // ---- settings: 檔案關聯 lists what was remembered and lets it be changed
   await sw.locator('.set-nav button', { hasText: '檔案關聯' }).click();
   const rowExts = await sw.locator('.assoc-row code').allTextContents();
@@ -1279,6 +1419,36 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await f2.click('#login-btn');
     await f2.waitForSelector('#desktop:not([hidden])', { timeout: 30000 });
     check((await f2.textContent('#conn-label')).startsWith(user2 + '@') && (await f2.locator('.win').count()) === 0, 'a second user signs in with their own empty desktop');
+    // this second account may use sudo: it can create accounts
+    try { sh('userdel -r e2etmpuser 2>/dev/null'); } catch { /* not there */ }
+    await f2.click('#start-btn');
+    await f2.click('#sm-settings');
+    await f2.locator('.set-nav button', { hasText: '帳號' }).click();
+    await f2.waitForSelector('#acc-create');
+    check(await f2.isVisible('#acc-sudo') && (await f2.locator('#acc-users .acc-user').allTextContents()).includes(user), 'with sudo rights the account page offers "create account" and lists the accounts');
+    const fillNew = async (sudoPw) => {
+      await f2.fill('#acc-name', 'e2etmpuser');
+      await f2.fill('#acc-pass', 'New-User-Pw-1');
+      await f2.fill('#acc-pass2', 'New-User-Pw-1');
+      await f2.fill('#acc-sudo', sudoPw);
+      await f2.click('#acc-create');
+      await f2.locator('.modal button', { hasText: '建立' }).click();
+    };
+    await fillNew('wrong-sudo-password');
+    check(await f2.locator('.toast.err', { hasText: 'sudo 驗證失敗' }).first().waitFor({ timeout: 20000 }).then(() => true, () => false) && !/e2etmpuser/.test(sh('getent passwd').toString()), 'a wrong sudo password creates nothing');
+    await fillNew(process.env.SSH_PW2);
+    check(await f2.locator('.toast', { hasText: '已建立帳號' }).first().waitFor({ timeout: 20000 }).then(() => true, () => false), 'with the right one the account is created');
+    const made = sh('getent passwd e2etmpuser || true').toString();
+    check(/^e2etmpuser:.*:\/home\/e2etmpuser:\/bin\/bash/.test(made) && fs.existsSync('/home/e2etmpuser'), 'it exists on the host with a home folder', made.trim());
+    await f2.locator('#acc-users .acc-user', { hasText: 'e2etmpuser' }).waitFor();
+    await f2.fill('#acc-name', 'Bad Name');
+    await f2.fill('#acc-pass', 'x');
+    await f2.fill('#acc-pass2', 'x');
+    await f2.fill('#acc-sudo', process.env.SSH_PW2);
+    await f2.click('#acc-create');
+    await f2.locator('.modal button', { hasText: '建立' }).click();
+    check(await f2.locator('.toast.err', { hasText: '帳號名稱只能用' }).first().waitFor({ timeout: 10000 }).then(() => true, () => false), 'an invalid account name is refused');
+    await f2.locator('.win[data-app="設定"] .traffic .close').click();
     await f2.click('#start-btn');
     await f2.click('#sm-files');
     const item2 = f2.locator('.files .item', { has: f2.locator('.name', { hasText: /^two\.txt$/ }) });

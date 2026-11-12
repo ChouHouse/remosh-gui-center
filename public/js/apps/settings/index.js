@@ -6,16 +6,32 @@
 // and calls changed() after every edit.
 import { h } from '../../core/dom.js';
 import { errText } from '../../core/errors.js';
-import { toast } from '../../core/ui.js';
+import { toast, dialog } from '../../core/ui.js';
+import { rpc } from '../../core/rpc.js';
 import { settingsSvg } from '../../core/icons.js';
 import { on } from '../../core/events.js';
 import { getSettings, saveSettings } from '../../core/settings.js';
 import { createWindow } from '../../shell/wm.js';
 import { registerApp, getApp, appsForExt } from '../../shell/apps.js';
+import { setTaskbar } from '../../shell/taskbar.js';
 import { COLORS, MODES, setColor, setMode, setControls, uploadWallpaper, useWallpaper, clearWallpaper, wallpaperUrl } from '../../shell/style.js';
 
 const row = (title, desc, control) =>
   h('div', { class: 'set-row' }, h('div', { class: 'set-text' }, h('b', null, title), h('small', null, desc)), control);
+
+// A row of mutually exclusive buttons. onPick(key) returns a promise.
+const segmented = (id, label, options, value, onPick) =>
+  h('div', { class: 'mode-seg', id, role: 'group', 'aria-label': label }, options.map(([key, text]) =>
+    h('button', {
+      type: 'button',
+      class: value === key ? 'current' : '',
+      'data-value': String(key),
+      'aria-pressed': String(value === key),
+      onclick: () => onPick(key).catch((err) => toast(`無法儲存：${errText(err)}`, true)),
+    }, text)));
+
+// Categories whose changes apply and save at once (the others wait for 儲存).
+const LIVE = ['style', 'taskbar'];
 
 const CATEGORIES = [
   {
@@ -88,15 +104,6 @@ const CATEGORIES = [
     // once (a wallpaper is a file on the host, not just a value).
     render(draft) {
       const fail = (what) => (err) => toast(`${what}：${errText(err)}`, true);
-      const segmented = (id, label, options, value, set) =>
-        h('div', { class: 'mode-seg', id, role: 'group', 'aria-label': label }, options.map(([key, text]) =>
-          h('button', {
-            type: 'button',
-            class: value === key ? 'current' : '',
-            'data-value': key,
-            'aria-pressed': String(value === key),
-            onclick: () => set(key).catch(fail('無法儲存')),
-          }, text)));
       const modes = segmented('set-mode', '模式', MODES, draft.style.mode, setMode);
       const controls = segmented('set-controls', '視窗按鈕', [['left', '左上'], ['right', '右上']], draft.style.controls, setControls);
       const colours = h('div', { class: 'tint-grid' }, COLORS.map((c) =>
@@ -156,6 +163,101 @@ const CATEGORIES = [
           h('button', { type: 'button', id: 'wp-none', disabled: !draft.style.wallpaper, onclick: () => clearWallpaper().catch(fail('無法儲存')) }, '不使用壁紙')));
     },
   },
+  {
+    id: 'taskbar',
+    label: '工作列',
+    render(draft) {
+      const t = draft.taskbar;
+      const autoHide = h('input', { type: 'checkbox', id: 'tb-autohide', class: 'switch', role: 'switch', 'aria-label': '自動隱藏', checked: t.autoHide });
+      autoHide.addEventListener('change', () => setTaskbar({ autoHide: autoHide.checked }).catch((err) => toast(`無法儲存：${errText(err)}`, true)));
+      return h('div', null,
+        h('h2', null, '工作列'),
+        h('p', { class: 'set-desc' }, '變更會立即套用。'),
+        row('自動隱藏', '滑鼠移到畫面底部才出現', autoHide),
+        row('大小', '', segmented('tb-size', '大小', [['small', '小'], ['medium', '中'], ['large', '大']], t.size, (size) => setTaskbar({ size }))),
+        row('項目顯示', '', segmented('tb-labels', '項目顯示', [[true, '圖示與文字'], [false, '只顯示圖示']], t.labels, (labels) => setTaskbar({ labels }))),
+        row('對齊', '', segmented('tb-align', '對齊', [['left', '靠左'], ['center', '置中']], t.align, (align) => setTaskbar({ align }))));
+    },
+  },
+  {
+    id: 'account',
+    label: '帳號',
+    render() {
+      const box = h('div', null, h('h2', null, '帳號'), h('p', { class: 'set-desc' }, '讀取中…'));
+      const field = (id, label, type = 'password') => {
+        const input = h('input', { id, type, autocomplete: 'off', spellcheck: 'false', autocapitalize: 'off' });
+        return { input, el: h('label', { class: 'acc-field' }, h('span', null, label), input) };
+      };
+      const fill = (info) => {
+        const isRoot = info.sudo === 'root';
+        // -- change my password
+        const old = field('acc-old', '目前的密碼');
+        const next = field('acc-new', '新密碼');
+        const again = field('acc-new2', '再輸入一次新密碼');
+        const change = h('button', { type: 'button', id: 'acc-change', class: 'set-save' }, '變更密碼');
+        change.addEventListener('click', async () => {
+          if (!next.input.value) return toast('請輸入新密碼', true);
+          if (next.input.value !== again.input.value) return toast('兩次輸入的新密碼不一樣', true);
+          change.disabled = true;
+          try {
+            await rpc('changePassword', { oldPassword: old.input.value, newPassword: next.input.value });
+            for (const f of [old, next, again]) f.input.value = '';
+            toast('密碼已變更');
+          } catch (err) {
+            toast(errText(err), true);
+          } finally {
+            change.disabled = false;
+          }
+        });
+        // -- create a user (root, or through sudo)
+        const parts = [
+          h('h2', null, '帳號'),
+          h('div', { class: 'acc-me' }, h('span', { class: 'avatar' }, [...info.user][0]), h('span', null, h('b', { id: 'acc-user' }, info.user), h('small', null, `UID ${info.uid}`))),
+          h('h3', null, '變更密碼'),
+          h('div', { class: 'acc-form' }, !isRoot && old.el, next.el, again.el, change),
+        ];
+        if (info.sudo !== 'none') {
+          const name = field('acc-name', '帳號名稱', 'text');
+          const pass = field('acc-pass', '密碼');
+          const pass2 = field('acc-pass2', '再輸入一次密碼');
+          const sudoPw = field('acc-sudo', '你的密碼（sudo 驗證用）');
+          const create = h('button', { type: 'button', id: 'acc-create', class: 'set-save' }, '建立帳號');
+          const users = h('div', { id: 'acc-users', class: 'acc-users' });
+          const listUsers = (list) => users.replaceChildren(...list.map((u) => h('span', { class: 'acc-user', title: u.home }, u.name)));
+          listUsers(info.users);
+          create.addEventListener('click', async () => {
+            const username = name.input.value.trim();
+            if (!username) return toast('請輸入帳號名稱', true);
+            if (!pass.input.value) return toast('請輸入密碼', true);
+            if (pass.input.value !== pass2.input.value) return toast('兩次輸入的密碼不一樣', true);
+            const ok = await dialog({
+              title: `要建立帳號「${username}」嗎？`,
+              message: '會在這台主機上新增一個可以登入的使用者，並建立它的家目錄。',
+              buttons: [{ label: '取消', value: false, cancel: true }, { label: '建立', value: true, default: true }],
+            });
+            if (!ok) return;
+            create.disabled = true;
+            try {
+              await rpc('createUser', { username, password: pass.input.value, sudoPassword: sudoPw.input.value });
+              for (const f of [name, pass, pass2, sudoPw]) f.input.value = '';
+              toast(`已建立帳號「${username}」`);
+              listUsers((await rpc('accountInfo')).users);
+            } catch (err) {
+              toast(`無法建立帳號：${errText(err)}`, true);
+            } finally {
+              create.disabled = false;
+            }
+          });
+          parts.push(h('h3', null, '建立帳號'),
+            h('div', { class: 'acc-form' }, name.el, pass.el, pass2.el, info.sudo === 'password' && sudoPw.el, create),
+            h('h3', null, '這台主機上的帳號'), users);
+        }
+        box.replaceChildren(...parts.filter(Boolean));
+      };
+      rpc('accountInfo').then(fill, (err) => box.replaceChildren(h('h2', null, '帳號'), h('p', { class: 'set-desc' }, `無法讀取帳號資訊：${errText(err)}`)));
+      return box;
+    },
+  },
 ];
 
 let win = null;
@@ -209,11 +311,15 @@ function openSettings() {
   const off = on('settings:changed', (next) => {
     if (saving) return;
     if (JSON.stringify(draft) !== saved) {
-      // Unsaved edits in another category: keep them, but 樣式 saves on its
-      // own, so take its new values into both the draft and the baseline.
-      draft.style = next.style;
-      saved = JSON.stringify({ ...JSON.parse(saved), style: next.style });
-      if (active.id === 'style') show(active);
+      // Unsaved edits in another category: keep them, but the live categories
+      // save on their own, so take their new values into both the draft and the baseline.
+      const base = JSON.parse(saved);
+      for (const key of LIVE) {
+        draft[key] = next[key];
+        base[key] = next[key];
+      }
+      saved = JSON.stringify(base);
+      if (LIVE.includes(active.id)) show(active);
       return;
     }
     Object.assign(draft, next);

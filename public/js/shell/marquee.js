@@ -9,7 +9,7 @@
 // space is left alone, so the owner can still clear its selection on click.
 export function attachMarquee(container, { itemSelector, onChange }) {
   container.addEventListener('pointerdown', (down) => {
-    if (down.button !== 0 || down.target.closest(itemSelector)) return;
+    if (down.button !== 0 || down.target.closest(itemSelector) || down.target.closest('[data-no-marquee]')) return;
     const frame = container.getBoundingClientRect();
     // Not when the press is on a scroll bar.
     if (down.clientX - frame.left > container.clientWidth || down.clientY - frame.top > container.clientHeight) return;

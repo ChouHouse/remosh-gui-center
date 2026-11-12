@@ -11,6 +11,7 @@ import './apps/terminal/index.js';
 import './apps/taskman/index.js';
 import './apps/settings/index.js';
 import './shell/clock.js';
+import './shell/taskbar.js';
 import './shell/desktop-icons.js';
 import './shell/fullscreen.js';
 import { initStartMenu } from './shell/start-menu.js';

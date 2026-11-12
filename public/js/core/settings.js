@@ -19,6 +19,12 @@ const DEFAULTS = {
     associations: {}, // extension ('' = no extension) -> app id
     sidebar: null, // file cabinet sidebar folders; null = the built-in list
   },
+  taskbar: {
+    autoHide: false, // slide away until the pointer reaches the bottom edge
+    size: 'medium', // 'small' | 'medium' | 'large'
+    labels: true, // show window titles next to the icons
+    align: 'left', // 'left' | 'center'
+  },
   start: {
     pinned: null, // app ids pinned to the start menu, in order; null = every app
   },
@@ -60,6 +66,12 @@ function normalise(obj) {
         : null,
     },
     style: normaliseStyle(obj?.style),
+    taskbar: {
+      autoHide: obj?.taskbar?.autoHide === true,
+      size: ['small', 'medium', 'large'].includes(obj?.taskbar?.size) ? obj.taskbar.size : DEFAULTS.taskbar.size,
+      labels: obj?.taskbar?.labels !== false,
+      align: obj?.taskbar?.align === 'center' ? 'center' : 'left',
+    },
   };
 }
 

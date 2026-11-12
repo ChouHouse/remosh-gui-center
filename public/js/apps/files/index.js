@@ -23,6 +23,11 @@ import { putFiles, takeFiles, clearFiles, cutPaths } from './clipboard.js';
 
 const finders = new Set(); // every open file cabinet window
 
+// List-view columns: default widths and how narrow / wide they may be dragged.
+const COLS = { name: 260, mtime: 150, size: 90, kind: 100 };
+const COL_MIN = 60;
+const COL_MAX = 900;
+
 function createFinder(home, startPath = home) {
   const win = createWindow({ title: '檔案櫃', appName: '檔案櫃', iconHtml: folderSvg(), width: 860, height: 540 });
   const st = {
@@ -35,6 +40,7 @@ function createFinder(home, startPath = home) {
     sel: new Set(),
     token: 0,
     view: store.get('view', 'grid'),
+    cols: { ...COLS, ...store.get('cols', {}) }, // list-view column widths in px
     showHidden: store.get('showHidden', false),
     sort: store.get('sort', { key: 'name', dir: 1 }),
   };
@@ -88,6 +94,61 @@ function createFinder(home, startPath = home) {
     ].filter((x) => x !== undefined && x !== false));
   });
   const offSettings = on('settings:changed', renderSidebar);
+  // Drag a place to reorder the list; drop a folder here to add it.
+  makeDraggable(side, (ev) => {
+    const path = ev.target.closest('button[data-path]')?.dataset.path;
+    return path ? { type: 'place', name: placeLabel(path), icon: folderSvg(), data: { path } } : null;
+  });
+  const offSideDrop = registerDropTarget(side, {
+    accepts: (payload) => payload.type === 'place' || (payload.type === 'file' && payload.data.isDir),
+    action: (payload) => (payload.type === 'place' ? '移動' : '加到側邊欄'),
+    onDrop(payload, drop) {
+      const paths = [...sidebarPaths()];
+      const buttons = [...side.querySelectorAll('button[data-path]')];
+      // Insert before the first entry whose middle is below the pointer.
+      let index = buttons.findIndex((b) => {
+        const r = b.getBoundingClientRect();
+        return drop.clientY < r.top + r.height / 2;
+      });
+      if (index < 0) index = buttons.length;
+      const from = paths.indexOf(payload.data.path);
+      if (payload.type === 'place') {
+        if (from < 0) return;
+        paths.splice(from, 1);
+        if (from < index) index--;
+      } else if (from >= 0) return toast('這個資料夾已經在側邊欄了');
+      paths.splice(index, 0, payload.data.path);
+      setSidebar(paths);
+    },
+  });
+
+  // ---- list view: column widths
+  const applyCols = () => files.style.setProperty('--cols', ['name', 'mtime', 'size', 'kind'].map((k) => `${st.cols[k]}px`).join(' '));
+  for (const k of Object.keys(COLS)) st.cols[k] = Math.max(COL_MIN, Math.min(COL_MAX, Number(st.cols[k]) || COLS[k]));
+  applyCols();
+  files.addEventListener('pointerdown', (down) => {
+    const grip = down.target.closest('.col-resize');
+    if (!grip || down.button !== 0) return;
+    down.preventDefault();
+    down.stopPropagation();
+    const key = grip.dataset.col;
+    const startWidth = st.cols[key];
+    document.body.classList.add('dragging', 'col-resizing');
+    const move = (ev) => {
+      st.cols[key] = Math.max(COL_MIN, Math.min(COL_MAX, startWidth + ev.clientX - down.clientX));
+      applyCols();
+    };
+    const up = () => {
+      document.body.classList.remove('dragging', 'col-resizing');
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      store.set('cols', st.cols);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  });
 
   function setView(v) {
     st.view = v;
@@ -202,15 +263,18 @@ function createFinder(home, startPath = home) {
       files.replaceChildren(h('div', { class: 'empty' }, hidden ? '這個資料夾只有隱藏檔' : '這個資料夾是空的'));
       return;
     }
-    const head = (k, label) => h('button', {
-      type: 'button',
-      class: st.sort.key === k ? 'sorted' : '',
-      onclick: () => {
-        st.sort = { key: k, dir: st.sort.key === k ? -st.sort.dir : 1 };
-        store.set('sort', st.sort);
-        render();
-      },
-    }, label + (st.sort.key === k ? (st.sort.dir > 0 ? ' ▲' : ' ▼') : ''));
+    // A header cell: click sorts, the grip at its right edge resizes the column.
+    const head = (k, label) => h('div', { class: 'col' },
+      h('button', {
+        type: 'button',
+        class: st.sort.key === k ? 'sorted' : '',
+        onclick: () => {
+          st.sort = { key: k, dir: st.sort.key === k ? -st.sort.dir : 1 };
+          store.set('sort', st.sort);
+          render();
+        },
+      }, label + (st.sort.key === k ? (st.sort.dir > 0 ? ' ▲' : ' ▼') : '')),
+      h('span', { class: 'col-resize', 'data-col': k, title: '拖曳調整欄寬', 'aria-hidden': 'true' }));
     const items = st.shown.map((e, i) => {
       const icon = isDir(e) ? folderSvg() : fileSvg(e.name);
       const el = h('div', { class: 'item' + (e.name.startsWith('.') ? ' hiddenfile' : '') + (cut.has(P.join(st.path, e.name)) ? ' cut' : ''), 'data-i': i, title: e.name },
@@ -223,7 +287,7 @@ function createFinder(home, startPath = home) {
       return el;
     });
     files.replaceChildren(
-      h('div', { class: 'list-head' }, head('name', '名稱'), head('mtime', '修改日期'), head('size', '大小'), head('kind', '種類')),
+      h('div', { class: 'list-head', 'data-no-marquee': '' }, head('name', '名稱'), head('mtime', '修改日期'), head('size', '大小'), head('kind', '種類')),
       h('div', { class: 'items' }, items));
     paint();
   }
@@ -578,6 +642,7 @@ function createFinder(home, startPath = home) {
     clearInterval(pollTimer);
     offSettings();
     offDrop();
+    offSideDrop();
     finders.delete(win);
   };
   win.navigate = navigate;

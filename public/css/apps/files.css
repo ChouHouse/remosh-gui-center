@@ -78,3 +78,15 @@
 }
 .files .state.err { color: var(--danger); }
 .files .item.cut svg, .files .item.cut .name { opacity: .45; }
+
+/* List view: fixed, draggable column widths (the name no longer takes all the room). */
+.files.list .list-head, .files.list .item {
+  grid-template-columns: var(--cols, 260px 150px 90px 100px); width: max-content; min-width: 100%;
+}
+.files .list-head .col { position: relative; min-width: 0; height: 100%; display: flex; align-items: center; }
+.files .list-head .col button { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.files .list-head .col-resize { position: absolute; top: 3px; bottom: 3px; right: -7px; width: 9px; cursor: col-resize; z-index: 2; }
+.files .list-head .col-resize::after { content: ""; position: absolute; left: 4px; top: 2px; bottom: 2px; width: 1px; background: var(--border); }
+.files .list-head .col-resize:hover::after, body.col-resizing .files .list-head .col-resize::after { background: var(--accent); width: 2px; left: 3px; }
+body.col-resizing, body.col-resizing * { cursor: col-resize !important; }
+.sidebar.drop-over { outline-offset: -3px; }

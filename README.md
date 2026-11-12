@@ -62,7 +62,7 @@ src/                    shared by both entries
   platform/             worker.js / node.js: how each runtime opens TCP
   util.js               shared helpers
   ops/                  one handler per request name
-    index.js            the registry (files, manage, stats, terminal)
+    index.js            the registry (files, manage, stats, process, terminal, account)
     files.js  manage.js  stats.js  terminal.js
 public/
   index.html
@@ -168,7 +168,11 @@ npm run deploy   # publish to Cloudflare
   `app:<id>`, `name.remosh_gui-lnk` holds `lnk:<path>`.
 - **Windows**: drag to the left or right edge for half the screen, to the top to
   maximise; the strip at the far right of the taskbar shows the desktop.
-- **Taskbar**: one entry per open window, clock at the right.
+- **Taskbar**: one entry per open window; 設定 → 工作列 sets its size, icons only
+  or with titles, left or centred, and auto-hide. More entries than fit scroll
+  with the wheel. Clicking the clock opens a calendar.
+- **Accounts** (設定 → 帳號): change your password; with root or sudo, create
+  users (`passwd` / `chpasswd` / `useradd` run on the host, passwords on stdin).
 - **Task manager**: CPU, memory and the process list of the SSH host, refreshed
   every 3 s by a fixed read-only script run over SSH. When the host is a
   container it reads the container's own cgroup usage and limits (v2 or v1)

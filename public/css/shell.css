@@ -7,6 +7,27 @@
   background: var(--bar); backdrop-filter: blur(14px); border-top: 1px solid var(--border);
 }
 #dock-items { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; gap: 6px; overflow-x: auto; overflow-y: hidden; }
+/* One entry per open window. */
+.dock-item {
+  position: relative; flex: none; display: flex; align-items: center; gap: 8px;
+  height: 40px; max-width: 200px; padding: 0 10px 0 6px;
+  border: 1px solid transparent; border-radius: 9px; background: transparent;
+}
+.dock-item:hover { background: var(--surface-3); }
+.dock-item.active { background: var(--surface); border-color: var(--border); }
+.dock-item .ico { width: 28px; height: 28px; flex: none; }
+.dock-item .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.dock-item::after {
+  content: ""; position: absolute; left: 50%; bottom: 2px; width: 14px; height: 3px; margin-left: -7px;
+  border-radius: 2px; background: var(--muted); opacity: 0;
+}
+.dock-item.open::after { opacity: .55; }
+.dock-item.active::after { opacity: 1; background: var(--accent); }
+.dock-item.minimized .lbl { opacity: .6; }
+.dock-item .dirty {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; display: none;
+}
+.dock-item.is-dirty .dirty { display: block; }
 #start-btn {
   flex: none; width: 42px; height: 40px; display: grid; place-items: center; padding: 0;
   border: 1px solid transparent; border-radius: 9px; background: transparent;
@@ -26,7 +47,7 @@
 
 /* ---------- start menu ---------- */
 #start-menu {
-  position: absolute; left: 10px; bottom: 60px; z-index: 20; width: 260px; padding: 8px;
+  position: absolute; left: 10px; bottom: calc(var(--dock-h, 54px) + 6px); z-index: 40; width: 260px; padding: 8px;
   display: flex; flex-direction: column; gap: 2px;
   background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
 }
@@ -248,3 +269,47 @@ body.dragging-item, body.dragging-item * { cursor: grabbing !important; user-sel
   position: absolute; z-index: 6; pointer-events: none; border-radius: 2px;
   border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
+
+/* ---------- taskbar options (設定 → 工作列) ---------- */
+:root { --dock-h: 54px; --dock-item-h: 40px; --dock-ico: 28px; --dock-font: 12.5px; }
+html[data-taskbar-size="small"] { --dock-h: 42px; --dock-item-h: 32px; --dock-ico: 20px; --dock-font: 12px; }
+html[data-taskbar-size="large"] { --dock-h: 68px; --dock-item-h: 52px; --dock-ico: 36px; --dock-font: 13.5px; }
+#dock { height: calc(var(--dock-h) + env(safe-area-inset-bottom, 0px)); position: relative; z-index: 30; }
+.dock-item { height: var(--dock-item-h); }
+.dock-item .ico { width: var(--dock-ico); height: var(--dock-ico); }
+.dock-item .lbl { font-size: var(--dock-font); }
+#start-btn { height: var(--dock-item-h); width: calc(var(--dock-item-h) + 2px); }
+#start-btn svg { width: calc(var(--dock-ico) - 4px); height: calc(var(--dock-ico) - 4px); }
+html[data-taskbar-size="small"] #clock-date { display: none; }
+html[data-taskbar-labels="off"] .dock-item { padding: 0 6px; gap: 4px; }
+html[data-taskbar-labels="off"] .dock-item .lbl { display: none; }
+/* Centred without clipping the first entries when they overflow. */
+html[data-taskbar-align="center"] #dock-items::before, html[data-taskbar-align="center"] #dock-items::after { content: ""; margin: auto; }
+/* More entries than fit: no scroll bar; the wheel scrolls it from script (shell/taskbar.js). */
+#dock-items { scrollbar-width: none; overflow-x: hidden; }
+#dock-items::-webkit-scrollbar { display: none; }
+/* Auto-hide: only a sliver stays at the bottom edge until the pointer gets there. */
+html[data-taskbar-autohide="on"] #dock {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  transform: translateY(calc(100% - 4px)); transition: transform var(--anim, .2s) ease;
+}
+html[data-taskbar-autohide="on"] #dock:hover, html[data-taskbar-autohide="on"] #dock:focus-within,
+html[data-taskbar-autohide="on"].start-open #dock, html[data-taskbar-autohide="on"].cal-open #dock { transform: none; }
+
+/* ---------- calendar (click the clock) ---------- */
+#clock { cursor: default; border-radius: 8px; }
+#clock:hover, #clock[aria-expanded="true"] { background: var(--surface-3); }
+#calendar {
+  position: absolute; right: 10px; bottom: calc(var(--dock-h, 54px) + 6px); z-index: 40; width: 252px; padding: 10px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
+}
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.cal-nav { width: 26px; height: 26px; border: 0; border-radius: 6px; background: transparent; font-size: 16px; }
+.cal-nav:hover { background: var(--surface-3); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; font-variant-numeric: tabular-nums; }
+.cal-grid .wd { font-size: 11px; color: var(--muted); padding: 3px 0; }
+.cal-grid .day { padding: 5px 0; border-radius: 6px; }
+.cal-grid .day.other { color: var(--muted); opacity: .55; }
+.cal-grid .day.today { background: var(--accent); color: var(--accent-text); font-weight: 700; }
+#cal-today { width: 100%; margin-top: 8px; padding: 5px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 12px; }
+#cal-today:hover { background: var(--surface-3); color: var(--text); }

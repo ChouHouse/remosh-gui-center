@@ -54,7 +54,9 @@ export function socketToDuplex(socket) {
   return duplex;
 }
 
-export function execCapture(client, command, limit = 512 * 1024, timeoutMs = 15000) {
+// `stdin`, when given, is written to the command and closed (for secrets that
+// must never appear on a command line).
+export function execCapture(client, command, limit = 512 * 1024, timeoutMs = 15000, stdin = null) {
   return new Promise((resolve, reject) => {
     if (!client) return reject(codeError('not-connected', 'Not connected'));
     client.exec(command, (err, stream) => {
@@ -70,6 +72,7 @@ export function execCapture(client, command, limit = 512 * 1024, timeoutMs = 150
         size += d.length;
       });
       stream.stderr.on('data', () => {});
+      if (stdin != null) stream.end(stdin);
       stream.on('close', () => {
         clearTimeout(timer);
         resolve(Buffer.concat(chunks).toString('utf8'));

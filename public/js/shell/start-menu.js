@@ -23,6 +23,7 @@ let hideTimer = 0;
 function closeStart() {
   if (!isOpen) return;
   isOpen = false;
+  document.documentElement.classList.remove('start-open');
   startMenu.classList.remove('open');
   startMenu.inert = true; // not clickable while it fades out
   clearTimeout(hideTimer);
@@ -55,6 +56,7 @@ function openStart() {
   startMenu.inert = false;
   startMenu.hidden = false;
   void startMenu.offsetWidth; // start from the closed style so the transition runs
+  document.documentElement.classList.add('start-open'); // keeps an auto-hiding taskbar up
   startMenu.classList.add('open');
   startBtn.classList.add('open');
   startBtn.setAttribute('aria-expanded', 'true');
