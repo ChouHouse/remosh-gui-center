@@ -237,7 +237,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // merged entries
   await setTb({ group: true });
   await page.waitForFunction(() => document.querySelectorAll('#dock-items .dock-item:not(.grouped)').length === 1);
-  check((await page.textContent('#dock-items .dock-item:not(.grouped) .grp')) === '檔案櫃 · 2', 'merged: one entry for the app, with the number of windows');
+  check((await page.textContent('#dock-items .dock-item:not(.grouped) .grp')) === '檔案櫃' && (await page.textContent('#dock-items .dock-item:not(.grouped) .cnt')) === '2', 'merged: one entry for the app, with the number of windows on its icon');
   await page.mouse.move(600, 300);
   await page.click('#dock-items .dock-item:not(.grouped)');
   await page.waitForSelector('.win-preview');

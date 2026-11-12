@@ -58,13 +58,17 @@ function sync() {
     seen.add(key);
     el.classList.toggle('grouped', follower);
     el.classList.toggle('active', members.includes(wm.focused));
-    let badge = el.querySelector('.grp');
+    // A merged entry carries the app's name, and the number of windows on its icon.
+    let name = el.querySelector('.grp');
+    let count = el.querySelector('.cnt');
     if (!follower && members.length > 1) {
-      if (!badge) el.append((badge = h('span', { class: 'grp' })));
-      badge.textContent = `${key} · ${members.length}`;
+      if (!name) el.append((name = h('span', { class: 'grp' })), (count = h('span', { class: 'cnt' })));
+      name.textContent = key;
+      count.textContent = members.length;
       el.dataset.count = members.length;
     } else {
-      badge?.remove();
+      name?.remove();
+      count?.remove();
       delete el.dataset.count;
     }
   }
