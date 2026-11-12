@@ -283,8 +283,13 @@ html[data-taskbar-size="large"] { --dock-h: 68px; --dock-item-h: 52px; --dock-ic
 html[data-taskbar-size="small"] #clock-date { display: none; }
 html[data-taskbar-labels="off"] .dock-item { padding: 0 6px; gap: 4px; }
 html[data-taskbar-labels="off"] .dock-item .lbl { display: none; }
-/* Centred without clipping the first entries when they overflow. */
-html[data-taskbar-align="center"] #dock-items::before, html[data-taskbar-align="center"] #dock-items::after { content: ""; margin: auto; }
+/* Centred = dock mode: the start button and the entries sit together in the
+   middle; the clock keeps its corner. */
+html[data-taskbar-align="center"] #dock { justify-content: center; }
+html[data-taskbar-align="center"] #dock-items { flex: 0 1 auto; max-width: calc(100% - 300px); }
+html[data-taskbar-align="center"] #clock { position: absolute; right: 18px; top: 0; bottom: 0; }
+html[data-taskbar-align="center"] #show-desktop { position: absolute; right: 0; top: 0; bottom: 0; margin: 0; }
+html[data-taskbar-align="center"] #start-menu { left: 50%; translate: -50% 0; transform-origin: bottom center; }
 /* More entries than fit: no scroll bar; the wheel scrolls it from script (shell/taskbar.js). */
 #dock-items { scrollbar-width: none; overflow-x: hidden; }
 #dock-items::-webkit-scrollbar { display: none; }
@@ -293,7 +298,9 @@ html[data-taskbar-autohide="on"] #dock {
   position: absolute; left: 0; right: 0; bottom: 0;
   transform: translateY(calc(100% - 4px)); transition: transform var(--anim, .2s) ease;
 }
-html[data-taskbar-autohide="on"] #dock:hover, html[data-taskbar-autohide="on"] #dock:focus-within,
+/* Shown while the pointer is on it and for 3 s after it leaves (shell/taskbar.js),
+   and while the start menu or the calendar is open. */
+html[data-taskbar-autohide="on"].dock-shown #dock,
 html[data-taskbar-autohide="on"].start-open #dock, html[data-taskbar-autohide="on"].cal-open #dock { transform: none; }
 
 /* ---------- calendar (click the clock) ---------- */

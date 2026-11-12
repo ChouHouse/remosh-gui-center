@@ -30,5 +30,31 @@ window.addEventListener('wheel', (ev) => {
   items.scrollLeft += Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY;
 }, { capture: true, passive: true });
 
-on('settings:changed', apply);
+// Auto-hide: the bar comes up when the pointer reaches it (a sliver stays at
+// the bottom edge) and goes away again 3 seconds after the pointer has left.
+const HIDE_AFTER_MS = 3000;
+const dock = $('#dock');
+let hideTimer = 0;
+const showDock = () => {
+  clearTimeout(hideTimer);
+  document.documentElement.classList.add('dock-shown');
+};
+const hideDockLater = () => {
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => document.documentElement.classList.remove('dock-shown'), HIDE_AFTER_MS);
+};
+dock.addEventListener('pointerenter', showDock);
+dock.addEventListener('pointerleave', hideDockLater);
+
+let wasAutoHide = false;
+on('settings:changed', () => {
+  apply();
+  // Just switched on: show it once, so it is seen sliding away.
+  const now = getSettings().taskbar.autoHide;
+  if (now && !wasAutoHide) {
+    showDock();
+    if (!dock.matches(':hover')) hideDockLater();
+  }
+  wasAutoHide = now;
+});
 apply();

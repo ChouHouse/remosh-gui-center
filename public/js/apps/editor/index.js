@@ -42,10 +42,10 @@ function setMinimap(on) {
 async function openEditor(path = null, size = 0) {
   const existing = path && editors.get(path);
   if (existing) return existing.win.focus();
-  if (size > 5 * 1024 * 1024) return toast(`「${P.base(path)}」太大（${fmtSize(size)}），編輯器上限是 5 MB`, true);
+  if (size > 5 * 1024 * 1024) return toast(`「${P.base(path)}」太大（${fmtSize(size)}），Procoder 的上限是 5 MB`, true);
 
   let name = path ? P.base(path) : UNTITLED; // both change on "save as"
-  const win = createWindow({ title: name, appName: '程式碼編輯器', iconHtml: fileSvg(name), width: 820, height: 560 });
+  const win = createWindow({ title: name, appName: 'Procoder', iconHtml: fileSvg(name), width: 820, height: 560 });
   const host = h('div', { class: 'editor-host' }, h('div', { class: 'editor-loading' }, '開啟中…'));
   const sPos = h('span');
   const sLang = h('span');
@@ -75,7 +75,7 @@ async function openEditor(path = null, size = 0) {
   const decoded = res ? decodeText(fromBase64(res.data)) : { text: '', encoding: 'UTF-8', bom: false };
   if (!decoded) {
     await win.close(true);
-    return toast(`「${name}」不是文字檔，無法在編輯器中開啟`, true);
+    return toast(`「${name}」不是文字檔，無法在 Procoder 中開啟`, true);
   }
   Object.assign(ed, { encoding: decoded.encoding, bom: decoded.bom, mtime: res ? res.mtime : null });
 
@@ -336,7 +336,7 @@ on('session:start', () => loadMonaco().catch(() => {})); // warm up so the first
 
 registerApp({
   id: 'editor',
-  name: '程式碼編輯器',
+  name: 'Procoder',
   icon: () => fileSvg('.js'),
   startMenu: true,
   extensions: 'all',

@@ -169,7 +169,8 @@ npm run deploy   # publish to Cloudflare
 - **Windows**: drag to the left or right edge for half the screen, to the top to
   maximise; the strip at the far right of the taskbar shows the desktop.
 - **Taskbar**: one entry per open window; 設定 → 工作列 sets its size, icons only
-  or with titles, left or centred, and auto-hide. More entries than fit scroll
+  or with titles, left or centred (dock mode: start button included), and auto-hide (3 s after
+  the pointer leaves). More entries than fit scroll
   with the wheel. Clicking the clock opens a calendar.
 - **Accounts** (設定 → 帳號): change your password; with root or sudo, create
   users (`passwd` / `chpasswd` / `useradd` run on the host, passwords on stdin).
