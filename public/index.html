@@ -62,7 +62,13 @@
     </button>
     <div id="dock-items"></div>
     </div>
-    <div id="clock" title=""><span id="clock-time"></span><span id="clock-date"></span></div>
+    <div id="dock-tray">
+      <button type="button" id="ws-btn" title="工作區（連按兩下 Tab）" aria-label="工作區" aria-haspopup="dialog" aria-expanded="false">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="3.5" width="16" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 17.5h6M10 14.5v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span class="ws-num" hidden></span>
+      </button>
+      <div id="clock" title=""><span id="clock-time"></span><span id="clock-date"></span></div>
+    </div>
     <button type="button" id="show-desktop" title="顯示桌面" aria-label="顯示桌面"></button>
   </nav>
 </div>

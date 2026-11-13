@@ -175,6 +175,7 @@ const CATEGORIES = [
         row('樣式', '', segmented('tb-float', '樣式', [[false, '貼齊底部'], [true, '懸浮']], t.float, (float) => setTaskbar({ float }))),
         row('對齊', '', segmented('tb-align', '對齊', [['left', '靠左'], ['center', '置中']], t.align, (align) => setTaskbar({ align }))),
         row('合併視窗', '同一個應用程式的視窗合成一個項目', segmented('tb-group', '合併視窗', [[false, '不合併'], [true, '合併']], t.group, (group) => setTaskbar({ group }))),
+        row('工作區按鈕', '也可以連按兩下 Tab 叫出工作區', segmented('tb-ws', '工作區按鈕', [[true, '顯示'], [false, '隱藏']], t.workspaces, (workspaces) => setTaskbar({ workspaces }))),
         row('時間', '', segmented('tb-clock', '時間', [[true, '顯示'], [false, '隱藏']], t.clock, (clock) => setTaskbar({ clock }))));
     },
   },

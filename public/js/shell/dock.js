@@ -5,7 +5,7 @@ import { on } from '../core/events.js';
 import { errText } from '../core/errors.js';
 import { toast } from '../core/ui.js';
 import { getSettings } from '../core/settings.js';
-import { wm, dockItems, onWindowsChange } from './wm.js';
+import { wm, dockItems, onWindowsChange, moveToWorkspace } from './wm.js';
 import { listApps, getApp, launchApp } from './apps.js';
 import { showContextMenu } from './context-menu.js';
 import { setTaskbar } from './taskbar.js';
@@ -33,7 +33,7 @@ function renderPins() {
 
 // Windows of the same app, in the order of their entries.
 export const groupOf = (win) =>
-  [...dockItems.children].map(winOf).filter((w) => w && w.el.dataset.app === win.el.dataset.app);
+  [...dockItems.children].map(winOf).filter((w) => w && w.workspace === win.workspace && w.el.dataset.app === win.el.dataset.app);
 export const grouping = () => getSettings().taskbar.group;
 
 // Keeps the bar in step with the open windows:
@@ -41,7 +41,8 @@ export const grouping = () => getSettings().taskbar.group;
 //    is there instead) and comes back when the last window closes;
 //  - with "合併視窗" on, the windows of one app share its first entry.
 function sync() {
-  const running = new Set(wm.wins.map((w) => appOf(w)?.id));
+  // Only what is open on this workspace counts.
+  const running = new Set(wm.wins.filter((w) => w.workspace === wm.ws).map((w) => appOf(w)?.id));
   let shown = 0;
   for (const el of pins.children) {
     el.hidden = running.has(el.dataset.pin);
@@ -52,6 +53,10 @@ function sync() {
   for (const el of dockItems.children) {
     const win = winOf(el);
     if (!win) continue;
+    if (win.workspace !== wm.ws) {
+      el.classList.remove('grouped');
+      continue;
+    }
     const key = win.el.dataset.app;
     const members = grouping() ? groupOf(win) : [win];
     const follower = grouping() && seen.has(key);
@@ -79,14 +84,14 @@ renderPins();
 
 // ---- focus mode: this window alone, as large as it goes
 function focusMode(win) {
-  for (const other of wm.wins) if (other !== win && !other.minimized) other.minimize();
+  for (const other of wm.wins) if (other !== win && !other.minimized && other.workspace === win.workspace) other.minimize();
   win.focus();
   if (!win.maximized) win.toggleMax();
 }
 
 // ---- right-click menus
 dock.addEventListener('contextmenu', (ev) => {
-  if (ev.target.closest('#start-btn')) return; // has its own (shell/start-menu.js)
+  if (ev.target.closest('#start-btn, #ws-btn')) return; // they have their own (start-menu.js, workspaces.js)
   const pinEl = ev.target.closest('.dock-pin');
   const win = winOf(ev.target.closest('#dock-items .dock-item'));
   if (pinEl) {
@@ -101,6 +106,8 @@ dock.addEventListener('contextmenu', (ev) => {
     const app = appOf(win);
     return showContextMenu(ev, [
       { label: '專注模式', run: () => focusMode(win) },
+      ...wm.workspaces.filter((id) => id !== win.workspace).map((id) =>
+        ({ label: `移到工作區 ${wm.workspaces.indexOf(id) + 1}`, run: () => moveToWorkspace(win, id) })),
       null,
       app && (pinnedIds().includes(app.id)
         ? { label: '從工作列取消釘選', run: () => unpin(app.id) }

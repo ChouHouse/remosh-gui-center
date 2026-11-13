@@ -50,15 +50,28 @@ function windowSize(win) {
   return { w: parseFloat(win.el.style.width) || win.el.offsetWidth, h: parseFloat(win.el.style.height) || win.el.offsetHeight };
 }
 
-function snapshot(win, w, hgt, scale) {
+// Where the window is, or would be once it is brought back, on the desktop area.
+export function windowRect(win) {
+  const area = winLayer.getBoundingClientRect();
+  if (win.maximized) return { left: 0, top: 0, width: area.width, height: area.height };
+  if (win.snapped) return { left: win.snapped === 'right' ? area.width / 2 : 0, top: 0, width: area.width / 2, height: area.height };
+  const n = (v, d) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : d);
+  const { w, h: hgt } = windowSize(win);
+  return { left: n(win.el.style.left, 0), top: n(win.el.style.top, 0), width: w, height: hgt };
+}
+
+const snapshot = (win, w, hgt, scale) => cloneWindow(win, { width: w, height: hgt, scale });
+
+// A still copy of a window: placed at left/top, at its real size, then scaled.
+export function cloneWindow(win, { left = 0, top = 0, width, height, scale = 1 }) {
   const copy = win.el.cloneNode(true);
-  copy.classList.remove('minimized', 'maximized', 'snapped', 'animating');
+  copy.classList.remove('minimized', 'maximized', 'snapped', 'animating', 'ws-hidden', 'peek-target');
   copy.inert = true;
   copy.setAttribute('aria-hidden', 'true');
   for (const el of [copy, ...copy.querySelectorAll('[id]')]) el.removeAttribute('id');
   Object.assign(copy.style, {
-    left: '0', top: '0', width: w + 'px', height: hgt + 'px', zIndex: 'auto',
-    transform: `scale(${scale})`, transformOrigin: '0 0', boxShadow: 'none', border: '0', borderRadius: '0',
+    left: left + 'px', top: top + 'px', width: width + 'px', height: height + 'px', zIndex: 'auto',
+    transform: scale === 1 ? 'none' : `scale(${scale})`, transformOrigin: '0 0', boxShadow: 'none', ...(scale === 1 ? {} : { border: '0', borderRadius: '0' }),
   });
   // What cloning leaves out: drawn canvases and what has been typed.
   const pair = (sel, fn) => {
@@ -79,7 +92,7 @@ function snapshot(win, w, hgt, scale) {
 }
 
 // Scroll positions only exist once the copy is in the page.
-function copyScroll(win, copy) {
+export function copyScroll(win, copy) {
   const from = win.el.querySelectorAll('*');
   const to = copy.querySelectorAll('*');
   if (from.length !== to.length) return;

@@ -27,6 +27,7 @@ const DEFAULTS = {
     float: false, // off: a bar along the bottom edge; on: a floating dock
     align: 'left', // 'left' | 'center'
     clock: true, // show the time
+    workspaces: true, // show the workspace button next to the clock
     pinned: [], // app ids kept on the taskbar as launchers
     group: false, // one entry per app instead of one per window
   },
@@ -85,6 +86,7 @@ function normalise(obj) {
       float: typeof obj?.taskbar?.float === 'boolean' ? obj.taskbar.float : obj?.taskbar?.align === 'center',
       align: obj?.taskbar?.align === 'center' ? 'center' : 'left',
       clock: obj?.taskbar?.clock !== false,
+      workspaces: obj?.taskbar?.workspaces !== false,
       group: obj?.taskbar?.group === true,
       pinned: [...new Set((Array.isArray(obj?.taskbar?.pinned) ? obj.taskbar.pinned : []).filter((v) => typeof v === 'string' && /^[a-z0-9-]{1,32}$/.test(v)))].slice(0, 20),
     },

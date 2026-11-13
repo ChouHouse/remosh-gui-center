@@ -285,12 +285,12 @@ html[data-taskbar-labels="off"] .dock-item { padding: 0 6px; gap: 4px; }
 html[data-taskbar-labels="off"] .dock-item .lbl { display: none; }
 /* #dock-main groups the start button, the pins and the open windows. It only
    becomes a box of its own for the floating dock on the left. */
-#dock-main { display: contents; }
+#dock-main, #dock-tray { display: contents; }
 
 /* 貼齊底部 + 置中: start and entries in the middle, the clock keeps its corner. */
 html[data-taskbar-float="off"][data-taskbar-align="center"] #dock { justify-content: center; }
 html[data-taskbar-float="off"][data-taskbar-align="center"] #dock-items { flex: 0 1 auto; max-width: calc(100% - 320px); }
-html[data-taskbar-float="off"][data-taskbar-align="center"] #clock { position: absolute; right: 18px; top: 0; bottom: 0; margin: auto 0; }
+html[data-taskbar-float="off"][data-taskbar-align="center"] #dock-tray { position: absolute; right: 18px; top: 0; bottom: 0; display: flex; align-items: center; gap: 4px; }
 html[data-taskbar-float="off"][data-taskbar-align="center"] #show-desktop { position: absolute; right: 0; top: 0; bottom: 0; margin: 0; }
 html[data-taskbar-float="off"][data-taskbar-align="center"] #start-menu { left: 50%; translate: -50% 0; transform-origin: bottom center; }
 
@@ -311,9 +311,9 @@ html[data-taskbar-float="on"][data-taskbar-align="center"] #dock {
 }
 html[data-taskbar-float="on"][data-taskbar-align="center"] #dock-items { padding: 0 8px; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
 html[data-taskbar-float="on"][data-taskbar-align="center"] #dock-items:empty { padding: 0; border-right: 0; }
-html[data-taskbar-float="on"][data-taskbar-align="center"][data-taskbar-clock="off"] #dock-items { border-right: 0; padding-right: 0; }
+html[data-taskbar-float="on"][data-taskbar-align="center"][data-taskbar-clock="off"][data-taskbar-ws="off"] #dock-items { border-right: 0; padding-right: 0; }
 /* Nothing open and no clock: the empty area must not leave a gap at the end. */
-html[data-taskbar-float="on"][data-taskbar-align="center"][data-taskbar-clock="off"] #dock-items:empty { display: none; }
+html[data-taskbar-float="on"][data-taskbar-align="center"][data-taskbar-clock="off"][data-taskbar-ws="off"] #dock-items:empty { display: none; }
 html[data-taskbar-float="on"][data-taskbar-align="center"] #start-menu { left: 50%; translate: -50% 0; transform-origin: bottom center; }
 html[data-taskbar-float="on"][data-taskbar-align="center"] #calendar { left: 50%; right: auto; translate: -50% 0; }
 
@@ -323,14 +323,15 @@ html[data-taskbar-float="on"][data-taskbar-align="left"] #dock {
   left: 12px; right: 12px; padding: 0; gap: 12px; justify-content: space-between;
   background: none; border: 0; backdrop-filter: none; pointer-events: none;
 }
-html[data-taskbar-float="on"][data-taskbar-align="left"] :is(#dock-main, #clock) {
+html[data-taskbar-float="on"][data-taskbar-align="left"] :is(#dock-main, #dock-tray) {
   pointer-events: auto; height: var(--dock-h); background: var(--bar); backdrop-filter: blur(14px);
   border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 6px 20px rgba(20, 30, 50, .22);
 }
 html[data-taskbar-float="on"][data-taskbar-align="left"] #dock-main { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 0 8px; }
 html[data-taskbar-float="on"][data-taskbar-align="left"] #dock-items { padding-left: 8px; border-left: 1px solid var(--border); }
 html[data-taskbar-float="on"][data-taskbar-align="left"] #dock-items:empty { display: none; }
-html[data-taskbar-float="on"][data-taskbar-align="left"] #clock { flex: none; padding: 0 14px; }
+html[data-taskbar-float="on"][data-taskbar-align="left"] #dock-tray { flex: none; display: flex; align-items: center; gap: 4px; padding: 0 8px; }
+html[data-taskbar-float="on"][data-taskbar-align="left"][data-taskbar-clock="off"][data-taskbar-ws="off"] #dock-tray { display: none; }
 html[data-taskbar-float="on"][data-taskbar-align="left"] #clock:hover,
 html[data-taskbar-float="on"][data-taskbar-align="left"] #clock[aria-expanded="true"] { background: var(--surface); }
 html[data-taskbar-float="on"][data-taskbar-align="left"] #start-menu { left: 12px; }
@@ -414,3 +415,47 @@ html[data-taskbar-labels="off"] .dock-item .grp { display: none; }
 .dock-pin .lbl { display: none; }
 .dock-pin { padding: 0 6px; }
 .dock-item.reordering { opacity: .6; cursor: grabbing; }
+
+/* ---------- workspaces (shell/workspaces.js) ---------- */
+html[data-taskbar-ws="off"] #ws-btn { display: none; }
+#ws-btn {
+  position: relative; flex: none; align-self: center; display: grid; place-items: center;
+  height: var(--dock-item-h); width: calc(var(--dock-item-h) - 4px); padding: 0;
+  border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text);
+}
+#ws-btn svg { width: calc(var(--dock-ico) - 6px); height: calc(var(--dock-ico) - 6px); }
+#ws-btn:hover, #ws-btn[aria-expanded="true"] { background: var(--surface-3); }
+#ws-btn .ws-num {
+  position: absolute; top: calc(50% - 7px); left: 0; right: 0; text-align: center;
+  font-size: 9.5px; font-weight: 700; line-height: 10px; pointer-events: none;
+}
+.win.ws-hidden { display: none !important; }
+.dock-item.ws-other { display: none !important; }
+
+#ws-panel {
+  position: fixed; z-index: 90010; display: flex; gap: 12px; padding: 12px; max-width: calc(100vw - 16px); overflow-x: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow);
+  animation: win-preview-in var(--anim, .2s) ease;
+}
+.ws-card {
+  flex: none; display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: 10px;
+  border: 2px solid transparent; background: transparent; color: var(--text); text-align: left; cursor: pointer;
+}
+.ws-card:hover, .ws-card.sel { background: var(--surface-3); }
+.ws-card.current { border-color: var(--accent); }
+.ws-card-head { display: flex; align-items: center; gap: 6px; min-height: 20px; font-size: 12.5px; }
+.ws-card-head .nm { flex: 1; }
+.ws-close {
+  width: 20px; height: 20px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--muted);
+  display: grid; place-items: center; opacity: 0; font-size: 14px; line-height: 1;
+}
+.ws-card:hover .ws-close, .ws-card.sel .ws-close { opacity: 1; }
+.ws-close:hover { background: var(--danger, #d33); color: #fff; }
+.ws-stage {
+  position: relative; overflow: hidden; border-radius: 6px; border: 1px solid var(--border);
+  background-color: var(--bg); background-position: center; background-size: cover; background-repeat: no-repeat;
+}
+.ws-stage-inner { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
+.ws-stage-inner > .win { display: flex; min-width: 0; min-height: 0; }
+.ws-card.new .ws-stage { display: grid; place-items: center; font-size: 28px; color: var(--muted); background: var(--surface-2); }
+@media (prefers-reduced-motion: reduce) { #ws-panel { animation: none; } }

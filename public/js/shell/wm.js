@@ -7,7 +7,10 @@ export const dockItems = $('#dock-items');
 export const setActiveTitle = (t) => {
   document.title = t ? `${t} — Remosh GUI` : 'Remosh GUI';
 };
-export const wm = { wins: [], z: 10, focused: null, cascade: 0 };
+// workspaces: ids in display order; ws: the one on screen. Every window
+// belongs to one workspace; the others' windows and taskbar entries are hidden.
+export const wm = { wins: [], z: 10, focused: null, cascade: 0, workspaces: [1], ws: 1, nextWs: 2 };
+export const MAX_WORKSPACES = 5;
 
 // Called after a window opens, closes, is minimised or takes the focus.
 const watchers = new Set();
@@ -20,7 +23,7 @@ const changed = () => {
 // "title — appName" so every window says which app it belongs to.
 export function createWindow({ title, appName, iconHtml, width, height }) {
   const fullTitle = (t) => (appName && t !== appName ? `${t} — ${appName}` : t);
-  const win = { title, minimized: false, maximized: false, onClose: null, onFocus: null };
+  const win = { title, minimized: false, maximized: false, onClose: null, onFocus: null, workspace: wm.ws };
   const titleIcon = h('span', { class: 'ticon', html: iconHtml });
   const titleText = h('span', { class: 'ttext' }, fullTitle(title));
   const titleEl = h('div', { class: 'title' }, titleIcon, titleText);
@@ -69,6 +72,8 @@ export function createWindow({ title, appName, iconHtml, width, height }) {
   };
   win.setDirty = (d) => win.dockEl.classList.toggle('is-dirty', d);
   win.focus = () => {
+    // A window on another workspace takes the user there.
+    if (win.workspace !== wm.ws) switchWorkspace(win.workspace);
     if (win.minimized) {
       win.minimized = false;
       win.el.classList.remove('minimized');
@@ -163,7 +168,7 @@ export function createWindow({ title, appName, iconHtml, width, height }) {
 }
 
 export function focusTop() {
-  const next = wm.wins.filter((w) => !w.minimized).sort((a, b) => b.el.style.zIndex - a.el.style.zIndex)[0];
+  const next = wm.wins.filter((w) => !w.minimized && w.workspace === wm.ws).sort((a, b) => b.el.style.zIndex - a.el.style.zIndex)[0];
   if (next) next.focus();
 }
 
@@ -276,7 +281,7 @@ export function dragRect(ev, win, mode) {
 // "Show desktop": minimise everything, or bring back what was minimised that way.
 let tuckedAway = [];
 export function toggleShowDesktop() {
-  const visible = wm.wins.filter((w) => !w.minimized);
+  const visible = wm.wins.filter((w) => !w.minimized && w.workspace === wm.ws);
   if (visible.length) {
     tuckedAway = visible.sort((a, b) => a.el.style.zIndex - b.el.style.zIndex);
     for (const w of tuckedAway) w.minimize();
@@ -286,3 +291,71 @@ export function toggleShowDesktop() {
   }
 }
 $('#show-desktop').addEventListener('click', toggleShowDesktop);
+
+// ---- workspaces
+function applyWorkspace() {
+  for (const w of wm.wins) {
+    const away = w.workspace !== wm.ws;
+    w.el.classList.toggle('ws-hidden', away);
+    w.dockEl.classList.toggle('ws-other', away);
+  }
+}
+function dropFocus() {
+  if (!wm.focused || wm.focused.workspace === wm.ws) return;
+  wm.focused.el.classList.remove('focused');
+  wm.focused.dockEl.classList.remove('active');
+  wm.focused = null;
+  setActiveTitle('');
+}
+
+export function switchWorkspace(id) {
+  if (!wm.workspaces.includes(id) || id === wm.ws) return;
+  wm.ws = id;
+  dropFocus();
+  applyWorkspace();
+  focusTop();
+  changed();
+}
+
+// Resolves to the new workspace's id, or null when there are already five.
+export function addWorkspace() {
+  if (wm.workspaces.length >= MAX_WORKSPACES) return null;
+  const id = wm.nextWs++;
+  wm.workspaces.push(id);
+  changed();
+  return id;
+}
+
+// Its windows move to the workspace before it (or after it, for the first).
+export function removeWorkspace(id) {
+  const i = wm.workspaces.indexOf(id);
+  if (i < 0 || wm.workspaces.length === 1) return;
+  const to = wm.workspaces[i - 1] ?? wm.workspaces[i + 1];
+  for (const w of wm.wins) if (w.workspace === id) w.workspace = to;
+  wm.workspaces.splice(i, 1);
+  if (wm.ws === id) {
+    wm.ws = null;
+    switchWorkspace(to);
+  } else {
+    applyWorkspace();
+    changed();
+  }
+}
+
+export function moveToWorkspace(win, id) {
+  if (!wm.workspaces.includes(id) || win.workspace === id) return;
+  win.workspace = id;
+  dropFocus();
+  applyWorkspace();
+  if (!wm.focused) focusTop();
+  changed();
+}
+
+// After logout: back to a single workspace.
+export function resetWorkspaces() {
+  wm.workspaces = [1];
+  wm.ws = 1;
+  wm.nextWs = 2;
+  applyWorkspace();
+  changed();
+}

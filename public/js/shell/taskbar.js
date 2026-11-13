@@ -13,6 +13,7 @@ function apply() {
   root.dataset.taskbarFloat = t.float ? 'on' : 'off';
   root.dataset.taskbarAutohide = t.autoHide ? 'on' : 'off';
   root.dataset.taskbarClock = t.clock ? 'on' : 'off';
+  root.dataset.taskbarWs = t.workspaces ? 'on' : 'off';
 }
 
 // Shows at once and is saved in the background.
