@@ -3,6 +3,9 @@
 // .inv-* file it is never listed in the GUI. Earlier versions used
 // setting.json; it is moved over at the first login.
 //
+// Only system settings belong here; an app keeps its own data with
+// core/app-store.js, in ~/.remosh-gui/app/<app id>/.
+//
 // To add a setting: give it a default in DEFAULTS, validate it in normalise(),
 // and react to it in apply() or by listening for the `settings:changed` event.
 import { conn, rpc } from './rpc.js';
@@ -20,8 +23,6 @@ const DEFAULTS = {
   animation: { enabled: true, speed: 'normal' },
   files: {
     associations: {}, // extension ('' = no extension) -> app id
-    sidebar: null, // file cabinet sidebar folders; null = the built-in list
-    sidebarWidth: 150, // px
   },
   taskbar: {
     autoHide: false, // slide away until the pointer reaches the bottom edge
@@ -48,8 +49,6 @@ const DEFAULTS = {
 
 export const WALLPAPER_DIR = 'wallpaper';
 export const MAX_WALLPAPERS = 5;
-export const SIDEBAR_MIN = 110;
-export const SIDEBAR_MAX = 420;
 const FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
 
 export const EXT_PATTERN = /^[a-z0-9_+-]{0,16}$/;
@@ -63,18 +62,12 @@ function normalise(obj) {
   for (const [ext, app] of Object.entries(obj?.files?.associations || {})) {
     if (EXT_PATTERN.test(ext) && typeof app === 'string' && app) associations[ext] = app;
   }
-  const side = obj?.files?.sidebar;
-  const sidebar = Array.isArray(side) ? [...new Set(side.filter((p) => typeof p === 'string' && p.startsWith('/')))] : null;
   return {
     animation: {
       enabled: typeof a?.enabled === 'boolean' ? a.enabled : DEFAULTS.animation.enabled,
       speed: Object.hasOwn(ANIMATION_SPEEDS, a?.speed) ? a.speed : DEFAULTS.animation.speed,
     },
-    files: {
-      associations,
-      sidebar,
-      sidebarWidth: Number.isFinite(obj?.files?.sidebarWidth) ? Math.round(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, obj.files.sidebarWidth))) : DEFAULTS.files.sidebarWidth,
-    },
+    files: { associations },
     start: {
       pinned: Array.isArray(obj?.start?.pinned)
         ? [...new Set(obj.start.pinned.filter((id) => typeof id === 'string' && /^[a-z0-9-]{1,32}$/.test(id)))]
@@ -118,6 +111,8 @@ function apply() {
 }
 
 export const getSettings = () => structuredClone(current);
+// The file as read, including keys this version no longer uses (for moving them elsewhere).
+export const rawSettings = () => structuredClone(raw);
 export const settingsDir = () => P.join(conn.info.home, SETTINGS_DIR);
 export const settingsPath = () => P.join(settingsDir(), SETTINGS_FILE);
 export const wallpaperDir = () => P.join(settingsDir(), WALLPAPER_DIR);

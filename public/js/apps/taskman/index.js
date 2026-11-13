@@ -6,6 +6,7 @@ import { fmtSize, fmtDuration } from '../../core/format.js';
 import { gaugeSvg } from './icon.js';
 import { conn, rpc } from '../../core/rpc.js';
 import { store } from '../../core/store.js';
+import { appStore } from '../../core/app-store.js';
 import { createWindow } from '../../shell/wm.js';
 import { registerApp, useAppStyle } from '../../shell/apps.js';
 import { parseStats } from './stats.js';
@@ -13,6 +14,16 @@ import { openProcessWindow } from './process.js';
 import { lineChart } from './chart.js';
 
 useAppStyle(import.meta.url);
+
+// Saved in ~/.remosh-gui/app/tasks/: which page was open last.
+const data = appStore('tasks', {
+  defaults: { tab: 'procs' },
+  migrate() {
+    const tab = store.get('tmTab', undefined);
+    store.remove('tmTab');
+    return tab === undefined ? {} : { tab };
+  },
+});
 
 const HISTORY = 60; // samples kept for the charts (3 s apart: three minutes)
 
@@ -63,7 +74,7 @@ function openTaskManager() {
   // ---- the two pages
   const tabBtns = {};
   const showTab = (key) => {
-    store.set('tmTab', key);
+    data.set('tab', key);
     list.hidden = key !== 'procs';
     perf.hidden = key !== 'perf';
     for (const [k, b] of Object.entries(tabBtns)) {
@@ -74,7 +85,7 @@ function openTaskManager() {
   const tabs = h('div', { class: 'tm-tabs', role: 'tablist' }, [['procs', '進程'], ['perf', '圖表']].map(([k, label]) =>
     (tabBtns[k] = h('button', { type: 'button', role: 'tab', 'data-tab': k, onclick: () => showTab(k) }, label))));
   win.body.append(h('div', { class: 'tm-top' }, meta, tabs, note), list, perf);
-  showTab(store.get('tmTab', 'procs') === 'perf' ? 'perf' : 'procs');
+  showTab(data.get('tab') === 'perf' ? 'perf' : 'procs');
 
   let prev = null;
   let last = null;

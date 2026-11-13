@@ -151,6 +151,16 @@ const { execSync: execSyncTop } = require('node:child_process');
   const menuLabels = () => page.locator('.ctx-menu button').allTextContents();
   const pick = (label) => page.locator('.ctx-menu button', { hasText: label }).click();
   const readSettings = () => JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+  const appFile = (id) => home + '/.remosh-gui/app/' + id + '/config.inv-remosh_gui-config';
+  const waitApp = async (id, test) => {
+    for (let i = 0; i < 40; i++) {
+      try {
+        if (test(JSON.parse(fs.readFileSync(appFile(id), 'utf8')))) return true;
+      } catch { /* not written yet */ }
+      await sleep(100);
+    }
+    return false;
+  };
   const waitSetting = async (test) => {
     for (let i = 0; i < 40; i++) {
       try {
@@ -685,7 +695,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   await page.keyboard.press('ArrowLeft');
   check((await cWin.locator('.menu[aria-label="檔案"]').count()) === 1, 'arrow keys switch between menus');
   await page.keyboard.press('Escape');
-  check((await page.evaluate(() => [localStorage.getItem('sshdesk.fontSize'), localStorage.getItem('sshdesk.minimap')].join())) === '14,false', 'preferences are remembered');
+  check(await waitApp('editor', (d) => d.fontSize === 14 && d.minimap === false), 'preferences are saved in ~/.remosh-gui/app/editor');
   await page.locator('.dock-item', { hasText: 'copy.py' }).click(); // minimise so the Finder is reachable
   await openItem('app.py');
   await page.waitForFunction(() => window.monaco.editor.getEditors().length === 3);
@@ -1040,7 +1050,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   check((await menuLabels()).join('|') === '加入目前的資料夾（project）|還原成預設', 'sidebar right-click on empty space', (await menuLabels()).join('|'));
   await pick('加入目前的資料夾');
   await page.locator('.sidebar button[title="' + home + '/project"]').waitFor();
-  check(await waitSetting((s) => s.files.sidebar?.includes(home + '/project')), 'sidebar folders are saved in setting.json');
+  check(await waitApp('files', (d) => d.sidebar?.includes(home + '/project')), 'sidebar folders are saved in ~/.remosh-gui/app/files');
   await page.locator('.sidebar button[title="/etc"]').click({ button: 'right' });
   check((await menuLabels()).slice(0, 4).join('|') === '開啟|上移|下移|從側邊欄移除', 'sidebar item right-click', (await menuLabels()).join('|'));
   await pick('從側邊欄移除');
@@ -1052,7 +1062,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   await page.locator('.sidebar h3').click({ button: 'right' });
   await pick('還原成預設');
   await page.locator('.sidebar button[title="/etc"]').waitFor();
-  check(await waitSetting((s) => s.files.sidebar === null), 'sidebar can be reset');
+  check(await waitApp('files', (d) => !('sidebar' in d)), 'sidebar can be reset');
 
   // ---- terminal: run a file, then type a command
   await item('hello.sh').dblclick();
@@ -1277,7 +1287,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   nameW = (await colBox('name')).width;
   const cellW = (await fwin.locator('.files .item .namecell').first().boundingBox()).width;
   check(nameW === 360 && cellW === 360 && (await fwin.locator('.marquee').count()) === 0, 'dragging a column edge resizes that column, header and rows together', JSON.stringify({ nameW, cellW }));
-  check(JSON.parse(await page.evaluate(() => localStorage.getItem('sshdesk.cols'))).name === 360, 'the widths are remembered');
+  check(await waitApp('files', (d) => d.cols?.name === 360), 'the widths are remembered');
   const grip2 = await fwin.locator('.col-resize[data-col="name"]').boundingBox();
   await page.mouse.move(grip2.x + grip2.width / 2, grip2.y + grip2.height / 2);
   await page.mouse.down();
@@ -1292,7 +1302,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   check(await fwin.locator('.sidebar .side-insert').isVisible() && Math.abs((await fwin.locator('.sidebar .side-insert').boundingBox()).y - homeBtn.y) < 4, 'a line shows where the place will go');
   await endDrag();
   await page.waitForFunction(() => document.querySelector('.sidebar button[data-path]').dataset.path === '/tmp');
-  check((await sideOrder()).join() === ['/tmp', home, '/', '/etc', '/var'].join() && await waitSetting((st) => st.files.sidebar?.[0] === '/tmp'), 'dropping one above another reorders the list, and the order is saved', (await sideOrder()).join());
+  check((await sideOrder()).join() === ['/tmp', home, '/', '/etc', '/var'].join() && await waitApp('files', (d) => d.sidebar?.[0] === '/tmp'), 'dropping one above another reorders the list, and the order is saved', (await sideOrder()).join());
   const sideBox = await fwin.locator('.sidebar').boundingBox();
   await beginDrag(item('src'), sideBox.x + 40, sideBox.y + sideBox.height - 12);
   check((await ghost()) === 'src|加到側邊欄', 'a folder can be dragged onto the sidebar');
@@ -1315,7 +1325,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   await page.mouse.down();
   await page.mouse.move(sGrip.x + sGrip.width / 2 + 90, sGrip.y + 60, { steps: 5 });
   await page.mouse.up();
-  check(Math.abs((await sideW()) - 240) <= 2 && await waitSetting((st) => Math.abs(st.files.sidebarWidth - 240) <= 2), 'dragging the edge widens the sidebar, and the width is saved', String(await sideW()));
+  check(Math.abs((await sideW()) - 240) <= 2 && await waitApp('files', (d) => Math.abs(d.sidebarWidth - 240) <= 2), 'dragging the edge widens the sidebar, and the width is saved', String(await sideW()));
   await page.mouse.move(sGrip.x + 90 + sGrip.width / 2, sGrip.y + 60);
   await page.mouse.down();
   await page.mouse.move(sGrip.x - 400, sGrip.y + 60, { steps: 5 });
@@ -1323,7 +1333,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   check((await sideW()) === 110, 'it does not get narrower than 110 px', String(await sideW()));
   await fwin.locator('.side-resize').dblclick();
   await page.waitForFunction(() => document.querySelector('.sidebar').offsetWidth === 150);
-  check(await waitSetting((st) => st.files.sidebarWidth === 150), 'double-click brings back the default width');
+  check(await waitApp('files', (d) => d.sidebarWidth === 150), 'double-click brings back the default width');
 
   // ---- multi-selection and rubber-band selection (file cabinet and desktop)
   await toFinder();
@@ -1891,7 +1901,9 @@ const { execSync: execSyncTop } = require('node:child_process');
   // Written under the old name: it is read, and moved to the new one.
   fs.rmSync(settingsFile, { force: true });
   fs.mkdirSync(home + '/.remosh-gui', { recursive: true });
-  fs.writeFileSync(legacySettings, JSON.stringify({ version: 1, animation: { enabled: false, speed: 'fast' }, future: { keep: 1 } }));
+  fs.writeFileSync(legacySettings, JSON.stringify({ version: 1, animation: { enabled: false, speed: 'fast' }, files: { sidebar: ['/tmp', home], sidebarWidth: 200 }, future: { keep: 1 } }));
+  fs.rmSync(home + '/.remosh-gui/app', { recursive: true, force: true });
+  await page.evaluate(() => localStorage.setItem('sshdesk.fontSize', '20'));
   give(home + '/.remosh-gui');
   give(legacySettings);
   await page.fill('#f-pass', password);
@@ -1907,6 +1919,9 @@ const { execSync: execSyncTop } = require('node:child_process');
   const cab = page.locator('.win[data-app="檔案櫃"]').last();
   await cab.locator('.files .item .name', { hasText: /^desktop$/ }).waitFor();
   check(!(await cab.locator('.files .item .name').allTextContents()).some((n) => n.startsWith('setting')), 'the settings file is not listed in the file cabinet');
+  check(await waitApp('files', (d) => d.sidebar?.join() === ['/tmp', home].join() && d.sidebarWidth === 200), 'the file cabinet\'s sidebar moves from the old settings to ~/.remosh-gui/app/files');
+  check(await waitApp('editor', (d) => d.fontSize === 20) && (await page.evaluate(() => localStorage.getItem('sshdesk.fontSize'))) === null, 'Procoder\'s preferences move from the browser to ~/.remosh-gui/app/editor');
+  check((await cab.locator('.sidebar button[data-path]').evaluateAll((els) => els.map((e) => e.dataset.path))).join() === ['/tmp', home].join(), 'and the file cabinet uses them');
   await cab.locator('.traffic .close').click();
   await page.click('#start-btn');
   await page.click('#sm-settings');
@@ -1916,6 +1931,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   await page.waitForFunction(() => document.querySelector('.set-status').textContent === '已儲存');
   const kept = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
   check(kept.animation.enabled === true && kept.future?.keep === 1, 'saving keeps keys this version does not know', JSON.stringify(kept));
+  check(!('sidebar' in (kept.files || {})) && !('sidebarWidth' in (kept.files || {})), 'and drops what now belongs to an app', JSON.stringify(kept.files));
   fs.rmSync(home + '/.remosh-gui', { recursive: true, force: true });
 
   check(errors.length === 0, 'no browser console errors', errors.join(' | '));

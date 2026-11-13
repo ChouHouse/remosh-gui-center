@@ -1,6 +1,7 @@
 // 記事本: a plain <textarea> editor (no Monaco) for quick text edits.
 import { h } from '../../core/dom.js';
 import { store } from '../../core/store.js';
+import { appStore } from '../../core/app-store.js';
 import { errText } from '../../core/errors.js';
 import { toast, dialog } from '../../core/ui.js';
 import { fmtSize } from '../../core/format.js';
@@ -19,6 +20,15 @@ useAppStyle(import.meta.url);
 const MAX_BYTES = 5 * 1024 * 1024;
 const UNTITLED = '未命名';
 const notes = new Set(); // every open notepad
+// Saved in ~/.remosh-gui/app/notepad/ (earlier versions kept it in the browser).
+const data = appStore('notepad', {
+  defaults: { wrap: true },
+  migrate() {
+    const wrap = store.get('notepadWrap', undefined);
+    store.remove('notepadWrap');
+    return wrap === undefined ? {} : { wrap: !!wrap };
+  },
+});
 
 async function openNotepad({ path = null, size = 0 } = {}) {
   if (path) {
@@ -40,11 +50,14 @@ async function openNotepad({ path = null, size = 0 } = {}) {
   const isDirty = () => area.value !== note.saved;
   note.isDirty = isDirty;
   note.refresh = () => refresh();
-  const setWrap = (on) => {
+  const showWrap = (on) => {
     area.wrap = on ? 'soft' : 'off';
-    store.set('notepadWrap', on);
   };
-  setWrap(store.get('notepadWrap', true));
+  const setWrap = (on) => {
+    showWrap(on);
+    data.set('wrap', on);
+  };
+  showWrap(data.get('wrap') !== false);
   const refresh = () => {
     const name = note.path ? P.base(note.path) : UNTITLED;
     const dirty = isDirty();

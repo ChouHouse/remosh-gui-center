@@ -1,6 +1,7 @@
 // Editor app: one Monaco window per remote file, with 檔案 / 介面 menus.
 import { h } from '../../core/dom.js';
 import { store } from '../../core/store.js';
+import { appStore } from '../../core/app-store.js';
 import { errText } from '../../core/errors.js';
 import { toast, dialog } from '../../core/ui.js';
 import { P } from '../../core/path.js';
@@ -22,25 +23,41 @@ const editors = new Map(); // key (remote path, or an id for an unsaved new file
 const UNTITLED = '未命名';
 let untitledSeq = 0;
 
-// Display preferences shared by every editor window and remembered per browser.
+// Display preferences shared by every editor window, saved in
+// ~/.remosh-gui/app/editor/ (earlier versions kept them in the browser).
 const FONT_DEFAULT = 13;
 const FONT_MIN = 9;
 const FONT_MAX = 32;
 const clampFont = (n) => Math.max(FONT_MIN, Math.min(FONT_MAX, Math.round(Number(n)) || FONT_DEFAULT));
-const prefs = { fontSize: clampFont(store.get('fontSize', FONT_DEFAULT)), minimap: store.get('minimap', true) !== false };
+const data = appStore('editor', {
+  defaults: { fontSize: FONT_DEFAULT, minimap: true, wordWrap: 'off' },
+  migrate() {
+    const out = {};
+    for (const key of ['fontSize', 'minimap', 'wordWrap']) {
+      const v = store.get(key, undefined);
+      if (v !== undefined) out[key] = v;
+      store.remove(key);
+    }
+    return out;
+  },
+});
+const prefs = {
+  get fontSize() {
+    return clampFont(data.get('fontSize'));
+  },
+  get minimap() {
+    return data.get('minimap') !== false;
+  },
+  get wordWrap() {
+    return data.get('wordWrap') === 'on' ? 'on' : 'off';
+  },
+};
 function applyPrefs() {
-  for (const ed of editors.values()) ed.editor?.updateOptions({ fontSize: prefs.fontSize, minimap: { enabled: prefs.minimap } });
+  for (const ed of editors.values()) ed.editor?.updateOptions({ fontSize: prefs.fontSize, minimap: { enabled: prefs.minimap }, wordWrap: prefs.wordWrap });
 }
-function setFontSize(n) {
-  prefs.fontSize = clampFont(n);
-  store.set('fontSize', prefs.fontSize);
-  applyPrefs();
-}
-function setMinimap(on) {
-  prefs.minimap = !!on;
-  store.set('minimap', prefs.minimap);
-  applyPrefs();
-}
+data.onChange(applyPrefs);
+const setFontSize = (n) => data.set('fontSize', clampFont(n));
+const setMinimap = (on) => data.set('minimap', !!on);
 
 async function openDropped(paths) {
   let folders = 0;
@@ -140,7 +157,7 @@ async function openEditor(path = null, size = 0) {
     automaticLayout: true,
     fontSize: prefs.fontSize,
     minimap: { enabled: prefs.minimap },
-    wordWrap: store.get('wordWrap', 'off'),
+    wordWrap: prefs.wordWrap,
     scrollBeyondLastLine: false,
     fixedOverflowWidgets: true,
     renderWhitespace: 'selection',
@@ -288,8 +305,7 @@ async function openEditor(path = null, size = 0) {
 
   const toggleWrap = () => {
     const next = editor.getRawOptions().wordWrap === 'on' ? 'off' : 'on';
-    store.set('wordWrap', next);
-    for (const other of editors.values()) other.editor?.updateOptions({ wordWrap: next });
+    data.set('wordWrap', next); // every editor window follows (applyPrefs)
     for (const other of editors.values()) other.refresh?.();
   };
   ed.refresh = refresh;

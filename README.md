@@ -90,6 +90,9 @@ public/
    `useAppStyle(import.meta.url)` from `shell/apps.js`). `core/` and `shell/` hold
    only what the whole system shares (file and folder icons, toolbar icons,
    windows, the status bar ...).
+   What an app saves goes through `appStore('<app id>')` (`core/app-store.js`)
+   into `~/.remosh-gui/app/<app id>/` on the host; only the system's own
+   settings sit directly in `~/.remosh-gui/`.
 3. If it needs new data from the host, add a handler in `src/ops/` and list it
    in `src/ops/index.js`; call it from the page with `rpc('<op>', args)`.
 

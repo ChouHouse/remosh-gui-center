@@ -10,7 +10,8 @@ import { ICON, folderSvg, fileSvg } from '../../core/icons.js';
 import { fileCabinetSvg } from './icon.js';
 import { conn, rpc } from '../../core/rpc.js';
 import { on, emit } from '../../core/events.js';
-import { getSettings, updateSettings, SIDEBAR_MIN, SIDEBAR_MAX } from '../../core/settings.js';
+import { rawSettings } from '../../core/settings.js';
+import { appStore } from '../../core/app-store.js';
 import { createWindow } from '../../shell/wm.js';
 import { registerApp, launchApp, getApp, useAppStyle } from '../../shell/apps.js';
 import { makeDraggable, registerDropTarget } from '../../shell/drag.js';
@@ -30,6 +31,27 @@ const finders = new Set(); // every open file cabinet window
 const COLS = { name: 260, mtime: 150, size: 90, kind: 100 };
 const COL_MIN = 60;
 const DEFAULT_SIDEBAR_W = 150;
+const SIDEBAR_MIN = 110;
+const SIDEBAR_MAX = 420;
+const clampSide = (w) => Math.round(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, Number(w) || DEFAULT_SIDEBAR_W)));
+
+// Saved in ~/.remosh-gui/app/files/. Earlier versions kept the sidebar in the
+// system settings and the view options in the browser; those are brought over once.
+const data = appStore('files', {
+  defaults: { sidebar: null, sidebarWidth: DEFAULT_SIDEBAR_W, view: 'grid', cols: {}, showHidden: false, sort: { key: 'name', dir: 1 } },
+  migrate() {
+    const old = rawSettings().files || {};
+    const out = {};
+    if (Array.isArray(old.sidebar)) out.sidebar = [...new Set(old.sidebar.filter((p) => typeof p === 'string' && p.startsWith('/')))];
+    if (Number.isFinite(old.sidebarWidth)) out.sidebarWidth = clampSide(old.sidebarWidth);
+    for (const key of ['view', 'cols', 'showHidden', 'sort']) {
+      const v = store.get(key, undefined);
+      if (v !== undefined) out[key] = v;
+      store.remove(key);
+    }
+    return out;
+  },
+});
 const COL_MAX = 900;
 
 function createFinder(home, startPath = home) {
@@ -43,10 +65,10 @@ function createFinder(home, startPath = home) {
     selected: -1,
     sel: new Set(),
     token: 0,
-    view: store.get('view', 'grid'),
-    cols: { ...COLS, ...store.get('cols', {}) }, // list-view column widths in px
-    showHidden: store.get('showHidden', false),
-    sort: store.get('sort', { key: 'name', dir: 1 }),
+    view: data.get('view') === 'list' ? 'list' : 'grid',
+    cols: { ...COLS, ...data.get('cols') }, // list-view column widths in px
+    showHidden: data.get('showHidden') === true,
+    sort: data.get('sort'),
   };
 
   const btn = (icon, title, onclick) => h('button', { type: 'button', class: 'tb-btn', title, 'aria-label': title, html: icon, onclick });
@@ -56,7 +78,7 @@ function createFinder(home, startPath = home) {
   const bRefresh = btn(ICON.refresh, '重新整理', () => navigate(st.path, false));
   const bHidden = btn(ICON.eye, '顯示隱藏檔', () => {
     st.showHidden = !st.showHidden;
-    store.set('showHidden', st.showHidden);
+    data.set('showHidden', st.showHidden);
     render();
   });
   const bGrid = btn(ICON.grid, '圖示檢視', () => setView('grid'));
@@ -75,24 +97,18 @@ function createFinder(home, startPath = home) {
 
   // ---- sidebar: the user's folders (settings), editable by right-click
   const defaultPlaces = [home, '/', '/tmp', '/etc', '/var'];
-  const sidebarPaths = () => getSettings().files.sidebar || defaultPlaces;
+  const sidebarPaths = () => data.get('sidebar') || defaultPlaces;
   const placeLabel = (p) => (p === home ? '家目錄' : p === '/' ? '根目錄' : P.base(p));
   const placeIcon = (p) => (p === home ? ICON.home : p === '/' ? ICON.disk : ICON.folder);
   function renderSidebar() {
-    side.style.width = getSettings().files.sidebarWidth + 'px';
+    side.style.width = clampSide(data.get('sidebarWidth')) + 'px';
     side.replaceChildren(h('h3', null, '位置'), ...sidebarPaths().map((p) =>
       h('button', { type: 'button', title: p, 'data-path': p, class: p === st.path ? 'current' : '', onclick: () => navigate(p) },
         h('span', { html: placeIcon(p), style: 'display:flex' }), h('span', null, placeLabel(p)))));
   }
-  // Saved in the settings, so every file cabinet window takes the new width.
-  const setSidebarWidth = (width) =>
-    updateSettings((s) => {
-      s.files.sidebarWidth = width;
-    }, { optimistic: true }).catch((err) => toast(`無法儲存側邊欄寬度：${errText(err)}`, true));
-  const setSidebar = (paths) =>
-    updateSettings((s) => {
-      s.files.sidebar = paths;
-    }).catch((err) => toast(`無法儲存側邊欄：${errText(err)}`, true));
+  // Saved with the app's data, so every file cabinet window follows along.
+  const setSidebarWidth = (width) => data.set('sidebarWidth', clampSide(width));
+  const setSidebar = (paths) => (paths ? data.set('sidebar', paths) : data.remove('sidebar'));
   const moveTo = (paths, path, index) => {
     const next = paths.filter((p) => p !== path);
     next.splice(index, 0, path);
@@ -109,10 +125,10 @@ function createFinder(home, startPath = home) {
       target && { label: '從側邊欄移除', run: () => setSidebar(paths.filter((p) => p !== target)) },
       target && null,
       { label: `加入目前的資料夾（${placeLabel(st.path)}）`, enabled: !paths.includes(st.path), run: () => setSidebar([...paths, st.path]) },
-      { label: '還原成預設', enabled: getSettings().files.sidebar != null, run: () => setSidebar(null) },
+      { label: '還原成預設', enabled: data.has('sidebar'), run: () => setSidebar(null) },
     ].filter((x) => x !== undefined && x !== false));
   });
-  const offSettings = on('settings:changed', renderSidebar);
+  const offSettings = data.onChange(renderSidebar);
   // Drag a place to reorder the list; drop a folder here to add it.
   makeDraggable(side, (ev) => {
     const path = ev.target.closest('button[data-path]')?.dataset.path;
@@ -201,7 +217,7 @@ function createFinder(home, startPath = home) {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
-      store.set('cols', st.cols);
+      data.set('cols', st.cols);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -210,7 +226,7 @@ function createFinder(home, startPath = home) {
 
   function setView(v) {
     st.view = v;
-    store.set('view', v);
+    data.set('view', v);
     render();
   }
 
@@ -328,7 +344,7 @@ function createFinder(home, startPath = home) {
         class: st.sort.key === k ? 'sorted' : '',
         onclick: () => {
           st.sort = { key: k, dir: st.sort.key === k ? -st.sort.dir : 1 };
-          store.set('sort', st.sort);
+          data.set('sort', st.sort);
           render();
         },
       }, label + (st.sort.key === k ? (st.sort.dir > 0 ? ' ▲' : ' ▼') : '')),
