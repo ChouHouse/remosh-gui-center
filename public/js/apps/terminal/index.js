@@ -18,11 +18,15 @@ useAppStyle(import.meta.url);
 
 const RUN_MODE = 0o777; // permissions given to a file before it is run
 const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
-// Copy and paste keys, as in a Linux terminal (Ctrl+C stays "interrupt").
-const COPY_KEY = isMac ? 'Option+C' : 'Ctrl+Shift+C';
-const PASTE_KEY = isMac ? 'Option+V' : 'Ctrl+Shift+V';
-const isCopy = (ev) => ev.code === 'KeyC' && (isMac ? ev.altKey && !ev.ctrlKey && !ev.metaKey : ev.ctrlKey && ev.shiftKey && !ev.altKey);
-const isPaste = (ev) => ev.code === 'KeyV' && (isMac ? ev.altKey && !ev.ctrlKey && !ev.metaKey : ev.ctrlKey && ev.shiftKey && !ev.altKey);
+// Copy and paste keys: ⌘C / ⌘V on a Mac, Ctrl+Shift+C / V elsewhere as in a
+// Linux terminal. Ctrl+C stays "interrupt" everywhere.
+const COPY_KEY = isMac ? '⌘C' : 'Ctrl+Shift+C';
+const PASTE_KEY = isMac ? '⌘V' : 'Ctrl+Shift+V';
+const keyOf = (ev, code) => ev.code === code && (isMac
+  ? ev.metaKey && !ev.ctrlKey && !ev.altKey && !ev.shiftKey
+  : ev.ctrlKey && ev.shiftKey && !ev.altKey && !ev.metaKey);
+const isCopy = (ev) => keyOf(ev, 'KeyC');
+const isPaste = (ev) => keyOf(ev, 'KeyV');
 
 let xtermPromise = null;
 function loadXterm() {
@@ -104,7 +108,7 @@ async function openTerminal({ path = null, cwd = null } = {}) {
     };
     const paste = async () => {
       const text = await readText();
-      if (text == null) return toast(`瀏覽器不允許讀取剪貼簿（需要 https），請改用 ${isMac ? '⌘V' : 'Ctrl+V'}`, true);
+      if (text == null) return toast(`瀏覽器不允許讀取剪貼簿（需要 https），請改用 ${PASTE_KEY}`, true);
       term.paste(text);
       term.focus();
     };
@@ -116,12 +120,9 @@ async function openTerminal({ path = null, cwd = null } = {}) {
         return false;
       }
       if (isPaste(ev)) {
-        // Ctrl+Shift+V is the browser's own "paste as plain text": let that
-        // through (it needs no permission) and keep it from the shell.
-        if (isMac) {
-          ev.preventDefault();
-          paste();
-        }
+        // Both are the browser's own paste (⌘V, and Ctrl+Shift+V "paste as
+        // plain text"): let that through, it needs no permission, and keep
+        // the key itself from the shell.
         return false;
       }
       return true;
