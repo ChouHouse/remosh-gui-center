@@ -65,6 +65,7 @@ public/
       files/            檔案櫃
       editor/           Monaco windows (index.js, monaco.js)
       notepad/          記事本
+      graphoto/         Graphoto (image viewer)
       terminal/         終端機
       taskman/          工作管理員 (index.js, stats.js)
       settings/         設定
@@ -174,6 +175,9 @@ npm run assets && WEB_PASSWORD=secret npm start   # http://localhost:8080
   (`extensions: 'all'` or a list). The first time an extension is opened the
   user is asked which app to use and the answer is remembered; 設定 → 檔案關聯
   lists them and lets them be changed or removed (not added by hand).
+- **Graphoto**: the image viewer (png, jpg, gif, webp, avif, bmp, ico, svg).
+  Wheel or +/- to zoom, drag to move, R to rotate, 0 to fit, 1 for actual size;
+  ← / → (or the mouse side buttons) step through the pictures in the same folder.
 - **Notepad** (記事本): a plain textarea editor, no Monaco.
 - **Terminal** (終端機): an interactive shell (xterm.js + an SSH PTY channel).
   Opening a file with it sets the file to mode 777 and runs it as `./name`
