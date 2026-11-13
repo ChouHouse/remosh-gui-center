@@ -310,10 +310,10 @@ html[data-taskbar-float="on"][data-taskbar-align="center"] #dock {
   padding: 0 8px; gap: 8px; border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 6px 20px rgba(20, 30, 50, .22);
 }
 html[data-taskbar-float="on"][data-taskbar-align="center"] #dock-items { padding: 0 8px; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
-html[data-taskbar-float="on"][data-taskbar-align="center"] #dock-items:empty { padding: 0; border-right: 0; }
+html[data-taskbar-float="on"][data-taskbar-align="center"] #dock-items.none-shown { padding: 0; border-right: 0; }
 html[data-taskbar-float="on"][data-taskbar-align="center"][data-taskbar-clock="off"][data-taskbar-ws="off"] #dock-items { border-right: 0; padding-right: 0; }
 /* Nothing open and no clock: the empty area must not leave a gap at the end. */
-html[data-taskbar-float="on"][data-taskbar-align="center"][data-taskbar-clock="off"][data-taskbar-ws="off"] #dock-items:empty { display: none; }
+html[data-taskbar-float="on"][data-taskbar-align="center"][data-taskbar-clock="off"][data-taskbar-ws="off"] #dock-items.none-shown { display: none; }
 html[data-taskbar-float="on"][data-taskbar-align="center"] #start-menu { left: 50%; translate: -50% 0; transform-origin: bottom center; }
 html[data-taskbar-float="on"][data-taskbar-align="center"] #calendar { left: 50%; right: auto; translate: -50% 0; }
 
@@ -329,7 +329,7 @@ html[data-taskbar-float="on"][data-taskbar-align="left"] :is(#dock-main, #dock-t
 }
 html[data-taskbar-float="on"][data-taskbar-align="left"] #dock-main { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 0 8px; }
 html[data-taskbar-float="on"][data-taskbar-align="left"] #dock-items { padding-left: 8px; border-left: 1px solid var(--border); }
-html[data-taskbar-float="on"][data-taskbar-align="left"] #dock-items:empty { display: none; }
+html[data-taskbar-float="on"][data-taskbar-align="left"] #dock-items.none-shown { display: none; }
 html[data-taskbar-float="on"][data-taskbar-align="left"] #dock-tray { flex: none; display: flex; align-items: center; gap: 4px; padding: 0 8px; }
 html[data-taskbar-float="on"][data-taskbar-align="left"][data-taskbar-clock="off"][data-taskbar-ws="off"] #dock-tray { display: none; }
 html[data-taskbar-float="on"][data-taskbar-align="left"] #clock:hover,

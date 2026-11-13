@@ -295,6 +295,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.waitForSelector('#ws-panel', { state: 'detached' });
   check((await wsState()).cur === 2 && (await shownWins()) === 0 && (await page.locator('#dock-items .dock-item:not(.ws-other)').count()) === 0, 'workspace 2 starts empty: the other windows and their taskbar entries are hidden');
   check((await page.textContent('#ws-btn .ws-num')) === '2', 'the button shows which workspace this is');
+  check(await page.locator('#dock-items').evaluate((el) => el.classList.contains('none-shown')), 'with nothing open here the window strip counts as empty (no stray separators)');
   await page.evaluate(() => import('/js/shell/apps.js').then((m) => m.launchApp('settings')));
   await page.waitForSelector('.win[data-app="設定"]:not(.ws-hidden)');
   await page.evaluate(() => document.activeElement?.blur());

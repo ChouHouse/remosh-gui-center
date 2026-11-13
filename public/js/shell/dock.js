@@ -41,6 +41,9 @@ export const grouping = () => getSettings().taskbar.group;
 //    is there instead) and comes back when the last window closes;
 //  - with "合併視窗" on, the windows of one app share its first entry.
 function sync() {
+  // Entries of other workspaces stay in the strip, hidden; "empty" means nothing on show.
+  queueMicrotask(() => dockItems.classList.toggle('none-shown',
+    ![...dockItems.children].some((el) => !el.hidden && !el.classList.contains('ws-other') && !el.classList.contains('grouped'))));
   // Only what is open on this workspace counts.
   const running = new Set(wm.wins.filter((w) => w.workspace === wm.ws).map((w) => appOf(w)?.id));
   let shown = 0;
