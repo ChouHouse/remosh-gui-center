@@ -4,7 +4,7 @@ import { h } from '../../core/dom.js';
 import { errText } from '../../core/errors.js';
 import { toast, dialog } from '../../core/ui.js';
 import { fmtSize } from '../../core/format.js';
-import { gaugeSvg } from '../../core/icons.js';
+import { gaugeSvg } from './icon.js';
 import { conn, rpc } from '../../core/rpc.js';
 import { createWindow } from '../../shell/wm.js';
 

@@ -8,13 +8,15 @@ import { h } from '../../core/dom.js';
 import { errText } from '../../core/errors.js';
 import { toast, dialog } from '../../core/ui.js';
 import { rpc } from '../../core/rpc.js';
-import { settingsSvg } from '../../core/icons.js';
+import { settingsSvg } from './icon.js';
 import { on } from '../../core/events.js';
 import { getSettings, saveSettings } from '../../core/settings.js';
 import { createWindow } from '../../shell/wm.js';
-import { registerApp, getApp, appsForExt } from '../../shell/apps.js';
+import { registerApp, getApp, appsForExt, useAppStyle } from '../../shell/apps.js';
 import { setTaskbar } from '../../shell/taskbar.js';
 import { COLORS, systemColor, MODES, setColor, setMode, setControls, uploadWallpaper, useWallpaper, clearWallpaper, wallpaperUrl } from '../../shell/style.js';
+
+useAppStyle(import.meta.url);
 
 const row = (title, desc, control) =>
   h('div', { class: 'set-row' }, h('div', { class: 'set-text' }, h('b', null, title), h('small', null, desc)), control);

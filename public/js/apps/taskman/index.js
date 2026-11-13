@@ -2,12 +2,14 @@
 import { h } from '../../core/dom.js';
 import { errText } from '../../core/errors.js';
 import { fmtSize, fmtDuration } from '../../core/format.js';
-import { gaugeSvg } from '../../core/icons.js';
+import { gaugeSvg } from './icon.js';
 import { conn, rpc } from '../../core/rpc.js';
 import { createWindow } from '../../shell/wm.js';
-import { registerApp } from '../../shell/apps.js';
+import { registerApp, useAppStyle } from '../../shell/apps.js';
 import { parseStats } from './stats.js';
 import { openProcessWindow } from './process.js';
+
+useAppStyle(import.meta.url);
 
 let taskman = null;
 function openTaskManager() {

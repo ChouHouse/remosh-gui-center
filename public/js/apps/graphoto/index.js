@@ -4,14 +4,17 @@ import { h } from '../../core/dom.js';
 import { errText } from '../../core/errors.js';
 import { fmtSize } from '../../core/format.js';
 import { P } from '../../core/path.js';
-import { graphotoSvg, stroke } from '../../core/icons.js';
+import { ICON, stroke } from '../../core/icons.js';
+import { graphotoSvg } from './icon.js';
 import { rpc } from '../../core/rpc.js';
 import { on } from '../../core/events.js';
 import { readFile } from '../../core/file-io.js';
 import { createWindow } from '../../shell/wm.js';
-import { registerApp, launchApp } from '../../shell/apps.js';
+import { registerApp, launchApp, useAppStyle } from '../../shell/apps.js';
 import { showContextMenu } from '../../shell/context-menu.js';
 import { registerDropTarget } from '../../shell/drag.js';
+
+useAppStyle(import.meta.url);
 
 const APP_NAME = 'Graphoto';
 const TYPES = {
@@ -25,8 +28,8 @@ const MAX_SCALE = 32;
 const byName = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 const I = {
-  prev: stroke('<path d="M10 3 5 8l5 5"/>'),
-  next: stroke('<path d="m6 3 5 5-5 5"/>'),
+  prev: ICON.back,
+  next: ICON.fwd,
   zoomOut: stroke('<circle cx="7" cy="7" r="4.5"/><path d="M5 7h4M10.5 10.5 14 14"/>'),
   zoomIn: stroke('<circle cx="7" cy="7" r="4.5"/><path d="M5 7h4M7 5v4M10.5 10.5 14 14"/>'),
   fit: stroke('<path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/>'),

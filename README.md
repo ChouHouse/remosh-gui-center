@@ -54,16 +54,16 @@ src/
     files.js  manage.js  stats.js  terminal.js
 public/
   index.html
-  css/                  base, login, shell + css/apps/<app>.css
+  css/                  base, login, shell (the system's own styles)
   js/
     main.js             imports the apps (start-menu order) and boots
     core/               dom, store, errors, ui, format, path, icons, events, rpc, text-codec, settings
     shell/              wm (windows), menubar, context-menu, drag, file-drop, shortcuts,
                         desktop-icons, login, gate, start-menu, clock, style, fullscreen,
                         desktop, apps (registry), file-open (associations)
-    apps/
+    apps/               one folder per app: index.js, icon.js, style.css
       files/            檔案櫃
-      editor/           Monaco windows (index.js, monaco.js)
+      editor/           Procoder (index.js, monaco.js)
       notepad/          記事本
       graphoto/         Graphoto (image viewer)
       terminal/         終端機
@@ -85,7 +85,11 @@ public/
    Optional fields: `autostart`, `extensions` (`'all'` or a list such as
    `['txt', 'md']`; `launch({ path, size })` then opens a remote file) and
    `unsavedCount()` (asked before logout).
-2. Import it in `public/js/main.js` and add `css/apps/<name>.css` to `index.html`.
+2. Import it in `public/js/main.js`. Everything else belongs in the app's folder:
+   its icon (`icon.js`) and its styles (`style.css`, loaded by the app with
+   `useAppStyle(import.meta.url)` from `shell/apps.js`). `core/` and `shell/` hold
+   only what the whole system shares (file and folder icons, toolbar icons,
+   windows, the status bar ...).
 3. If it needs new data from the host, add a handler in `src/ops/` and list it
    in `src/ops/index.js`; call it from the page with `rpc('<op>', args)`.
 

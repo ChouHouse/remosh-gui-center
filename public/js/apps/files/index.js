@@ -7,11 +7,12 @@ import { toast, dialog } from '../../core/ui.js';
 import { fmtSize, fmtTime } from '../../core/format.js';
 import { P, freeName, isInvisible } from '../../core/path.js';
 import { ICON, folderSvg, fileSvg } from '../../core/icons.js';
+import { fileCabinetSvg } from './icon.js';
 import { conn, rpc } from '../../core/rpc.js';
 import { on, emit } from '../../core/events.js';
 import { getSettings, updateSettings, SIDEBAR_MIN, SIDEBAR_MAX } from '../../core/settings.js';
 import { createWindow } from '../../shell/wm.js';
-import { registerApp, launchApp, getApp } from '../../shell/apps.js';
+import { registerApp, launchApp, getApp, useAppStyle } from '../../shell/apps.js';
 import { makeDraggable, registerDropTarget } from '../../shell/drag.js';
 import { attachMarquee } from '../../shell/marquee.js';
 import { acceptsDrop, dropAction, dropInto } from '../../shell/file-drop.js';
@@ -20,6 +21,8 @@ import { isPinned, pinApp } from '../../shell/start-menu.js';
 import { openFile, openWith } from '../../shell/file-open.js';
 import { showContextMenu } from '../../shell/context-menu.js';
 import { putFiles, takeFiles, clearFiles, cutPaths } from './clipboard.js';
+
+useAppStyle(import.meta.url);
 
 const finders = new Set(); // every open file cabinet window
 
@@ -30,7 +33,7 @@ const DEFAULT_SIDEBAR_W = 150;
 const COL_MAX = 900;
 
 function createFinder(home, startPath = home) {
-  const win = createWindow({ title: '檔案櫃', appName: '檔案櫃', iconHtml: folderSvg(), width: 860, height: 540 });
+  const win = createWindow({ title: '檔案櫃', appName: '檔案櫃', iconHtml: fileCabinetSvg(), width: 860, height: 540 });
   const st = {
     path: home,
     history: [],
@@ -719,4 +722,4 @@ on('session:resume', () => {
   for (const f of finders) f.navigate(f.getPath(), false);
 });
 
-registerApp({ id: 'files', name: '檔案櫃', icon: folderSvg, startMenu: true, launch: openFinder });
+registerApp({ id: 'files', name: '檔案櫃', icon: fileCabinetSvg, startMenu: true, launch: openFinder });

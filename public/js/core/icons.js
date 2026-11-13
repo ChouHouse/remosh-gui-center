@@ -1,4 +1,5 @@
-// Inline SVG icons.
+// Inline SVG icons the system shares: files and folders, and the small
+// toolbar icons. An app's own icon lives in its folder (apps/<name>/icon.js).
 import { P } from './path.js';
 
 export const EXT_COLORS = ['#d9534f', '#e08a1e', '#2e9e5b', '#1f8fd6', '#7a5bd6', '#c2409a', '#4f7a8a'];
@@ -15,21 +16,6 @@ export function fileSvg(name) {
   return `<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M11 4h18l10 10v28a2 2 0 0 1-2 2H11a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="var(--file)" stroke="var(--file-edge)" stroke-width="1.5"/><path d="M29 4v10h10" fill="none" stroke="var(--file-edge)" stroke-width="1.5"/>${label}</svg>`;
 }
 export const stroke = (d) => `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
-export function gaugeSvg() {
-  return '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="7" width="38" height="34" rx="6" fill="var(--file)" stroke="var(--file-edge)" stroke-width="1.5"/><path d="M10 30l7-9 5 5 6-11 5 8 5-4" fill="none" stroke="#2e9e5b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 35h26" stroke="var(--file-edge)" stroke-width="1.6" stroke-linecap="round"/></svg>';
-}
-export function settingsSvg() {
-  return '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="7" width="38" height="34" rx="6" fill="var(--file)" stroke="var(--file-edge)" stroke-width="1.5"/><path d="M12 16h24M12 24h24M12 32h24" stroke="var(--file-edge)" stroke-width="2" stroke-linecap="round"/><circle cx="19" cy="16" r="3.4" fill="#1f8fd6"/><circle cx="30" cy="24" r="3.4" fill="#e08a1e"/><circle cx="17" cy="32" r="3.4" fill="#2e9e5b"/></svg>';
-}
-export function notepadSvg() {
-  return '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="9" y="6" width="30" height="37" rx="4" fill="#fff6c9" stroke="#d9b84a" stroke-width="1.5"/><path d="M9 14h30" stroke="#d9b84a" stroke-width="1.5"/><path d="M15 22h18M15 28h18M15 34h11" stroke="#a88f3a" stroke-width="1.8" stroke-linecap="round"/><path d="M16 4v6M24 4v6M32 4v6" stroke="#8a8f99" stroke-width="2" stroke-linecap="round"/></svg>';
-}
-export function terminalSvg() {
-  return '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="8" width="38" height="32" rx="6" fill="#1f232b" stroke="#4b5261" stroke-width="1.5"/><path d="M13 19l7 5-7 5" fill="none" stroke="#5fd38d" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 31h11" stroke="#d7dbe3" stroke-width="2.6" stroke-linecap="round"/></svg>';
-}
-export function graphotoSvg() {
-  return '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="8" width="38" height="32" rx="6" fill="#e8f1fb" stroke="#7aa7d6" stroke-width="1.5"/><circle cx="33" cy="17" r="4" fill="#f5b83d"/><path d="M8 36l11-13 8 9 5-5 9 9z" fill="#3f9b6a"/><path d="M8 36l11-13 8 9" fill="none" stroke="#2c7a51" stroke-width="1.4" stroke-linejoin="round"/></svg>';
-}
 export const ICON = {
   back: stroke('<path d="M10 3 5 8l5 5"/>'),
   fwd: stroke('<path d="m6 3 5 5-5 5"/>'),

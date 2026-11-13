@@ -5,12 +5,14 @@ import { h } from '../../core/dom.js';
 import { errText } from '../../core/errors.js';
 import { toast } from '../../core/ui.js';
 import { P } from '../../core/path.js';
-import { terminalSvg } from '../../core/icons.js';
+import { terminalSvg } from './icon.js';
 import { rpc } from '../../core/rpc.js';
 import { on } from '../../core/events.js';
 import { fromBase64 } from '../../core/text-codec.js';
 import { createWindow } from '../../shell/wm.js';
-import { registerApp } from '../../shell/apps.js';
+import { registerApp, useAppStyle } from '../../shell/apps.js';
+
+useAppStyle(import.meta.url);
 
 const RUN_MODE = 0o777; // permissions given to a file before it is run
 

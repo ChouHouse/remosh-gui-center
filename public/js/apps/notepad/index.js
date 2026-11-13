@@ -5,14 +5,16 @@ import { errText } from '../../core/errors.js';
 import { toast, dialog } from '../../core/ui.js';
 import { fmtSize } from '../../core/format.js';
 import { P } from '../../core/path.js';
-import { notepadSvg } from '../../core/icons.js';
+import { notepadSvg } from './icon.js';
 import { conn, rpc } from '../../core/rpc.js';
 import { on, emit } from '../../core/events.js';
 import { decodeText, encodeText, toBase64, fromBase64 } from '../../core/text-codec.js';
 import { createWindow } from '../../shell/wm.js';
 import { attachMenuBar } from '../../shell/menubar.js';
-import { registerApp } from '../../shell/apps.js';
+import { registerApp, useAppStyle } from '../../shell/apps.js';
 import { showContextMenu } from '../../shell/context-menu.js';
+
+useAppStyle(import.meta.url);
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const UNTITLED = '未命名';

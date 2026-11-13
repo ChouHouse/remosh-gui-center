@@ -128,6 +128,8 @@ body.dragging iframe, body.dragging .monaco-editor { pointer-events: none; }
   white-space: nowrap; overflow: hidden;
 }
 .statusbar .spacer { flex: 1; }
+.statusbar .dirty-flag { color: var(--text); font-weight: 600; }
+.statusbar .err { color: var(--danger); }
 .statusbar .path { overflow: hidden; text-overflow: ellipsis; }
 .statusbar button { border: 0; background: transparent; color: inherit; font-size: inherit; padding: 0 4px; border-radius: 4px; }
 .statusbar button:hover { background: var(--surface-3); color: var(--text); }

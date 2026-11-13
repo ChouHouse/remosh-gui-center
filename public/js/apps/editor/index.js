@@ -5,15 +5,18 @@ import { errText } from '../../core/errors.js';
 import { toast, dialog } from '../../core/ui.js';
 import { P } from '../../core/path.js';
 import { fileSvg } from '../../core/icons.js';
+import { procoderSvg } from './icon.js';
 import { conn, rpc } from '../../core/rpc.js';
 import { readFile, writeFile } from '../../core/file-io.js';
 import { on, emit } from '../../core/events.js';
 import { decodeText, encodeText } from '../../core/text-codec.js';
 import { createWindow, wm } from '../../shell/wm.js';
 import { attachMenuBar } from '../../shell/menubar.js';
-import { registerApp } from '../../shell/apps.js';
+import { registerApp, useAppStyle } from '../../shell/apps.js';
 import { registerDropTarget } from '../../shell/drag.js';
 import { loadMonaco, themeName, NAME_LANG, EXT_LANG } from './monaco.js';
+
+useAppStyle(import.meta.url);
 
 const editors = new Map(); // key (remote path, or an id for an unsaved new file) -> editor record
 const UNTITLED = '未命名';
@@ -384,7 +387,7 @@ on('session:start', () => loadMonaco().catch(() => {})); // warm up so the first
 registerApp({
   id: 'editor',
   name: 'Procoder',
-  icon: () => fileSvg('.js'),
+  icon: procoderSvg,
   startMenu: true,
   extensions: 'all',
   launch: (args) => openEditor(args?.path, args?.size),

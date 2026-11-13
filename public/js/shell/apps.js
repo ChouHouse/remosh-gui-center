@@ -15,6 +15,14 @@
 // })
 const apps = new Map();
 
+// An app's stylesheet sits next to its code; the app loads it with
+// useAppStyle(import.meta.url), so nothing outside the app's folder lists it.
+export function useAppStyle(moduleUrl, file = 'style.css') {
+  const href = new URL(file, moduleUrl).href;
+  if ([...document.styleSheets].some((s) => s.href === href) || document.querySelector(`link[href="${href}"]`)) return;
+  document.head.append(Object.assign(document.createElement('link'), { rel: 'stylesheet', href }));
+}
+
 export function registerApp(app) {
   if (apps.has(app.id)) throw new Error(`App "${app.id}" is already registered`);
   apps.set(app.id, app);
