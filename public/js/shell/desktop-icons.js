@@ -34,6 +34,7 @@ let placed = new Map(); // file name -> { col, row }, only icons the user has pu
 let configSeen = ''; // mtime|size of the config last read
 let saveTimer = 0;
 let savePending = false; // positions changed here and are not on the host yet
+let localEdits = 0; // counts moves made here, so a read that started before one is dropped
 const gridSize = () => ({
   cols: Math.max(1, Math.floor((layer.clientWidth - PAD) / CELL)),
   rows: Math.max(1, Math.floor((layer.clientHeight - PAD) / CELL)),
@@ -69,6 +70,7 @@ function layout() {
 }
 
 function saveConfig() {
+  localEdits++;
   savePending = true;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
@@ -89,8 +91,11 @@ async function readConfig(entry) {
   if (stamp === configSeen) return;
   configSeen = stamp;
   if (!entry) return;
+  const edits = localEdits;
   try {
     const res = await rpc('read', { path: P.join(desktopDir(), CONFIG_NAME) });
+    // An icon was moved here while the file was on its way: what is in memory is newer.
+    if (edits !== localEdits || savePending) return;
     const list = JSON.parse(new TextDecoder().decode(fromBase64(res.data)));
     if (!Array.isArray(list)) return;
     placed = new Map(list

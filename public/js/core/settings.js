@@ -1,5 +1,7 @@
-// User settings, stored on the SSH host in ~/.remosh-gui/setting.json so they
-// follow the account rather than the browser.
+// User settings, stored on the SSH host in ~/.remosh-gui/setting.inv-remosh_gui-config
+// (JSON) so they follow the account rather than the browser. Like every
+// .inv-* file it is never listed in the GUI. Earlier versions used
+// setting.json; it is moved over at the first login.
 //
 // To add a setting: give it a default in DEFAULTS, validate it in normalise(),
 // and react to it in apply() or by listening for the `settings:changed` event.
@@ -10,7 +12,8 @@ import { toast } from './ui.js';
 import { toBase64, fromBase64 } from './text-codec.js';
 
 export const SETTINGS_DIR = '.remosh-gui';
-export const SETTINGS_FILE = 'setting.json';
+export const SETTINGS_FILE = 'setting.inv-remosh_gui-config';
+const LEGACY_FILE = 'setting.json';
 export const ANIMATION_SPEEDS = { fast: 120, normal: 200, slow: 350 }; // milliseconds
 
 const DEFAULTS = {
@@ -121,10 +124,24 @@ export const wallpaperDir = () => P.join(settingsDir(), WALLPAPER_DIR);
 // Duration of UI transitions; 0 when animations are switched off.
 export const animationMs = () => (current.animation.enabled ? ANIMATION_SPEEDS[current.animation.speed] : 0);
 
+let legacy = false; // loaded from setting.json: move it to the new name
+
+async function readSettingsFile() {
+  try {
+    return await rpc('read', { path: settingsPath() });
+  } catch (err) {
+    if (err.code !== 'not-found') throw err;
+    const res = await rpc('read', { path: P.join(settingsDir(), LEGACY_FILE) });
+    legacy = true;
+    return res;
+  }
+}
+
 export async function loadSettings() {
   raw = {};
+  legacy = false;
   try {
-    const res = await rpc('read', { path: settingsPath() });
+    const res = await readSettingsFile();
     const parsed = JSON.parse(new TextDecoder().decode(fromBase64(res.data)));
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) raw = parsed;
     else throw new SyntaxError('not an object');
@@ -191,6 +208,17 @@ let ready = Promise.resolve();
 export const whenSettingsReady = () => ready;
 on('session:start', () => {
   ready = loadSettings();
+  // Settings found under the old name: write them under the new one, then drop the old file.
+  ready.then(async () => {
+    if (!legacy) return;
+    legacy = false;
+    try {
+      await writeFile(normalise(raw));
+      await rpc('remove', { path: P.join(settingsDir(), LEGACY_FILE) });
+    } catch {
+      /* stays where it was; tried again at the next login */
+    }
+  });
 });
 on('session:end', () => {
   raw = {};

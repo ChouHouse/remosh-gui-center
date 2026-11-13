@@ -18,9 +18,11 @@ const check = (cond, label, extra = '') => {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
-  const settingsFile = home + '/.remosh-gui/setting.json';
+  const settingsFile = home + '/.remosh-gui/setting.inv-remosh_gui-config';
+  const legacySettings = home + '/.remosh-gui/setting.json';
   // The account's real settings are put back when the test ends, however it ends.
   const realSettings = fs.existsSync(settingsFile) ? fs.readFileSync(settingsFile) : null;
+  const realLegacy = fs.existsSync(legacySettings) ? fs.readFileSync(legacySettings) : null;
   const owner = fs.statSync(home);
   const give = (path) => fs.chownSync(path, owner.uid, owner.gid);
   const scratch = ['/project/m1.txt', '/project/m2.txt', '/project/drag-a.txt', '/project/drag-b.txt', '/project/ren-a.txt', '/project/ren-b.txt', '/project/poll-new.txt', '/docs/todo.txt', '/docs/todo 複本.txt', '/project/todo 複本.txt', '/project/hello.sh', '/project/src/copy.py'];
@@ -31,8 +33,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     for (const f of scratch) fs.rmSync(home + f, { force: true });
     fs.rmSync(home + '/.remosh-gui', { recursive: true, force: true });
     fs.rmSync(home + '/pics', { recursive: true, force: true });
+    if (realLegacy) {
+      fs.mkdirSync(home + '/.remosh-gui', { recursive: true, mode: 0o700 });
+      fs.writeFileSync(legacySettings, realLegacy);
+      give(home + '/.remosh-gui');
+      give(legacySettings);
+    }
     if (realSettings) {
-      fs.mkdirSync(home + '/.remosh-gui', { mode: 0o700 });
+      fs.mkdirSync(home + '/.remosh-gui', { recursive: true, mode: 0o700 });
       fs.writeFileSync(settingsFile, realSettings);
       give(home + '/.remosh-gui');
       give(settingsFile);
@@ -1044,6 +1052,31 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => document.querySelector('.term-host .xterm-rows').textContent.includes('sum-23'), null, { timeout: 10000 });
   check((await tw.locator('.xterm-rows').textContent()).includes(home + '/project'), 'typed commands run in the file\'s folder');
+  // copy and paste
+  const isMacUA = await page.evaluate(() => /Mac|iPhone|iPad/.test(navigator.platform));
+  await tw.locator('.term-host').click({ button: 'right' });
+  check((await menuLabels()).join('|') === (isMacUA ? '複製（Option+C）|貼上（Option+V）|全選|清除畫面' : '複製（Ctrl+Shift+C）|貼上（Ctrl+Shift+V）|全選|清除畫面') && await page.locator('.ctx-menu button', { hasText: '複製' }).isDisabled(), 'terminal right-click: copy (needs a selection), paste, select all, clear', (await menuLabels()).join('|'));
+  await pick('全選');
+  await tw.locator('.term-host').click({ button: 'right' });
+  await pick('複製');
+  await page.waitForFunction(() => navigator.clipboard.readText().then((t) => t.includes('sum-23')));
+  check(true, 'copy puts the selected text on the clipboard');
+  await page.evaluate(() => navigator.clipboard.writeText(''));
+  await tw.locator('.term-host').click({ button: 'right' });
+  await pick('全選');
+  await tw.locator('.xterm-helper-textarea').focus();
+  await page.keyboard.press(isMacUA ? 'Alt+KeyC' : 'Control+Shift+KeyC');
+  await page.waitForFunction(() => navigator.clipboard.readText().then((t) => t.includes('sum-23')));
+  check(true, isMacUA ? 'Option+C copies' : 'Ctrl+Shift+C copies');
+  await page.evaluate(() => navigator.clipboard.writeText('echo pasted-$((40+2))'));
+  await tw.locator('.term-host').click({ button: 'right' });
+  await pick('貼上');
+  await page.waitForFunction(() => document.querySelector('.term-host .xterm-rows').textContent.includes('echo pasted-$((40+2))'), null, { timeout: 10000 });
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelector('.term-host .xterm-rows').textContent.includes('pasted-42'), null, { timeout: 10000 });
+  check(true, 'paste from the menu types the clipboard into the shell');
+  await tw.locator('.term-host').click({ button: 'right' });
+  await pick('清除畫面');
   await tw.locator('.traffic .close').click();
   check((await tw.count()) === 0, 'terminal closes');
 
@@ -1119,7 +1152,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const boxes = await page.locator('.desk-item').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => [Math.round(r.left), Math.round(r.top)]));
   const onGrid = boxes.every((b) => (b[0] - 12) % 96 === 0 && (b[1] - 12) % 96 === 0) && new Set(boxes.map(String)).size === boxes.length;
   const dropCell = [12 + Math.floor((300 - 12) / 96) * 96, 12 + Math.floor((420 - 12) / 96) * 96];
-  check(onGrid && String(await deskItem('src').evaluate((el) => [el.offsetLeft, el.offsetTop])) === String(dropCell), 'icons sit on a grid, one per cell; the last one dropped is where it was dropped', JSON.stringify(boxes));
+  check(onGrid && String(await deskItem('src').evaluate((el) => [el.offsetLeft, el.offsetTop])) === String(dropCell), 'icons sit on a grid, one per cell; the last one dropped is where it was dropped', JSON.stringify(await page.locator('.desk-item').evaluateAll((els) => els.map((e) => [e.textContent.trim(), e.offsetLeft, e.offsetTop]))));
   fs.writeFileSync(desk + '/fresh.txt', 'x');
   give(desk + '/fresh.txt');
   await deskItem('fresh.txt').waitFor({ timeout: 9000 });
@@ -1415,7 +1448,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.click('#set-save');
   await page.waitForFunction(() => document.querySelector('.set-status').textContent === '已儲存');
   let saved = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
-  check(saved.animation.enabled === true && saved.animation.speed === 'slow' && saved.version === 1, 'save wrote ~/.remosh-gui/setting.json', JSON.stringify(saved));
+  check(saved.animation.enabled === true && saved.animation.speed === 'slow' && saved.version === 1, 'save wrote ~/.remosh-gui/setting.inv-remosh_gui-config', JSON.stringify(saved));
   check(fs.statSync(settingsFile).uid === fs.statSync(home).uid, 'the file belongs to the SSH user');
   check((await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--anim'))) === '350ms', 'saved speed takes effect');
   await page.uncheck('#set-anim-enabled');
@@ -1837,12 +1870,26 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // ---- settings follow the account: log in again and they are loaded from the host
   check(!(await page.evaluate(() => document.documentElement.classList.contains('no-anim'))), 'logout resets settings to defaults');
-  fs.writeFileSync(settingsFile, JSON.stringify({ version: 1, animation: { enabled: false, speed: 'fast' }, future: { keep: 1 } }));
+  // Written under the old name: it is read, and moved to the new one.
+  fs.rmSync(settingsFile, { force: true });
+  fs.mkdirSync(home + '/.remosh-gui', { recursive: true });
+  fs.writeFileSync(legacySettings, JSON.stringify({ version: 1, animation: { enabled: false, speed: 'fast' }, future: { keep: 1 } }));
+  give(home + '/.remosh-gui');
+  give(legacySettings);
   await page.fill('#f-pass', password);
   await page.click('#login-btn');
   await page.waitForSelector('#desktop:not([hidden])');
   await page.waitForFunction(() => document.documentElement.classList.contains('no-anim'));
   check(true, 'settings are loaded from the host at login');
+  check(await (async () => {
+    for (let i = 0; i < 50 && (fs.existsSync(legacySettings) || !fs.existsSync(settingsFile)); i++) await sleep(100);
+    return !fs.existsSync(legacySettings) && JSON.parse(fs.readFileSync(settingsFile, 'utf8')).future?.keep === 1;
+  })(), 'a setting.json from an earlier version is moved to setting.inv-remosh_gui-config, unknown keys kept');
+  await page.evaluate((d) => import('/js/shell/apps.js').then((m) => m.launchApp('files', { path: d })), home + '/.remosh-gui');
+  const cab = page.locator('.win[data-app="檔案櫃"]').last();
+  await cab.locator('.files .item .name', { hasText: /^desktop$/ }).waitFor();
+  check(!(await cab.locator('.files .item .name').allTextContents()).some((n) => n.startsWith('setting')), 'the settings file is not listed in the file cabinet');
+  await cab.locator('.traffic .close').click();
   await page.click('#start-btn');
   await page.click('#sm-settings');
   check(!(await page.isChecked('#set-anim-enabled')) && (await page.inputValue('#set-anim-speed')) === 'fast', 'settings window shows the loaded values');

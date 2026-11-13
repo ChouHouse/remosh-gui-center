@@ -1,5 +1,5 @@
 // 設定: categories on the left, their options on the right. 儲存 writes
-// ~/.remosh-gui/setting.json on the SSH host (see core/settings.js).
+// ~/.remosh-gui/setting.inv-remosh_gui-config on the SSH host (see core/settings.js).
 //
 // To add a category, push another entry to CATEGORIES: { id, label, render }.
 // render(draft, changed) returns the pane's element; it edits `draft` in place

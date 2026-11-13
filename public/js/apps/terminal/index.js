@@ -11,10 +11,18 @@ import { on } from '../../core/events.js';
 import { fromBase64 } from '../../core/text-codec.js';
 import { createWindow } from '../../shell/wm.js';
 import { registerApp, useAppStyle } from '../../shell/apps.js';
+import { showContextMenu } from '../../shell/context-menu.js';
+import { copyText, readText } from '../../core/clipboard.js';
 
 useAppStyle(import.meta.url);
 
 const RUN_MODE = 0o777; // permissions given to a file before it is run
+const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+// Copy and paste keys, as in a Linux terminal (Ctrl+C stays "interrupt").
+const COPY_KEY = isMac ? 'Option+C' : 'Ctrl+Shift+C';
+const PASTE_KEY = isMac ? 'Option+V' : 'Ctrl+Shift+V';
+const isCopy = (ev) => ev.code === 'KeyC' && (isMac ? ev.altKey && !ev.ctrlKey && !ev.metaKey : ev.ctrlKey && ev.shiftKey && !ev.altKey);
+const isPaste = (ev) => ev.code === 'KeyV' && (isMac ? ev.altKey && !ev.ctrlKey && !ev.metaKey : ev.ctrlKey && ev.shiftKey && !ev.altKey);
 
 let xtermPromise = null;
 function loadXterm() {
@@ -86,6 +94,50 @@ async function openTerminal({ path = null, cwd = null } = {}) {
       if (tid != null) rpc('termInput', { tid, data }).catch(() => {});
     };
     term.onData(send);
+
+    // ---- copy and paste
+    const copy = async () => {
+      const text = term.getSelection();
+      if (!text) return;
+      if (!(await copyText(text))) toast('瀏覽器不允許寫入剪貼簿', true);
+      term.focus();
+    };
+    const paste = async () => {
+      const text = await readText();
+      if (text == null) return toast(`瀏覽器不允許讀取剪貼簿（需要 https），請改用 ${isMac ? '⌘V' : 'Ctrl+V'}`, true);
+      term.paste(text);
+      term.focus();
+    };
+    term.attachCustomKeyEventHandler((ev) => {
+      if (ev.type !== 'keydown') return !(isCopy(ev) || isPaste(ev));
+      if (isCopy(ev)) {
+        ev.preventDefault();
+        copy();
+        return false;
+      }
+      if (isPaste(ev)) {
+        // Ctrl+Shift+V is the browser's own "paste as plain text": let that
+        // through (it needs no permission) and keep it from the shell.
+        if (isMac) {
+          ev.preventDefault();
+          paste();
+        }
+        return false;
+      }
+      return true;
+    });
+    host.addEventListener('contextmenu', (ev) => {
+      showContextMenu(ev, [
+        { label: `複製（${COPY_KEY}）`, enabled: term.hasSelection(), run: copy },
+        { label: `貼上（${PASTE_KEY}）`, run: paste },
+        null,
+        { label: '全選', run: () => term.selectAll() },
+        { label: '清除畫面', run: () => {
+          term.clear();
+          term.focus();
+        } },
+      ]);
+    });
     term.onResize(({ cols, rows }) => {
       if (tid != null) rpc('termResize', { tid, cols, rows }).catch(() => {});
     });

@@ -188,7 +188,8 @@ npm run assets && WEB_PASSWORD=secret npm start   # http://localhost:8080
   from its folder.
 - **Settings** (設定): categories on the left (動畫: on/off and speed; 檔案關聯; 樣式: light/dark mode, which side the window
   buttons sit on, one system colour, and a wallpaper — the last five uploads are
-  kept in `~/.remosh-gui/wallpaper`). 儲存 writes `~/.remosh-gui/setting.json` on the SSH host, so settings
+  kept in `~/.remosh-gui/wallpaper`). 儲存 writes `~/.remosh-gui/setting.inv-remosh_gui-config` (JSON; `setting.json` from
+  earlier versions is moved over at login) on the SSH host, so settings
   follow the account, and they are read back at login. Add a setting in
   `core/settings.js` and a category in `apps/settings/index.js`.
 
