@@ -1,25 +1,32 @@
-// 工作管理員: CPU, memory and processes of the SSH host (read-only).
+// 工作管理員: the SSH host's processes, and charts of CPU, memory, storage and
+// network (read-only). Two pages: 進程 and 圖表.
 import { h } from '../../core/dom.js';
 import { errText } from '../../core/errors.js';
 import { fmtSize, fmtDuration } from '../../core/format.js';
 import { gaugeSvg } from './icon.js';
 import { conn, rpc } from '../../core/rpc.js';
+import { store } from '../../core/store.js';
 import { createWindow } from '../../shell/wm.js';
 import { registerApp, useAppStyle } from '../../shell/apps.js';
 import { parseStats } from './stats.js';
 import { openProcessWindow } from './process.js';
+import { lineChart } from './chart.js';
 
 useAppStyle(import.meta.url);
+
+const HISTORY = 60; // samples kept for the charts (3 s apart: three minutes)
 
 let taskman = null;
 function openTaskManager() {
   if (taskman) return taskman.focus();
   const win = (taskman = createWindow({ title: '工作管理員', appName: '工作管理員', iconHtml: gaugeSvg(), width: 640, height: 520 }));
   const meta = h('div', { class: 'tm-meta' });
-  const meter = (title) => {
-    const m = { val: h('div', { class: 'val' }, '—'), sub: h('div', { class: 'sub' }), bar: h('i'), barBox: null };
+  // One card on the 圖表 page: a figure, a line under it, a bar, and a chart.
+  const meter = (key, title, withChart = true) => {
+    const m = { val: h('div', { class: 'val' }, '—'), sub: h('div', { class: 'sub' }), extra: h('div', { class: 'extra' }), bar: h('i'), barBox: null };
     m.barBox = h('div', { class: 'tm-bar none' }, m.bar);
-    m.el = h('div', { class: 'tm-meter' }, h('h4', null, title), m.val, m.sub, m.barBox);
+    m.chart = withChart ? lineChart(HISTORY) : null;
+    m.el = h('div', { class: 'tm-meter', 'data-k': key }, h('h4', null, title), m.val, m.sub, m.extra, m.barBox, m.chart?.el);
     m.set = (value, sub, ratio) => {
       m.val.textContent = value;
       m.sub.textContent = sub;
@@ -28,8 +35,16 @@ function openTaskManager() {
     };
     return m;
   };
-  const mCpu = meter('CPU');
-  const mMem = meter('記憶體');
+  const mCpu = meter('cpu', 'CPU');
+  const mMem = meter('mem', '記憶體');
+  const mDisk = meter('disk', '儲存空間', false);
+  const mNet = meter('net', '網路');
+  const perf = h('div', { class: 'tm-perf', role: 'tabpanel', 'aria-label': '圖表' }, mCpu.el, mMem.el, mDisk.el, mNet.el);
+  const hist = { cpu: [], mem: [], rx: [], tx: [] };
+  const push = (arr, v) => {
+    arr.push(v);
+    if (arr.length > HISTORY) arr.shift();
+  };
   const note = h('div', { class: 'tm-note' });
   const tbody = h('tbody');
   const cols = [
@@ -42,10 +57,24 @@ function openTaskManager() {
   const sort = { key: 'cpu', dir: -1 };
   const headRow = h('tr');
   const table = h('table', null, h('thead', null, headRow), tbody);
-  const list = h('div', { class: 'tm-list' }, table);
+  const list = h('div', { class: 'tm-list', role: 'tabpanel', 'aria-label': '進程' }, table);
   const state = h('div', { class: 'state' }, '讀取中…');
   list.append(state);
-  win.body.append(h('div', { class: 'tm-top' }, meta, h('div', { class: 'tm-meters' }, mCpu.el, mMem.el), note), list);
+  // ---- the two pages
+  const tabBtns = {};
+  const showTab = (key) => {
+    store.set('tmTab', key);
+    list.hidden = key !== 'procs';
+    perf.hidden = key !== 'perf';
+    for (const [k, b] of Object.entries(tabBtns)) {
+      b.classList.toggle('current', k === key);
+      b.setAttribute('aria-selected', String(k === key));
+    }
+  };
+  const tabs = h('div', { class: 'tm-tabs', role: 'tablist' }, [['procs', '進程'], ['perf', '圖表']].map(([k, label]) =>
+    (tabBtns[k] = h('button', { type: 'button', role: 'tab', 'data-tab': k, onclick: () => showTab(k) }, label))));
+  win.body.append(h('div', { class: 'tm-top' }, meta, tabs, note), list, perf);
+  showTab(store.get('tmTab', 'procs') === 'perf' ? 'perf' : 'procs');
 
   let prev = null;
   let last = null;
@@ -98,10 +127,38 @@ function openTaskManager() {
     if (used == null) mCpu.set('計算中…', limit ? `上限 ${cores(limit)} 核` : '', null);
     else if (limit) mCpu.set(`${((used / limit) * 100).toFixed(1)}%`, `${used.toFixed(2)} / ${cores(limit)} 核`, used / limit);
     else mCpu.set(`${used.toFixed(2)} 核`, '這個容器沒有設定 CPU 上限', null);
+    mCpu.extra.textContent = s.cpuModel;
+    mCpu.extra.title = s.cpuModel;
+    if (used != null) push(hist.cpu, limit ? used / limit : Math.min(1, used / s.nproc));
+    mCpu.chart.draw([{ values: hist.cpu }], 1);
 
     if (!src) mMem.set('—', '讀不到記憶體資訊', null);
     else if (src.memLimit) mMem.set(`${((src.memUsed / src.memLimit) * 100).toFixed(1)}%`, `${fmtSize(src.memUsed)} / ${fmtSize(src.memLimit)}`, src.memUsed / src.memLimit);
     else mMem.set(fmtSize(src.memUsed), '這個容器沒有設定記憶體上限', null);
+    const memTop = src?.memLimit || s.sys?.memLimit;
+    if (src && memTop) push(hist.mem, src.memUsed / memTop);
+    mMem.extra.textContent = src && !src.memLimit && memTop ? `圖表以整台主機的 ${fmtSize(memTop)} 為上限` : '';
+    mMem.chart.draw([{ values: hist.mem }], 1);
+
+    const disk = s.disks[0];
+    if (!disk) mDisk.set('—', '讀不到儲存空間資訊（找不到 df）', null);
+    else mDisk.set(`${((disk.used / disk.size) * 100).toFixed(1)}%`, `${fmtSize(disk.used)} / ${fmtSize(disk.size)}，剩 ${fmtSize(disk.avail)}`, disk.used / disk.size);
+    mDisk.extra.replaceChildren(...s.disks.slice(1).map((d) =>
+      h('div', null, `${d.mount}：${fmtSize(d.used)} / ${fmtSize(d.size)}，剩 ${fmtSize(d.avail)}`)));
+
+    if (!s.net) mNet.set('—', '讀不到網路資訊', null);
+    else if (dt > 0.2 && prev?.net) {
+      const rx = Math.max(0, (s.net.rx - prev.net.rx) / dt);
+      const tx = Math.max(0, (s.net.tx - prev.net.tx) / dt);
+      push(hist.rx, rx);
+      push(hist.tx, tx);
+      mNet.set(`↓ ${fmtSize(rx)}/s`, `↑ ${fmtSize(tx)}/s`, null);
+    } else mNet.set('計算中…', '', null);
+    if (s.net) {
+      const top = Math.max(1024, ...hist.rx, ...hist.tx) * 1.15;
+      mNet.extra.textContent = `接收（藍）與傳送（橘），圖表上限 ${fmtSize(top)}/s`;
+      mNet.chart.draw([{ values: hist.rx, cls: 'rx' }, { values: hist.tx, cls: 'tx' }], top);
+    }
 
     const before = new Map((prev?.procs || []).map((p) => [p.pid, p.ticks]));
     rows = s.procs.map((p) => {

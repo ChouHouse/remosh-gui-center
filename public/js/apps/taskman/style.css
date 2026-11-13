@@ -2,7 +2,6 @@
 .tm-top { flex: none; padding: 12px 14px 10px; display: grid; gap: 10px; border-bottom: 1px solid var(--border); }
 .tm-meta { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--muted); font-size: 12px; }
 .tm-meta b { color: var(--text); font-weight: 600; }
-.tm-meters { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .tm-meter { padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); min-width: 0; }
 .tm-meter h4 { margin: 0 0 2px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
 .tm-meter .val { font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -33,3 +32,27 @@
 .proc-status.ended { color: var(--danger); font-weight: 600; }
 .proc-kill { padding: 6px 14px; border: 0; border-radius: 7px; background: var(--danger); color: #fff; font-weight: 600; }
 .proc-kill:disabled { opacity: .4; cursor: default; }
+
+/* ---------- pages: 進程 / 圖表 ---------- */
+.tm-tabs { display: flex; gap: 4px; }
+.tm-tabs button {
+  padding: 5px 14px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); font-size: 12.5px;
+}
+.tm-tabs button:hover { background: var(--surface-3); }
+.tm-tabs button.current { background: var(--surface-2); border-color: var(--border); color: var(--text); font-weight: 600; }
+.tm-list[hidden], .tm-perf[hidden] { display: none; }
+.tm-perf {
+  flex: 1; min-height: 0; overflow: auto; padding: 12px 14px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; align-content: start;
+}
+.tm-meter .extra { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tm-meter .extra:empty { display: none; }
+.tm-chart { position: relative; height: 92px; margin-top: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); overflow: hidden; }
+.tm-chart-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.tm-chart-svg .grid line { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.tm-chart-svg .line { fill: none; stroke: var(--accent); stroke-width: 1.6; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.tm-chart-svg .area { fill: color-mix(in srgb, var(--accent) 18%, transparent); stroke: none; }
+.tm-chart-svg .line.rx { stroke: #1f8fd6; }
+.tm-chart-svg .area.rx { fill: color-mix(in srgb, #1f8fd6 16%, transparent); }
+.tm-chart-svg .line.tx { stroke: #e08a1e; }
+.tm-chart-svg .area.tx { fill: color-mix(in srgb, #e08a1e 12%, transparent); }

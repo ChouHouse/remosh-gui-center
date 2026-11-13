@@ -16,6 +16,7 @@ const check = (cond, label, extra = '') => {
   }
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const { execSync: execSyncTop } = require('node:child_process');
 
 (async () => {
   const settingsFile = home + '/.remosh-gui/setting.inv-remosh_gui-config';
@@ -752,8 +753,25 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await tm.locator('.tm-list th button', { hasText: 'PID' }).click();
   check((await tm.locator('.tm-list tbody tr').first().locator('td').nth(1).textContent()) === '1', 'clicking a column sorts the list');
   check((await page.locator('.dock-item', { hasText: '工作管理員' }).count()) === 1, 'task manager has a dock entry');
+  // ---- two pages: 進程 and 圖表
+  check((await tm.locator('.tm-tabs button').allTextContents()).join() === '進程,圖表' && await tm.locator('.tm-list').isVisible() && await tm.locator('.tm-perf').isHidden(), 'task manager has two pages, 進程 first');
+  await tm.locator('.tm-tabs button', { hasText: '圖表' }).click();
+  check(await tm.locator('.tm-perf').isVisible() && await tm.locator('.tm-list').isHidden(), '圖表 replaces the process list');
+  check((await tm.locator('.tm-meter h4').allTextContents()).join() === 'CPU,記憶體,儲存空間,網路', 'it shows CPU, memory, storage and network');
+  const cpuModel = (fs.readFileSync('/proc/cpuinfo', 'utf8').match(/^model name\s*:\s*(.+)$/m) || [])[1];
+  if (cpuModel) check((await tm.locator('.tm-meter[data-k="cpu"] .extra').textContent()) === cpuModel.replace(/\s+/g, ' ').trim(), 'the CPU card names the processor', await tm.locator('.tm-meter[data-k="cpu"] .extra').textContent());
+  const dfRoot = execSyncTop('df -kP / | tail -n 1').toString().trim().split(/\s+/);
+  check((await tm.locator('.tm-meter[data-k="disk"] .val').textContent()).endsWith('%') && (await tm.locator('.tm-meter[data-k="disk"] .sub').textContent()).includes('剩'), 'storage shows how full it is and what is left', await tm.locator('.tm-meter[data-k="disk"]').textContent());
+  check(Number(dfRoot[1]) > 0, 'df works on this host');
+  await page.waitForFunction(() => /\/s$/.test(document.querySelector('.tm-meter[data-k="net"] .val').textContent), null, { timeout: 10000 });
+  check((await tm.locator('.tm-meter[data-k="net"] .sub').textContent()).startsWith('↑'), 'network shows receive and send rates');
+  await page.waitForFunction(() => (document.querySelector('.tm-meter[data-k="cpu"] polyline.line')?.getAttribute('points') || '').split(' ').length >= 2, null, { timeout: 10000 });
+  check(await tm.locator('.tm-meter[data-k="net"] polyline.line').count() === 2 && await tm.locator('.tm-meter[data-k="disk"] svg').count() === 0, 'CPU, memory and network are drawn as charts (two lines for the network)');
+  await tm.locator('.tm-tabs button', { hasText: '進程' }).click();
+  await tm.locator('.tm-list').waitFor();
   // ---- double-click a process -> details window -> force close
-  const { execSync, spawn } = require('node:child_process');
+  const { spawn } = require('node:child_process');
+  const execSync = execSyncTop;
   spawn('su', [user, '-c', 'exec sleep 4321'], { detached: true, stdio: 'ignore' }).unref();
   await sleep(500);
   const victim = Number(execSync('pgrep -n -x sleep -u ' + user).toString().trim());

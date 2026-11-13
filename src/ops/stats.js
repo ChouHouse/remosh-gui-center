@@ -32,6 +32,9 @@ sec v1:pids; cat "$c/pids/pids.current" 2>/dev/null
 sec meminfo; grep -E '^(MemTotal|MemAvailable|MemFree|Buffers|Cached):' /proc/meminfo 2>/dev/null
 sec stat; head -n 1 /proc/stat 2>/dev/null
 sec uptime; cat /proc/uptime 2>/dev/null
+sec cpumodel; grep -m1 -E '^(model name|Hardware|cpu model|Processor|Model)[[:space:]]*:' /proc/cpuinfo 2>/dev/null | cut -d: -f2-
+sec disk; df -kP / "$HOME" 2>/dev/null | tail -n +2
+sec net; tail -n +3 /proc/net/dev 2>/dev/null
 sec ps; ps -eo pid=,user=,rss=,comm= 2>/dev/null
 sec ticks; awk '{ i = index($0, ") "); n = split(substr($0, i + 2), a, " "); print $1, a[12] + a[13], a[20] }' /proc/[0-9]*/stat 2>/dev/null
 sec end

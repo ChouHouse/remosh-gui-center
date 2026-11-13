@@ -69,6 +69,32 @@ export function parseStats(out) {
     };
   }
   s.uptime = parseFloat(sec.uptime?.[0]) || null;
+  s.cpuModel = (sec.cpumodel?.[0] || '').replace(/\s+/g, ' ').trim();
+
+  // Storage: the file systems holding / and the home folder (one entry when they are the same).
+  s.disks = [];
+  for (const line of sec.disk || []) {
+    const m = /^(\S+)\s+(\d+)\s+(\d+)\s+(\d+)\s+\S+\s+(.+)$/.exec(line);
+    if (!m) continue;
+    const d = { fs: m[1], size: Number(m[2]) * 1024, used: Number(m[3]) * 1024, avail: Number(m[4]) * 1024, mount: m[5] };
+    if (!s.disks.some((x) => x.mount === d.mount || (x.fs === d.fs && x.size === d.size))) s.disks.push(d);
+  }
+
+  // Network: bytes received / sent so far on every interface but loopback.
+  // Inside a container these are the container's own interfaces.
+  let rx = 0;
+  let tx = 0;
+  let ifaces = 0;
+  for (const line of sec.net || []) {
+    const [name, rest] = line.split(':');
+    if (!rest || name.trim() === 'lo') continue;
+    const f = rest.trim().split(/\s+/).map(Number);
+    if (f.length < 9) continue;
+    rx += f[0] || 0;
+    tx += f[8] || 0;
+    ifaces++;
+  }
+  s.net = ifaces ? { rx, tx } : null;
 
   const ticks = new Map();
   for (const line of sec.ticks || []) {

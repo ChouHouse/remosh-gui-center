@@ -67,7 +67,7 @@ public/
       notepad/          記事本
       graphoto/         Graphoto (image viewer)
       terminal/         終端機
-      taskman/          工作管理員 (index.js, stats.js)
+      taskman/          工作管理員 (index.js, stats.js, chart.js, process.js)
       settings/         設定
   vs/  xterm/           Monaco and xterm.js, copied by `npm run assets` (not committed)
 ```
@@ -165,8 +165,10 @@ npm run assets && WEB_PASSWORD=secret npm start   # http://localhost:8080
   with the wheel. Clicking the clock opens a calendar.
 - **Accounts** (設定 → 帳號): change your password; with root or sudo, create
   users (`passwd` / `chpasswd` / `useradd` run on the host, passwords on stdin).
-- **Task manager**: CPU, memory and the process list of the SSH host, refreshed
-  every 3 s by a fixed read-only script run over SSH. When the host is a
+- **Task manager**: two pages. 進程 is the process list (double-click one for
+  details and force close); 圖表 charts CPU (with the processor's name), memory
+  and network over the last three minutes and shows how full the storage is.
+  Refreshed every 3 s by a fixed read-only script run over SSH. When the host is a
   container it reads the container's own cgroup usage and limits (v2 or v1)
   instead of `/proc` totals, which would describe the Docker host.
 
