@@ -12,6 +12,8 @@
 //     accepts(payload) -> boolean,
 //     action?(payload, { ctrlKey, altKey }) -> label shown on the card ('移動', '複製', ...),
 //     onDrop(payload, { ctrlKey, altKey, clientX, clientY, target }),
+//     onOver?(payload, { clientX, clientY }),   while the pointer moves over it
+//     onLeave?(),                               when it leaves, or the drag ends
 //   })
 //
 // The innermost registered target under the pointer that accepts the payload
@@ -48,9 +50,11 @@ export function makeDraggable(element, getPayload) {
       const hit = targetAt(last.clientX, last.clientY, payload);
       if (over?.el !== hit?.el) {
         over?.el.classList.remove('drop-over');
+        over?.spec.onLeave?.();
         hit?.el.classList.add('drop-over');
         over = hit;
       }
+      over?.spec.onOver?.(payload, { clientX: last.clientX, clientY: last.clientY });
       ghost.style.left = last.clientX + 14 + 'px';
       ghost.style.top = last.clientY + 12 + 'px';
       ghost.classList.toggle('no-drop', !over);
@@ -94,6 +98,7 @@ export function makeDraggable(element, getPayload) {
       document.removeEventListener('keyup', onKey, true);
       document.body.classList.remove('dragging-item');
       over?.el.classList.remove('drop-over');
+      over?.spec.onLeave?.();
       ghost.remove();
       // The press ended a drag, not a click: swallow the click that follows.
       const swallow = (ev) => {

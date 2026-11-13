@@ -9,7 +9,7 @@ import { P, freeName, isInvisible } from '../../core/path.js';
 import { ICON, folderSvg, fileSvg } from '../../core/icons.js';
 import { conn, rpc } from '../../core/rpc.js';
 import { on, emit } from '../../core/events.js';
-import { getSettings, updateSettings } from '../../core/settings.js';
+import { getSettings, updateSettings, SIDEBAR_MIN, SIDEBAR_MAX } from '../../core/settings.js';
 import { createWindow } from '../../shell/wm.js';
 import { registerApp, launchApp, getApp } from '../../shell/apps.js';
 import { makeDraggable, registerDropTarget } from '../../shell/drag.js';
@@ -26,6 +26,7 @@ const finders = new Set(); // every open file cabinet window
 // List-view columns: default widths and how narrow / wide they may be dragged.
 const COLS = { name: 260, mtime: 150, size: 90, kind: 100 };
 const COL_MIN = 60;
+const DEFAULT_SIDEBAR_W = 150;
 const COL_MAX = 900;
 
 function createFinder(home, startPath = home) {
@@ -59,13 +60,14 @@ function createFinder(home, startPath = home) {
   const bList = btn(ICON.list, '列表檢視', () => setView('list'));
   const crumbs = h('div', { class: 'crumbs', title: '點空白處可直接輸入路徑' });
   const side = h('aside', { class: 'sidebar' });
+  const sideGrip = h('div', { class: 'side-resize', title: '拖曳調整寬度，點兩下還原', 'data-no-marquee': '' });
   const files = h('div', { class: 'files', tabindex: '0' });
   const status = h('span');
   const statusPath = h('span', { class: 'path' });
 
   win.body.append(
     h('div', { class: 'finder-toolbar' }, bBack, bFwd, bUp, crumbs, bRefresh, bHidden, bGrid, bList),
-    h('div', { class: 'finder-main' }, side, files),
+    h('div', { class: 'finder-main' }, side, sideGrip, files),
     h('div', { class: 'statusbar' }, status, h('span', { class: 'spacer' }), statusPath));
 
   // ---- sidebar: the user's folders (settings), editable by right-click
@@ -74,19 +76,33 @@ function createFinder(home, startPath = home) {
   const placeLabel = (p) => (p === home ? '家目錄' : p === '/' ? '根目錄' : P.base(p));
   const placeIcon = (p) => (p === home ? ICON.home : p === '/' ? ICON.disk : ICON.folder);
   function renderSidebar() {
+    side.style.width = getSettings().files.sidebarWidth + 'px';
     side.replaceChildren(h('h3', null, '位置'), ...sidebarPaths().map((p) =>
       h('button', { type: 'button', title: p, 'data-path': p, class: p === st.path ? 'current' : '', onclick: () => navigate(p) },
         h('span', { html: placeIcon(p), style: 'display:flex' }), h('span', null, placeLabel(p)))));
   }
+  // Saved in the settings, so every file cabinet window takes the new width.
+  const setSidebarWidth = (width) =>
+    updateSettings((s) => {
+      s.files.sidebarWidth = width;
+    }, { optimistic: true }).catch((err) => toast(`無法儲存側邊欄寬度：${errText(err)}`, true));
   const setSidebar = (paths) =>
     updateSettings((s) => {
       s.files.sidebar = paths;
     }).catch((err) => toast(`無法儲存側邊欄：${errText(err)}`, true));
+  const moveTo = (paths, path, index) => {
+    const next = paths.filter((p) => p !== path);
+    next.splice(index, 0, path);
+    setSidebar(next);
+  };
   side.addEventListener('contextmenu', (ev) => {
     const paths = sidebarPaths();
     const target = ev.target.closest('button[data-path]')?.dataset.path;
     showContextMenu(ev, [
       target && { label: '開啟', run: () => navigate(target) },
+      target && { label: '上移', enabled: paths.indexOf(target) > 0, run: () => moveTo(paths, target, paths.indexOf(target) - 1) },
+      target && { label: '下移', enabled: paths.indexOf(target) < paths.length - 1, run: () => moveTo(paths, target, paths.indexOf(target) + 1) },
+      target && null,
       target && { label: '從側邊欄移除', run: () => setSidebar(paths.filter((p) => p !== target)) },
       target && null,
       { label: `加入目前的資料夾（${placeLabel(st.path)}）`, enabled: !paths.includes(st.path), run: () => setSidebar([...paths, st.path]) },
@@ -99,18 +115,33 @@ function createFinder(home, startPath = home) {
     const path = ev.target.closest('button[data-path]')?.dataset.path;
     return path ? { type: 'place', name: placeLabel(path), icon: folderSvg(), data: { path } } : null;
   });
+  // Where a drop would land: before the first entry whose middle is below the pointer.
+  const dropIndex = (y) => {
+    const buttons = [...side.querySelectorAll('button[data-path]')];
+    const i = buttons.findIndex((b) => {
+      const r = b.getBoundingClientRect();
+      return y < r.top + r.height / 2;
+    });
+    return i < 0 ? buttons.length : i;
+  };
+  // A line between the entries shows where it will go.
+  const marker = h('div', { class: 'side-insert' });
   const offSideDrop = registerDropTarget(side, {
     accepts: (payload) => payload.type === 'place' || (payload.type === 'file' && payload.data.isDir),
     action: (payload) => (payload.type === 'place' ? '移動' : '加到側邊欄'),
+    onOver(_payload, at) {
+      const buttons = [...side.querySelectorAll('button[data-path]')];
+      const i = dropIndex(at.clientY);
+      const ref = buttons[i] || buttons[buttons.length - 1];
+      if (!ref) return marker.remove();
+      const top = buttons[i] ? ref.offsetTop - 1 : ref.offsetTop + ref.offsetHeight + 1;
+      marker.style.top = top + 'px';
+      if (!marker.isConnected) side.append(marker);
+    },
+    onLeave: () => marker.remove(),
     onDrop(payload, drop) {
       const paths = [...sidebarPaths()];
-      const buttons = [...side.querySelectorAll('button[data-path]')];
-      // Insert before the first entry whose middle is below the pointer.
-      let index = buttons.findIndex((b) => {
-        const r = b.getBoundingClientRect();
-        return drop.clientY < r.top + r.height / 2;
-      });
-      if (index < 0) index = buttons.length;
+      let index = dropIndex(drop.clientY);
       const from = paths.indexOf(payload.data.path);
       if (payload.type === 'place') {
         if (from < 0) return;
@@ -121,6 +152,30 @@ function createFinder(home, startPath = home) {
       setSidebar(paths);
     },
   });
+
+  // ---- sidebar width: drag the line between the sidebar and the files
+  sideGrip.addEventListener('pointerdown', (down) => {
+    if (down.button !== 0) return;
+    down.preventDefault();
+    const start = side.offsetWidth;
+    let width = start;
+    document.body.classList.add('dragging', 'col-resizing');
+    const move = (ev) => {
+      width = Math.round(Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, start + ev.clientX - down.clientX)));
+      side.style.width = width + 'px';
+    };
+    const up = () => {
+      document.body.classList.remove('dragging', 'col-resizing');
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      if (width !== start) setSidebarWidth(width);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  });
+  sideGrip.addEventListener('dblclick', () => setSidebarWidth(DEFAULT_SIDEBAR_W));
 
   // ---- list view: column widths
   const applyCols = () => files.style.setProperty('--cols', ['name', 'mtime', 'size', 'kind'].map((k) => `${st.cols[k]}px`).join(' '));

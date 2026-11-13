@@ -27,9 +27,15 @@
 }
 .finder-main { flex: 1; min-height: 0; display: flex; }
 .sidebar {
-  width: 150px; flex: none; padding: 8px 6px; border-right: 1px solid var(--border);
+  position: relative; width: 150px; flex: none; padding: 8px 6px;
   background: var(--surface-2); overflow-y: auto;
 }
+/* The line between the sidebar and the files; drag it to change the width. */
+.side-resize { flex: none; width: 5px; margin: 0 -2px; position: relative; z-index: 2; cursor: col-resize; }
+.side-resize::before { content: ""; position: absolute; top: 0; bottom: 0; left: 2px; width: 1px; background: var(--border); }
+.side-resize:hover::before, body.col-resizing .side-resize::before { left: 1px; width: 3px; background: var(--accent); }
+/* Where a dragged place will be put. */
+.side-insert { position: absolute; left: 8px; right: 8px; height: 2px; margin-top: -1px; border-radius: 1px; background: var(--accent); pointer-events: none; }
 .sidebar h3 { margin: 2px 8px 4px; font-size: 11px; font-weight: 600; color: var(--muted); }
 .sidebar button {
   width: 100%; display: flex; align-items: center; gap: 7px; padding: 4px 8px;

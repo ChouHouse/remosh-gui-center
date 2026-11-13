@@ -18,6 +18,7 @@ const DEFAULTS = {
   files: {
     associations: {}, // extension ('' = no extension) -> app id
     sidebar: null, // file cabinet sidebar folders; null = the built-in list
+    sidebarWidth: 150, // px
   },
   taskbar: {
     autoHide: false, // slide away until the pointer reaches the bottom edge
@@ -43,6 +44,8 @@ const DEFAULTS = {
 
 export const WALLPAPER_DIR = 'wallpaper';
 export const MAX_WALLPAPERS = 5;
+export const SIDEBAR_MIN = 110;
+export const SIDEBAR_MAX = 420;
 const FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
 
 export const EXT_PATTERN = /^[a-z0-9_+-]{0,16}$/;
@@ -63,7 +66,11 @@ function normalise(obj) {
       enabled: typeof a?.enabled === 'boolean' ? a.enabled : DEFAULTS.animation.enabled,
       speed: Object.hasOwn(ANIMATION_SPEEDS, a?.speed) ? a.speed : DEFAULTS.animation.speed,
     },
-    files: { associations, sidebar },
+    files: {
+      associations,
+      sidebar,
+      sidebarWidth: Number.isFinite(obj?.files?.sidebarWidth) ? Math.round(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, obj.files.sidebarWidth))) : DEFAULTS.files.sidebarWidth,
+    },
     start: {
       pinned: Array.isArray(obj?.start?.pinned)
         ? [...new Set(obj.start.pinned.filter((id) => typeof id === 'string' && /^[a-z0-9-]{1,32}$/.test(id)))]
