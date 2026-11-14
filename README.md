@@ -66,6 +66,7 @@ public/
       editor/           Procoder: windows with tabs and a file tree (index.js, window.js, tree.js, welcome.js, prefs.js, monaco.js)
       notepad/          記事本
       graphoto/         Graphoto (image viewer)
+      filex/            Filex (upload files from this computer)
       terminal/         終端機
       taskman/          工作管理員 (index.js, stats.js, chart.js, process.js)
       settings/         設定

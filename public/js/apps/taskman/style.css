@@ -43,11 +43,11 @@
 .tm-list[hidden], .tm-perf[hidden] { display: none; }
 .tm-perf {
   flex: 1; min-height: 0; overflow: auto; padding: 12px 14px;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; align-content: start;
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-content: start; /* one column: a card per row */
 }
 .tm-meter .extra { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tm-meter .extra:empty { display: none; }
-.tm-chart { position: relative; height: 92px; margin-top: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); overflow: hidden; }
+.tm-chart { position: relative; height: 110px; margin-top: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); overflow: hidden; }
 .tm-chart-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .tm-chart-svg .grid line { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .tm-chart-svg .line { fill: none; stroke: var(--accent); stroke-width: 1.6; vector-effect: non-scaling-stroke; stroke-linejoin: round; }

@@ -778,6 +778,40 @@ const { execSync: execSyncTop } = require('node:child_process');
     await pcTab('math.ts').click();
   }
 
+  // ---- Filex: upload files from this computer, several at once
+  {
+    const crypto = require('crypto');
+    for (const f of ['fx-a.txt', 'fx-a 複本.txt', 'fx-big.bin']) fs.rmSync(home + '/' + f, { force: true });
+    await page.evaluate(() => import('/js/shell/apps.js').then((m) => { m.launchApp('filex'); }));
+    const fx = page.locator('.win[data-app="Filex"]');
+    await fx.locator('.fx-drop').waitFor();
+    check((await fx.locator('.titlebar .ttext').textContent()) === 'Filex' && (await fx.locator('.fx-dest-path').textContent()) === home && await fx.locator('input[type="file"]').evaluate((el) => el.multiple),
+      'Filex opens with the home folder as the place to upload to, and takes several files at once');
+    const big = crypto.randomBytes(5 * 1024 * 1024 + 123);
+    await fx.locator('input[type="file"]').setInputFiles([{ name: 'fx-a.txt', mimeType: 'text/plain', buffer: Buffer.from('hello filex') }, { name: 'fx-big.bin', mimeType: 'application/octet-stream', buffer: big }]);
+    await page.waitForFunction(() => document.querySelectorAll('.fx-item[data-state="done"]').length === 2, null, { timeout: 60000 });
+    check(fs.readFileSync(home + '/fx-a.txt', 'utf8') === 'hello filex' && fs.readFileSync(home + '/fx-big.bin').equals(big), 'both files arrive on the host intact (one of them over 5 MB, sent in pieces)');
+    check((await fx.locator('.statusbar span').first().textContent()) === '完成 2 個' && (await fx.locator('.fx-item[data-name="fx-a.txt"] .fx-status').textContent()) === '完成', 'each file shows how it went');
+    await fx.locator('input[type="file"]').setInputFiles([{ name: 'fx-a.txt', mimeType: 'text/plain', buffer: Buffer.from('second') }]);
+    await page.waitForFunction(() => document.querySelector('.modal h2')?.textContent.includes('已經存在'));
+    check((await page.locator('.modal .btns button').allTextContents()).join() === '略過,保留兩者,取代', 'a name that is taken asks: skip, keep both or replace');
+    await page.locator('.modal button', { hasText: '保留兩者' }).click();
+    await page.waitForFunction(() => document.querySelectorAll('.fx-item[data-state="done"]').length === 3);
+    check(fs.readFileSync(home + '/fx-a 複本.txt', 'utf8') === 'second' && fs.readFileSync(home + '/fx-a.txt', 'utf8') === 'hello filex', '"keep both" uploads under a new name');
+    await fx.locator('input[type="file"]').setInputFiles([{ name: 'fx-a.txt', mimeType: 'text/plain', buffer: Buffer.from('third') }]);
+    await page.locator('.modal button', { hasText: '略過' }).click();
+    await page.waitForFunction(() => document.querySelectorAll('.fx-item[data-state="skip"]').length === 1);
+    check(fs.readFileSync(home + '/fx-a.txt', 'utf8') === 'hello filex', '"skip" leaves the file on the host alone');
+    await fx.locator('.fx-clear').click();
+    check((await fx.locator('.fx-item').count()) === 0 && (await fx.locator('.statusbar span').first().textContent()) === '還沒有要上傳的檔案', 'the finished ones can be cleared from the list');
+    await fx.locator('.fx-change').click();
+    await page.locator('.modal.picker .pk-col.right .pk-item[data-name="project"]').click();
+    await page.locator('.modal.picker .pk-ok').click();
+    check((await fx.locator('.fx-dest-path').textContent()) === home + '/project' && await waitApp('filex', (d) => d.dest === home + '/project'), 'the folder to upload to is chosen with the system chooser and remembered');
+    await fx.locator('.traffic .close').click();
+    for (const f of ['fx-a.txt', 'fx-a 複本.txt', 'fx-big.bin']) fs.rmSync(home + '/' + f, { force: true });
+  }
+
   fs.writeFileSync(home + '/project/tree-new.txt', 'x');
   fs.writeFileSync(home + '/project/secret.inv-test', 'x');
   await edWin.locator('.pc-side-tools button[title="重新整理"]').click();
@@ -1046,17 +1080,17 @@ const { execSync: execSyncTop } = require('node:child_process');
     await page.click('#sm-files');
   };
   await page.click('#start-btn');
-  const allApps = '檔案櫃,Procoder,記事本,Graphoto,終端機,工作管理員,設定';
+  const allApps = '檔案櫃,Procoder,記事本,Graphoto,Filex,終端機,工作管理員,設定';
   check((await page.locator('#sm-apps button').allTextContents()).join() === allApps, 'every app is pinned to start by default');
   await page.click('#sm-all-btn');
   check(await page.isVisible('#sm-all') && await page.isHidden('#sm-home') && (await page.locator('#sm-all-list button').allTextContents()).join() === allApps, '"all apps" lists every app, the code editor included');
   await page.locator('#sma-tasks').click({ button: 'right' });
   check((await menuLabels()).join('|') === '開啟|從開始取消釘選', 'right-click on an app offers to unpin it');
   await pick('從開始取消釘選');
-  check(await waitSetting((st) => st.start?.pinned && !st.start.pinned.includes('tasks') && st.start.pinned.length === 6), 'unpinning is saved');
+  check(await waitSetting((st) => st.start?.pinned && !st.start.pinned.includes('tasks') && st.start.pinned.length === 7), 'unpinning is saved');
   check(await page.isVisible('#start-menu'), 'the start menu stays open while pinning');
   await page.click('#sm-back');
-  check((await page.locator('#sm-apps button').allTextContents()).join() === '檔案櫃,Procoder,記事本,Graphoto,終端機,設定', 'the unpinned app leaves the pinned list');
+  check((await page.locator('#sm-apps button').allTextContents()).join() === '檔案櫃,Procoder,記事本,Graphoto,Filex,終端機,設定', 'the unpinned app leaves the pinned list');
   await page.click('#sm-all-btn');
   await page.locator('#sma-tasks').click({ button: 'right' });
   check((await menuLabels()).join('|') === '開啟|釘選到開始', 'an unpinned app offers to pin');

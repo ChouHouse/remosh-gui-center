@@ -8,6 +8,7 @@ import './apps/files/index.js';
 import './apps/editor/index.js';
 import './apps/notepad/index.js';
 import './apps/graphoto/index.js';
+import './apps/filex/index.js';
 import './apps/terminal/index.js';
 import './apps/taskman/index.js';
 import './apps/settings/index.js';

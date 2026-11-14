@@ -1,0 +1,39 @@
+/* ---------- Filex: upload from this computer ---------- */
+.fx-dest { flex: none; display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--border); background: var(--surface); font-size: 12.5px; }
+.fx-dest-label { flex: none; color: var(--muted); }
+.fx-dest-ico { flex: none; width: 15px; height: 15px; color: var(--muted); }
+.fx-dest-ico svg { width: 15px; height: 15px; display: block; }
+.fx-dest-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; user-select: text; }
+.fx-dest button, .fx-pick, .fx-clear { flex: none; padding: 4px 11px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); color: var(--text); font-size: 12.5px; }
+.fx-dest button:hover, .fx-clear:hover { background: var(--surface-3); }
+.fx-main { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px; overflow: hidden; }
+.fx-drop { flex: 1; min-height: 110px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border: 2px dashed var(--border); border-radius: 12px; color: var(--muted); font-size: 13px; text-align: center; transition: border-color .12s, background .12s; }
+.fx-has-items .fx-drop { flex: none; flex-direction: row; min-height: 0; padding: 10px; }
+.fx-has-items .fx-drop-ico, .fx-has-items .fx-hint { display: none; }
+.fx-over .fx-drop { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.fx-drop p { margin: 0; }
+.fx-drop-ico { width: 46px; height: 46px; }
+.fx-drop-ico svg { width: 100%; height: 100%; }
+.fx-hint { font-size: 11.5px; }
+.fx-pick { padding: 6px 16px; border-color: transparent; background: var(--accent); color: var(--accent-text); font-weight: 600; }
+.fx-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.fx-list:empty { display: none; }
+.fx-item { flex: none; display: flex; align-items: center; gap: 10px; padding: 7px 8px 7px 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); }
+.fx-ico { flex: none; width: 26px; height: 26px; }
+.fx-ico svg { width: 100%; height: 100%; display: block; }
+.fx-body { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.fx-line { display: flex; align-items: baseline; gap: 10px; min-width: 0; font-size: 11.5px; color: var(--muted); }
+.fx-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 13px; }
+.fx-size, .fx-status { flex: none; white-space: nowrap; }
+.fx-status { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.fx-where { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+.fx-bar { height: 4px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
+.fx-bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+.fx-item[data-state="done"] .fx-bar i { background: #2e9e5b; }
+.fx-item[data-state="done"] .fx-status { color: #2e9e5b; }
+.fx-item[data-state="fail"] .fx-bar i { background: var(--danger); width: 100% !important; }
+.fx-item[data-state="fail"] .fx-status { color: var(--danger); flex: 1; }
+.fx-item[data-state="skip"] { opacity: .6; }
+.fx-remove { flex: none; width: 22px; height: 22px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font-size: 15px; line-height: 1; }
+.fx-remove:hover { background: var(--surface-3); color: var(--text); }
+.fx-remove[hidden], .fx-clear[hidden] { display: none; }
