@@ -637,6 +637,60 @@ const { execSync: execSyncTop } = require('node:child_process');
   await pcTab('歡迎').hover();
   await pcTab('歡迎').locator('.pc-tab-close').click();
 
+  // ---- file tree: open a folder, browse it, open files from it
+  const treeNames = () => edWin.locator('.pc-row .pc-row-name').allTextContents();
+  check(await edWin.locator('.pc-side .pc-tree-empty').isVisible() && (await edWin.locator('.pc-side-title').textContent()) === '檔案', 'the file tree is on the left and starts without a folder');
+  await edWin.locator('.pc-tree-open').click();
+  await page.waitForSelector('.modal input');
+  check((await page.textContent('.modal h2')) === '開啟資料夾', '"open folder" asks for the folder');
+  await page.fill('.modal input', home + '/project');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelector('.pc-row.current .pc-row-name')?.textContent === 'math.ts');
+  {
+    const names = await treeNames();
+    check((await edWin.locator('.pc-side-title').textContent()) === 'project' && names[0] === 'src' && names.includes('README.md') && names.indexOf('README.md') > names.indexOf('math.ts'),
+      'the folder is listed, folders first', names.join());
+    check(names.includes('math.ts') && (await edWin.locator('.pc-row.dir.open .pc-row-name').textContent()) === 'src', 'the folder holding the open file is expanded and the file is marked');
+  }
+  await edWin.locator('.pc-row', { hasText: 'README.md' }).click();
+  await pcTab('README.md').waitFor();
+  await page.waitForFunction(() => document.querySelector('.pc-row.current .pc-row-name')?.textContent === 'README.md');
+  check((await pcTabs()) === 'math.ts,README.md' && (await edWin.locator('.titlebar .ttext').textContent()) === 'README.md — Procoder', 'clicking a file in the tree opens it as a tab');
+  await pcTab('math.ts').click();
+  check((await edWin.locator('.pc-row.current .pc-row-name').textContent()) === 'math.ts', 'the tree follows the tab in front');
+  await edWin.locator('.pc-row.dir', { hasText: 'src' }).click();
+  check(!(await treeNames()).includes('math.ts') && (await edWin.locator('.pc-row.dir').first().getAttribute('aria-expanded')) === 'false', 'clicking a folder collapses it');
+  await edWin.locator('.pc-row.dir', { hasText: 'src' }).click();
+  check((await treeNames()).includes('math.ts'), 'and expands it again');
+  fs.writeFileSync(home + '/project/tree-new.txt', 'x');
+  fs.writeFileSync(home + '/project/secret.inv-test', 'x');
+  await edWin.locator('.pc-side-tools button[title="重新整理"]').click();
+  await page.waitForFunction(() => [...document.querySelectorAll('.pc-row .pc-row-name')].some((e) => e.textContent === 'tree-new.txt'));
+  check(!(await treeNames()).includes('secret.inv-test'), 'refresh picks up new files; internal files stay out of the tree');
+  fs.rmSync(home + '/project/tree-new.txt');
+  fs.rmSync(home + '/project/secret.inv-test');
+  check(await waitApp('editor', (d) => d.folder === home + '/project'), 'the opened folder is remembered in ~/.remosh-gui/app/editor');
+  {
+    const before = (await edWin.locator('.pc-side').boundingBox()).width;
+    const g = await edWin.locator('.pc-side-grip').boundingBox();
+    await page.mouse.move(g.x + g.width / 2, g.y + 60);
+    await page.mouse.down();
+    await page.mouse.move(g.x + g.width / 2 + 70, g.y + 60, { steps: 4 });
+    await page.mouse.up();
+    const after = (await edWin.locator('.pc-side').boundingBox()).width;
+    check(Math.abs(after - before - 70) <= 2 && await waitApp('editor', (d) => d.sideWidth === Math.round(after)), 'the tree can be dragged wider, and the width is saved', before + ' -> ' + after);
+  }
+  await edWin.locator('.monaco-editor .view-lines').click();
+  await page.keyboard.press('Control+b');
+  check(await edWin.locator('.pc-side').isHidden(), 'Ctrl+B hides the file tree');
+  await edWin.locator('.menu-btn', { hasText: '介面' }).click();
+  await edWin.locator('.menu button', { hasText: '顯示檔案樹' }).click();
+  check(await edWin.locator('.pc-side').isVisible(), 'the 介面 menu shows it again');
+  await pcTab('README.md').click({ button: 'middle' });
+  await edWin.locator('.pc-side-tools button[title="關閉資料夾"]').click();
+  check(await edWin.locator('.pc-tree-empty').isVisible() && await waitApp('editor', (d) => d.folder === null), 'the folder can be closed again');
+  await pcTab('math.ts').click();
+
   // ---- unsaved-changes guard
   await edWin.locator('.monaco-editor .view-lines').click();
   await page.keyboard.type('x');
@@ -670,7 +724,7 @@ const { execSync: execSyncTop } = require('node:child_process');
     await mWin.locator('.menu button', { hasText: label }).click();
   };
   await mWin.locator('.menu-btn', { hasText: '檔案' }).click();
-  check((await mWin.locator('.menu button .lbl').allTextContents()).join('|') === '新增檔案|開啟檔案…|上一步（復原）|下一步（重做）|存檔|另存新檔…|關閉分頁|結束 Procoder', 'File menu lists its commands');
+  check((await mWin.locator('.menu button .lbl').allTextContents()).join('|') === '新增檔案|開啟檔案…|開啟資料夾…|關閉資料夾|上一步（復原）|下一步（重做）|存檔|另存新檔…|關閉分頁|結束 Procoder', 'File menu lists its commands');
   check(await mWin.locator('.menu button', { hasText: '上一步' }).isDisabled(), 'undo is disabled when there is nothing to undo');
   await page.keyboard.press('Escape');
   check((await mWin.locator('.menu').count()) === 0, 'Escape closes the menu');
@@ -897,7 +951,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   await pcWin.locator('.pc-welcome').waitFor();
   check((await pcWin.locator('.titlebar .ttext').textContent()) === '歡迎 — Procoder' && (await pcWin.locator('.pc-tab').count()) === 1 && (await pcWin.locator('.pc-w-head h1').textContent()) === 'Procoder',
     'the code editor starts on its welcome page, in a tab');
-  check((await pcWin.locator('.pc-w-start .pc-w-link').allTextContents()).join() === '新增檔案,開啟檔案…', 'the welcome page offers a new file and opening one');
+  check((await pcWin.locator('.pc-w-start .pc-w-link').allTextContents()).join() === '新增檔案,開啟檔案…,開啟資料夾…', 'the welcome page offers a new file and opening a file or a folder');
   await page.click('#start-btn');
   await page.click('#sm-editor');
   check((await page.locator('.win[data-app="Procoder"]').count()) === 1 && (await pcWin.locator('.pc-tab').count()) === 1, 'starting it again does not open a second Procoder');

@@ -63,7 +63,7 @@ public/
                         desktop, apps (registry), file-open (associations)
     apps/               one folder per app: index.js, icon.js, style.css
       files/            檔案櫃
-      editor/           Procoder: one window with tabs (index.js, welcome.js, monaco.js)
+      editor/           Procoder: one window with tabs and a file tree (index.js, tree.js, welcome.js, monaco.js)
       notepad/          記事本
       graphoto/         Graphoto (image viewer)
       terminal/         終端機

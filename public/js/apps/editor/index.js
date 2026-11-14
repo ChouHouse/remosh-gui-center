@@ -20,6 +20,7 @@ import { registerApp, useAppStyle } from '../../shell/apps.js';
 import { registerDropTarget } from '../../shell/drag.js';
 import { loadMonaco, themeName, NAME_LANG, EXT_LANG } from './monaco.js';
 import { buildWelcome } from './welcome.js';
+import { createTree } from './tree.js';
 
 useAppStyle(import.meta.url);
 
@@ -38,9 +39,13 @@ let untitledSeq = 0;
 const FONT_DEFAULT = 13;
 const FONT_MIN = 9;
 const FONT_MAX = 32;
+const SIDE_DEFAULT = 200;
+const SIDE_MIN = 120;
+const SIDE_MAX = 480;
+const clampSide = (n) => Math.max(SIDE_MIN, Math.min(SIDE_MAX, Math.round(Number(n)) || SIDE_DEFAULT));
 const clampFont = (n) => Math.max(FONT_MIN, Math.min(FONT_MAX, Math.round(Number(n)) || FONT_DEFAULT));
 const data = appStore('editor', {
-  defaults: { fontSize: FONT_DEFAULT, minimap: true, wordWrap: 'off', recent: [] },
+  defaults: { fontSize: FONT_DEFAULT, minimap: true, wordWrap: 'off', recent: [], folder: null, sideWidth: SIDE_DEFAULT, sideShown: true },
   migrate() {
     const out = {};
     for (const key of ['fontSize', 'minimap', 'wordWrap']) {
@@ -68,7 +73,16 @@ const toggleWrap = () => data.set('wordWrap', prefs.wordWrap === 'on' ? 'off' : 
 const recentList = () => (Array.isArray(data.get('recent')) ? data.get('recent').filter((p) => typeof p === 'string') : []);
 const remember = (path) => data.set('recent', [path, ...recentList().filter((p) => p !== path)].slice(0, RECENT_MAX));
 const forget = (path) => data.set('recent', recentList().filter((p) => p !== path));
+const sideShown = () => data.get('sideShown') !== false;
+const toggleSide = () => data.set('sideShown', !sideShown());
+const isFolderRef = (ref) => ref.length > 1 && ref.endsWith('/'); // folders are remembered with a trailing slash
+function applySide() {
+  if (!app) return;
+  app.main.classList.toggle('no-side', !sideShown());
+  app.tree.el.style.width = clampSide(data.get('sideWidth')) + 'px';
+}
 data.onChange(() => {
+  applySide();
   app?.editor?.updateOptions({ fontSize: prefs.fontSize, minimap: { enabled: prefs.minimap }, wordWrap: prefs.wordWrap });
   if (active?.kind === 'welcome') show();
   else refresh();
@@ -94,7 +108,7 @@ function ensureWindow() {
     app.win.focus();
     return app;
   }
-  const win = createWindow({ title: APP_NAME, appName: APP_NAME, iconHtml: procoderSvg(), width: 900, height: 600 });
+  const win = createWindow({ title: APP_NAME, appName: APP_NAME, iconHtml: procoderSvg(), width: 980, height: 620 });
   const s = {
     state: h('span'),
     path: h('span', { class: 'path' }),
@@ -108,18 +122,46 @@ function ensureWindow() {
   const tabsEl = h('div', { class: 'pc-tabs', role: 'tablist' });
   const host = h('div', { class: 'editor-host' });
   const pane = h('div', { class: 'pc-pane' });
-  win.body.append(menubar,
-    h('div', { class: 'pc-tabbar' }, tabsEl,
-      h('button', { type: 'button', class: 'pc-tab-add', title: '新增檔案', 'aria-label': '新增檔案', onclick: () => openFile() }, '+')),
-    h('div', { class: 'pc-stage' }, host, pane),
+  const tree = createTree({ openFile, openFolder: askOpenFolder, closeFolder });
+  const grip = h('div', { class: 'pc-side-grip', title: '拖曳調整寬度，點兩下還原' });
+  const main = h('div', { class: 'pc-main' }, tree.el, grip,
+    h('div', { class: 'pc-work' },
+      h('div', { class: 'pc-tabbar' }, tabsEl,
+        h('button', { type: 'button', class: 'pc-tab-add', title: '新增檔案', 'aria-label': '新增檔案', onclick: () => openFile() }, '+')),
+      h('div', { class: 'pc-stage' }, host, pane)));
+  grip.addEventListener('pointerdown', (down) => {
+    if (down.button !== 0) return;
+    down.preventDefault();
+    const start = tree.el.offsetWidth;
+    let width = start;
+    document.body.classList.add('dragging', 'col-resizing');
+    const move = (ev) => {
+      width = clampSide(start + ev.clientX - down.clientX);
+      tree.el.style.width = width + 'px';
+    };
+    const up = () => {
+      document.body.classList.remove('dragging', 'col-resizing');
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      if (width !== start) data.set('sideWidth', width);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  });
+  grip.addEventListener('dblclick', () => data.set('sideWidth', SIDE_DEFAULT));
+  win.body.append(menubar, main,
     h('div', { class: 'statusbar' }, s.state, s.path, h('span', { class: 'spacer' }), s.pos, s.wrap, s.eol, s.enc, s.lang));
-  const me = (app = { win, tabsEl, host, pane, s, editor: null, monaco: null });
+  const me = (app = { win, tabsEl, host, pane, s, main, tree, editor: null, monaco: null });
+  applySide();
+  if (data.get('folder')) tree.setRoot(data.get('folder')); // the folder from last time
   attachMenuBar(menubar, buildMenus(), focusEditor);
 
   // Files dragged onto the window (from the file cabinet or the desktop) open
-  // as tabs. Any kind of file; folders are left out.
+  // as tabs; a dropped folder becomes the folder in the file tree.
   const offDrop = registerDropTarget(win.el, {
-    accepts: (payload) => payload.type === 'file' && !payload.data.isDir,
+    accepts: (payload) => payload.type === 'file',
     action: () => '用 Procoder 開啟',
     onDrop: (payload) => openDropped(payload.data.paths || [payload.data.path]),
   });
@@ -171,6 +213,7 @@ async function ensureEditor() {
   act('fontReset', '重設文字大小', [KeyMod.CtrlCmd | KeyCode.Digit0, KeyMod.CtrlCmd | KeyCode.Numpad0], () => setFontSize(FONT_DEFAULT));
   act('toggleMinimap', '顯示／隱藏右側縮圖', undefined, () => setMinimap(!prefs.minimap));
   act('toggleWordWrap', '切換自動換行', [KeyMod.Alt | KeyCode.KeyZ], toggleWrap);
+  act('toggleSide', '顯示／隱藏檔案樹', [KeyMod.CtrlCmd | KeyCode.KeyB], toggleSide);
   act('closeTab', '關閉分頁', [KeyMod.Alt | KeyCode.KeyW], () => active && closeDoc(active));
   editor.addCommand(KeyMod.CtrlCmd | KeyCode.KeyY, () => editor.trigger('keyboard', 'redo', null));
   editor.onDidChangeCursorPosition(refresh);
@@ -188,6 +231,8 @@ function buildMenus() {
       items: [
         { label: '新增檔案', run: () => openFile() },
         { label: '開啟檔案…', run: askOpen },
+        { label: '開啟資料夾…', run: askOpenFolder },
+        { label: '關閉資料夾', enabled: () => !!app.tree.root, run: closeFolder },
         null,
         { label: '上一步（復原）', key: mod + 'Z', enabled: () => file() && active.model.canUndo(), run: () => edit('undo') },
         { label: '下一步（重做）', key: mod + 'Y', enabled: () => file() && active.model.canRedo(), run: () => edit('redo') },
@@ -203,6 +248,7 @@ function buildMenus() {
       label: '介面',
       items: [
         { label: '歡迎頁面', run: openWelcome },
+        { label: '顯示檔案樹', key: mod + 'B', checked: sideShown, run: toggleSide },
         null,
         { label: '放大文字', key: mod + '+', enabled: () => prefs.fontSize < FONT_MAX, run: () => setFontSize(prefs.fontSize + 1) },
         { label: '縮小文字', key: mod + '-', enabled: () => prefs.fontSize > FONT_MIN, run: () => setFontSize(prefs.fontSize - 1) },
@@ -312,11 +358,12 @@ function show() {
     if (wm.focused === app.win) app.editor.focus();
   } else {
     if (doc.kind === 'welcome') {
-      doc.page = buildWelcome(recentList(), { newFile: () => openFile(), openFile: askOpen, openRecent: openPath, forget });
+      doc.page = buildWelcome(recentList(), { newFile: () => openFile(), openFile: askOpen, openFolder: askOpenFolder, openRecent: openPath, forget });
     }
     app.pane.replaceChildren(doc.page || '');
     app.pane.style.display = '';
   }
+  app.tree.setCurrent(doc.path);
   refresh();
 }
 
@@ -456,43 +503,74 @@ async function loadDoc(doc, size) {
   if (active === doc) show();
 }
 
-async function openPath(path) {
+// A path from the welcome page or a dialog: a file opens as a tab, a folder
+// (also written with a trailing slash) opens in the file tree.
+async function openPath(ref) {
+  const path = isFolderRef(ref) ? ref.slice(0, -1) : ref;
   try {
     const { entry } = await rpc('stat', { path });
-    if (entry.type === 'dir') return toast('Procoder 不能開啟資料夾', true);
+    if (entry.type === 'dir') return openFolder(path);
     await openFile(path, entry.size);
   } catch (err) {
-    if (err.code === 'not-found') forget(path);
+    if (err.code === 'not-found') forget(ref);
     toast(`無法開啟「${P.base(path)}」：${errText(err)}`, true);
   }
 }
 
-async function askOpen() {
+function openFolder(path) {
+  ensureWindow();
+  data.set('folder', path);
+  data.set('sideShown', true);
+  app.tree.setRoot(path);
+  remember(path === '/' ? '/' : path + '/');
+}
+
+function closeFolder() {
+  data.set('folder', null);
+  app?.tree.setRoot(null);
+}
+
+async function askPath(title, message) {
   const answer = await dialog({
-    title: '開啟檔案',
-    message: '輸入主機上的檔案路徑：',
-    input: (active?.path ? P.parent(active.path) : conn.info.home) + '/',
+    title,
+    message,
+    input: (active?.path ? P.parent(active.path) : app?.tree.root || conn.info.home).replace(/\/?$/, '/'),
     buttons: [{ label: '取消', value: false, cancel: true }, { label: '開啟', value: true, default: true }],
   });
   const typed = answer.value ? answer.text.trim() : '';
-  if (!typed) return;
-  await openPath(P.norm(typed.startsWith('/') ? typed : P.join(conn.info.home, typed)));
+  return typed ? P.norm(typed.startsWith('/') ? typed : P.join(conn.info.home, typed)) : null;
+}
+
+async function askOpen() {
+  const path = await askPath('開啟檔案', '輸入主機上的檔案路徑：');
+  if (path) await openPath(path);
+}
+
+async function askOpenFolder() {
+  const path = await askPath('開啟資料夾', '輸入主機上的資料夾路徑：');
+  if (!path) return;
+  try {
+    const { entry } = await rpc('stat', { path });
+    if (entry.type !== 'dir') return toast(`「${path}」不是資料夾`, true);
+    openFolder(path);
+  } catch (err) {
+    toast(`無法開啟「${path}」：${errText(err)}`, true);
+  }
 }
 
 async function openDropped(paths) {
-  let folders = 0;
+  let folder = null;
   for (const path of paths) {
     try {
       const { entry } = await rpc('stat', { path });
-      if (entry.type === 'dir') folders++;
+      if (entry.type === 'dir') folder = folder || path;
       else await openFile(path, entry.size);
     } catch (err) {
       toast(`無法開啟「${P.base(path)}」：${errText(err)}`, true);
     }
   }
-  if (folders) toast(folders === paths.length ? 'Procoder 不能開啟資料夾' : `略過了 ${folders} 個資料夾`);
+  if (folder) openFolder(folder);
 }
-
 // ---- saving
 async function saveDoc(doc, force) {
   if (!doc?.model || doc.saving) return false;
@@ -614,6 +692,9 @@ window.addEventListener('keydown', (ev) => {
     ev.preventDefault();
     if (ev.target.closest?.('.monaco-editor')) return; // Monaco's own keybinding handles it
     if (mine && active) (ev.shiftKey ? saveDocAs : saveDoc)(active);
+  } else if (mine && (ev.ctrlKey || ev.metaKey) && !ev.altKey && !ev.shiftKey && ev.code === 'KeyB' && !ev.target.closest?.('.monaco-editor, input, textarea')) {
+    ev.preventDefault();
+    toggleSide();
   } else if (mine && active && ev.altKey && !ev.ctrlKey && !ev.metaKey && ev.code === 'KeyW' && !ev.target.closest?.('.monaco-editor')) {
     ev.preventDefault();
     closeDoc(active);
@@ -634,6 +715,8 @@ on('fs:moved', (from, to) => {
     if (next && !findDoc(next)) relocate(doc, next);
   }
 });
+
+on('fs:changed', (dir) => app?.tree.refresh(dir));
 
 on('session:start', () => loadMonaco().catch(() => {})); // warm up so the first file opens quickly
 
