@@ -449,7 +449,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   check(original.includes('export function add'), 'editor shows the file content');
   const edWin = page.locator('.win[data-app="Procoder"]');
   const state = () => edWin.locator('.statusbar span').first().textContent();
-  check((await edWin.locator('.statusbar').textContent()).includes('typescript'), 'language detected as typescript');
+  check((await edWin.locator('.statusbar').textContent()).includes('TypeScript'), 'language detected as typescript');
   check((await page.$$('.dock-item')).length === 2, 'dock has Finder + the editor');
   check((await edWin.locator('.titlebar .ttext').textContent()) === 'math.ts — Procoder', 'editor title bar names the file and the app');
   check(await page.locator('.dock-item.active .lbl').textContent() === 'math.ts', 'editor is the active dock item');
@@ -480,7 +480,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   await page.keyboard.press('Control+z');
   await sleep(150);
 
-  const wrapBtn = edWin.locator('.statusbar button');
+  const wrapBtn = edWin.locator('.statusbar button:not(.pc-lang-btn)');
   const before = await wrapBtn.textContent();
   await page.keyboard.press('Alt+z');
   await sleep(150);
@@ -602,9 +602,31 @@ const { execSync: execSyncTop } = require('node:child_process');
 
   // ---- tabs: switch, keep each file's state, reorder, close
   await pcTab('math.ts').click();
-  check((await edWin.locator('.titlebar .ttext').textContent()) === 'math.ts — Procoder' && (await edWin.locator('.statusbar').textContent()).includes('typescript') && (await edWin.locator('.statusbar .path').textContent()) === home + '/project/src/math.ts',
+  check((await edWin.locator('.titlebar .ttext').textContent()) === 'math.ts — Procoder' && (await edWin.locator('.statusbar').textContent()).includes('TypeScript') && (await edWin.locator('.statusbar .path').textContent()) === home + '/project/src/math.ts',
     'clicking a tab shows that file: title, language and path follow');
   check((await edWin.locator('.monaco-editor .view-lines').textContent()).includes('export'), 'the editor shows the tab\'s content');
+  // the language can be chosen by hand, whatever the file name says
+  {
+    const langOf = () => page.evaluate(() => window.monaco.editor.getModels().find((m) => m.uri.path.endsWith('math.ts')).getLanguageId());
+    const btn = edWin.locator('.statusbar .pc-lang-btn');
+    await btn.click();
+    await page.waitForSelector('.pc-lang input');
+    check((await page.locator('.pc-lang-list button').first().textContent()) === '自動偵測依檔名：TypeScript' && (await page.locator('.pc-lang-list button.on').getAttribute('data-lang')) === 'typescript',
+      'clicking the language in the status bar lists the languages, the current one marked');
+    await page.keyboard.type('php');
+    check((await page.locator('.pc-lang-list button').first().getAttribute('data-lang')) === 'php', 'typing narrows the list');
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.querySelector('.statusbar .pc-lang-btn').textContent === 'PHP');
+    check((await langOf()) === 'php' && (await page.locator('.pc-lang').count()) === 0, 'the file is then treated as the chosen language');
+    check(await waitApp('editor', (d) => d.langs && d.langs[home + '/project/src/math.ts'] === 'php'), 'the choice is remembered for that file');
+    await pcTab('legacy.asp').click();
+    await pcTab('math.ts').click();
+    check((await btn.textContent()) === 'PHP' && (await edWin.locator('.statusbar .pc-lang-btn').count()) === 1, 'other tabs keep their own language');
+    await btn.click();
+    await page.locator('.pc-lang-list button[data-lang="auto"]').click();
+    await page.waitForFunction(() => document.querySelector('.statusbar .pc-lang-btn').textContent === 'TypeScript');
+    check((await langOf()) === 'typescript' && await waitApp('editor', (d) => !d.langs || !(home + '/project/src/math.ts' in d.langs)), '"auto" goes back to what the file name says');
+  }
   {
     const a = await pcTab('math.ts').boundingBox();
     const b = await pcTab('legacy.asp').boundingBox();
@@ -837,7 +859,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   const cWin = page.locator('.win', { has: page.locator('.titlebar .title', { hasText: 'copy.py' }) });
   await cWin.waitFor();
   check(fs.readFileSync(copyPath, 'utf8') === onDisk + '//menu', 'save as wrote the new file');
-  check((await cWin.locator('.statusbar').textContent()).includes('python'), 'language follows the new file name');
+  check((await cWin.locator('.statusbar').textContent()).includes('Python'), 'language follows the new file name');
   check((await page.locator('.dock-item', { hasText: 'copy.py' }).count()) === 1 && (await page.locator('.dock-item', { hasText: 'math.ts' }).count()) === 0, 'dock entry is renamed');
   await page.waitForFunction(() => [...document.querySelectorAll('.files .item .name')].some((e) => e.textContent === 'copy.py'));
   check(true, 'finder shows the new file');

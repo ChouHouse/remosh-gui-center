@@ -19,9 +19,10 @@ import { pickPath } from '../../shell/picker.js';
 import { loadMonaco, themeName, NAME_LANG, EXT_LANG } from './monaco.js';
 import { buildWelcome } from './welcome.js';
 import { createTree } from './tree.js';
+import { pickLanguage, langName } from './lang-picker.js';
 import {
   APP_NAME, UNTITLED, WELCOME, LARGE_FILE_BYTES, FONT_DEFAULT, FONT_MIN, FONT_MAX, SIDE_DEFAULT, clampSide,
-  data, prefs, setFontSize, setMinimap, toggleWrap, recentList, remember, forget, sideShown, toggleSide, isFolderRef,
+  data, prefs, setFontSize, setMinimap, toggleWrap, recentList, remember, forget, sideShown, toggleSide, isFolderRef, chosenLang, setChosenLang,
 } from './prefs.js';
 
 // ---- documents
@@ -79,7 +80,7 @@ export function createProcoder(hub, { folder = null } = {}) {
       wrap: h('button', { type: 'button', title: '切換自動換行（Alt+Z）', onclick: toggleWrap }),
       eol: h('span'),
       enc: h('span'),
-      lang: h('span'),
+      lang: h('button', { type: 'button', class: 'pc-lang-btn', title: '切換語言', onclick: chooseLanguage }),
     };
     const menubar = h('div', { class: 'ed-menubar' });
     const tabsEl = h('div', { class: 'pc-tabs', role: 'tablist' });
@@ -218,6 +219,7 @@ export function createProcoder(hub, { folder = null } = {}) {
         label: '介面',
         items: [
           { label: '歡迎頁面', run: openWelcome },
+          { label: '切換語言…', enabled: () => !!active?.model, run: chooseLanguage },
           { label: '顯示檔案樹', key: mod + 'B', checked: sideShown, run: toggleSide },
           null,
           { label: '放大文字', key: mod + '+', enabled: () => prefs.fontSize < FONT_MAX, run: () => setFontSize(prefs.fontSize + 1) },
@@ -360,7 +362,8 @@ export function createProcoder(hub, { folder = null } = {}) {
     s.path.textContent = s.path.title = doc.path || '';
     const pos = ready && editor.getPosition();
     s.pos.textContent = pos ? `第 ${pos.lineNumber} 行，第 ${pos.column} 欄` : '';
-    s.lang.textContent = ready ? doc.model.getLanguageId() : '';
+    s.lang.textContent = ready ? langName(app.monaco, doc.model.getLanguageId()) : '';
+    s.lang.style.display = ready ? '' : 'none';
     s.enc.textContent = ready ? doc.encoding + (doc.bom ? ' BOM' : '') : '';
     s.eol.textContent = ready ? (doc.model.getEOL() === '\r\n' ? 'CRLF' : 'LF') : '';
     s.wrap.textContent = ready ? (prefs.wordWrap === 'on' ? '換行：開' : '換行：關') : '';
@@ -470,7 +473,7 @@ export function createProcoder(hub, { folder = null } = {}) {
 
     const uri = monaco.Uri.from({ scheme: 'sftp', authority: 'remote', path: doc.path || `/untitled-${doc.seq}` });
     monaco.editor.getModel(uri)?.dispose();
-    const model = (doc.model = monaco.editor.createModel(decoded.text, doc.path ? langFor(monaco, doc.name) : undefined, uri));
+    const model = (doc.model = monaco.editor.createModel(decoded.text, doc.path ? chosenLang(doc.path) || langFor(monaco, doc.name) : undefined, uri));
     doc.savedVersion = model.getAlternativeVersionId();
     doc.page = null;
     model.onDidChangeContent(() => {
@@ -581,11 +584,32 @@ export function createProcoder(hub, { folder = null } = {}) {
 
   // Point a tab at another path (after "save as", or when the file is renamed or moved).
   function relocate(doc, target) {
+    // A language the user chose for this file stays with it under the new name.
+    const chosen = doc.path ? chosenLang(doc.path) : doc.lang;
+    if (doc.path) setChosenLang(doc.path, null);
     doc.path = target;
     doc.name = P.base(target);
-    if (app?.monaco && doc.model) app.monaco.editor.setModelLanguage(doc.model, langFor(app.monaco, doc.name));
+    doc.lang = null;
+    if (chosen) setChosenLang(target, chosen);
+    if (app?.monaco && doc.model) app.monaco.editor.setModelLanguage(doc.model, chosen || langFor(app.monaco, doc.name));
     paintTab(doc);
     refresh();
+  }
+
+  // The language of the tab in front: the file name decides at first, the
+  // user can say otherwise (an .html that is really PHP), and that is remembered.
+  async function chooseLanguage() {
+    const doc = active;
+    if (!doc?.model || !app.monaco || document.querySelector('.pc-lang')) return;
+    const auto = doc.path ? langFor(app.monaco, doc.name) : 'plaintext';
+    const picked = await pickLanguage(app.monaco, app.s.lang, doc.model.getLanguageId(), auto);
+    if (!picked || !docs.includes(doc) || !doc.model) return focusEditor();
+    const lang = picked === 'auto' ? null : picked;
+    if (doc.path) setChosenLang(doc.path, lang);
+    else doc.lang = lang;
+    app.monaco.editor.setModelLanguage(doc.model, lang || auto);
+    refresh();
+    focusEditor();
   }
 
   async function saveDocAs(doc) {

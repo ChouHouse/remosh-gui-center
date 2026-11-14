@@ -19,7 +19,7 @@ export const SIDE_MAX = 480;
 export const clampSide = (n) => Math.max(SIDE_MIN, Math.min(SIDE_MAX, Math.round(Number(n)) || SIDE_DEFAULT));
 export const clampFont = (n) => Math.max(FONT_MIN, Math.min(FONT_MAX, Math.round(Number(n)) || FONT_DEFAULT));
 export const data = appStore('editor', {
-  defaults: { fontSize: FONT_DEFAULT, minimap: true, wordWrap: 'off', recent: [], folder: null, sideWidth: SIDE_DEFAULT, sideShown: true },
+  defaults: { fontSize: FONT_DEFAULT, minimap: true, wordWrap: 'off', recent: [], langs: {}, folder: null, sideWidth: SIDE_DEFAULT, sideShown: true },
   migrate() {
     const out = {};
     for (const key of ['fontSize', 'minimap', 'wordWrap']) {
@@ -50,3 +50,14 @@ export const forget = (path) => data.set('recent', recentList().filter((p) => p 
 export const sideShown = () => data.get('sideShown') !== false;
 export const toggleSide = () => data.set('sideShown', !sideShown());
 export const isFolderRef = (ref) => ref.length > 1 && ref.endsWith('/'); // folders are remembered with a trailing slash
+
+// Languages the user chose by hand, per file path (the newest LANGS_MAX are kept).
+const LANGS_MAX = 200;
+const langs = () => (data.get('langs') && typeof data.get('langs') === 'object' ? data.get('langs') : {});
+export const chosenLang = (path) => (typeof langs()[path] === 'string' ? langs()[path] : null);
+export function setChosenLang(path, lang) {
+  if ((chosenLang(path) || null) === (lang || null)) return;
+  const next = Object.fromEntries(Object.entries(langs()).filter(([p]) => p !== path));
+  if (lang) next[path] = lang;
+  data.set('langs', Object.fromEntries(Object.entries(next).slice(-LANGS_MAX)));
+}

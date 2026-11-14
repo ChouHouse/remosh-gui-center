@@ -93,3 +93,17 @@
 .pc-tree-empty p { margin: 0; color: var(--muted); font-size: 12.5px; }
 .pc-tree-open { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-text, #fff); font: inherit; font-size: 12.5px; cursor: pointer; }
 .pc-row:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
+
+/* Language list, popping up from the status bar */
+.pc-lang {
+  position: fixed; z-index: 80000; width: 280px; max-height: min(380px, 70vh); display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 30px rgba(20, 30, 50, .28); overflow: hidden;
+}
+.pc-lang input { flex: none; margin: 8px; padding: 6px 9px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; font-size: 13px; }
+.pc-lang input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.pc-lang-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 5px 5px; }
+.pc-lang-list button { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 5px 8px; border: 0; border-radius: 5px; background: transparent; color: var(--text); font: inherit; font-size: 13px; text-align: left; }
+.pc-lang-list button:hover, .pc-lang-list button.at { background: var(--surface-3); }
+.pc-lang-list button.on span:first-child { font-weight: 600; color: var(--accent); }
+.pc-lang-id { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+.pc-lang-none { padding: 8px; color: var(--muted); font-size: 12.5px; }
