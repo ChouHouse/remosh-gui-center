@@ -7,13 +7,19 @@ import { errText } from '../../core/errors.js';
 import { fileSvg, folderSvg, ICON, stroke } from '../../core/icons.js';
 import { copyText } from '../../core/clipboard.js';
 import { showContextMenu } from '../../shell/context-menu.js';
+import { toast, dialog } from '../../core/ui.js';
+import { writeFile } from '../../core/file-io.js';
+import { emit } from '../../core/events.js';
 
 const CHEVRON = stroke('<path d="m6 3.5 4.5 4.5L6 12.5"/>');
+const NEW_FILE = stroke('<path d="M9 2.5H4.5v11h7V5zM9 2.5V5h2.5M8 7.5v4M6 9.5h4"/>');
+const NEW_FOLDER = stroke('<path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.5 1.5h4.5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5zM8 7v4M6 9h4"/>');
+const badName = (name) => !name || name === '.' || name === '..' || name.includes('/');
 const CLOSE = stroke('<path d="m4 4 8 8M12 4l-8 8"/>');
 const isFolder = (e) => e.type === 'dir' || e.targetType === 'dir';
 const byName = (a, b) => isFolder(b) - isFolder(a) || a.name.localeCompare(b.name, undefined, { numeric: true });
 
-// actions: { openFile(path, size), openFolder(), closeFolder() }
+// actions: { openFile(path, size), openFolder(), closeFolder(), removed(path) }
 export function createTree(actions) {
   let root = null;
   let current = null; // path of the file in the active tab
@@ -23,7 +29,10 @@ export function createTree(actions) {
   const body = h('div', { class: 'pc-tree', role: 'tree' });
   const bRefresh = h('button', { type: 'button', title: '重新整理', 'aria-label': '重新整理', html: ICON.refresh, onclick: () => refresh() });
   const bClose = h('button', { type: 'button', title: '關閉資料夾', 'aria-label': '關閉資料夾', html: CLOSE, onclick: () => actions.closeFolder() });
-  const tools = h('span', { class: 'pc-side-tools' }, bRefresh, bClose);
+  const bNewFile = h('button', { type: 'button', title: '新增檔案', 'aria-label': '新增檔案', html: NEW_FILE, onclick: () => create(root, false) });
+  const bNewDir = h('button', { type: 'button', title: '新增資料夾', 'aria-label': '新增資料夾', html: NEW_FOLDER, onclick: () => create(root, true) });
+  const tools = h('span', { class: 'pc-side-tools' }, bNewFile, bNewDir, bRefresh, bClose);
+  const label = (path) => (path === '/' ? '/' : P.base(path));
   const el = h('aside', { class: 'pc-side' }, h('div', { class: 'pc-side-head' }, title, tools), body);
 
   async function load(path, quiet) {
@@ -64,12 +73,22 @@ export function createTree(actions) {
         class: 'pc-row' + (isDir ? ' dir' : '') + (open ? ' open' : '') + (full === current ? ' current' : ''),
         'aria-expanded': isDir ? String(open) : null,
         onclick: () => (isDir ? toggle(full) : actions.openFile(full, entry.size)),
-        oncontextmenu: (ev) => showContextMenu(ev, [
-          isDir ? { label: open ? '收合' : '展開', run: () => toggle(full) } : { label: '開啟', run: () => actions.openFile(full, entry.size) },
-          null,
-          { label: '複製路徑', run: () => copyText(full) },
-          { label: '重新整理', run: () => refresh() },
-        ]),
+        oncontextmenu: (ev) => {
+          ev.stopPropagation();
+          const into = isDir ? full : path; // where "new" puts things
+          showContextMenu(ev, [
+            isDir ? { label: open ? '收合' : '展開', run: () => toggle(full) } : { label: '開啟', run: () => actions.openFile(full, entry.size) },
+            null,
+            { label: '新增檔案', run: () => create(into, false) },
+            { label: '新增資料夾', run: () => create(into, true) },
+            null,
+            { label: '重新命名', run: () => rename(full, entry.name) },
+            { label: '刪除', danger: true, run: () => remove(full, entry.name, isDir) },
+            null,
+            { label: '複製路徑', run: () => copyText(full) },
+            { label: '重新整理', run: () => refresh() },
+          ]);
+        },
       },
       h('span', { class: 'pc-row-arrow', html: isDir ? CHEVRON : '' }),
       h('span', { class: 'pc-row-ico', html: isDir ? folderSvg() : fileSvg(entry.name) }),
@@ -78,6 +97,103 @@ export function createTree(actions) {
       if (open) rows(full, depth + 1, out);
     }
   }
+
+  // ---- new file / new folder / rename / delete
+  function expand(dir) {
+    if (dir !== root) expanded.add(dir);
+    return load(dir, true);
+  }
+
+  async function create(dir, isDir) {
+    if (!root) return;
+    const kind = isDir ? '資料夾' : '檔案';
+    const answer = await dialog({
+      title: '新增' + kind,
+      message: `在「${label(dir)}」裡新增${kind}，名稱：`,
+      input: isDir ? '新資料夾' : '未命名.txt',
+      buttons: [{ label: '取消', value: false, cancel: true }, { label: '新增', value: true, default: true }],
+    });
+    if (!answer.value) return;
+    const name = answer.text.trim();
+    if (badName(name)) return toast('名稱不能是空的，也不能包含 /', true);
+    const full = P.join(dir, name);
+    try {
+      const exists = await rpc('stat', { path: full }).then(() => true, (err) => {
+        if (err.code === 'not-found') return false;
+        throw err;
+      });
+      if (exists) return toast(`已經有「${name}」了`, true);
+      if (isDir) await rpc('mkdir', { path: full, mode: 0o755 });
+      else await writeFile(full, new Uint8Array(0));
+    } catch (err) {
+      return toast(`無法建立「${name}」：${errText(err)}`, true);
+    }
+    await expand(dir);
+    emit('fs:changed', dir);
+    if (!isDir) actions.openFile(full, 0);
+  }
+
+  async function rename(full, oldName) {
+    const answer = await dialog({
+      title: '重新命名',
+      message: `「${oldName}」的新名稱：`,
+      input: oldName,
+      buttons: [{ label: '取消', value: false, cancel: true }, { label: '重新命名', value: true, default: true }],
+    });
+    const name = answer.value ? answer.text.trim() : '';
+    if (!answer.value || name === oldName) return;
+    if (badName(name)) return toast('名稱不能是空的，也不能包含 /', true);
+    const dir = P.parent(full);
+    const to = P.join(dir, name);
+    try {
+      const exists = await rpc('stat', { path: to }).then(() => true, (err) => {
+        if (err.code === 'not-found') return false;
+        throw err;
+      });
+      if (exists) return toast(`已經有「${name}」了`, true);
+      await rpc('move', { from: full, to });
+    } catch (err) {
+      return toast(`無法重新命名「${oldName}」：${errText(err)}`, true);
+    }
+    // What was open below the old name stays open below the new one.
+    for (const p of [...expanded]) {
+      if (p === full || p.startsWith(full + '/')) {
+        expanded.delete(p);
+        expanded.add(to + p.slice(full.length));
+      }
+    }
+    for (const p of [...dirs.keys()]) if (p === full || p.startsWith(full + '/')) dirs.delete(p);
+    for (const p of expanded) if (!dirs.has(p)) load(p, true);
+    emit('fs:moved', full, to); // open tabs follow the file
+    emit('fs:changed', dir);
+  }
+
+  async function remove(full, name, isDir) {
+    const sure = await dialog({
+      title: `刪除「${name}」？`,
+      message: isDir ? '資料夾和裡面所有的東西都會從主機上刪除，無法復原。' : '這個檔案會從主機上刪除，無法復原。',
+      buttons: [{ label: '取消', value: false, cancel: true, default: true }, { label: '刪除', value: true, danger: true }],
+    });
+    if (!sure) return;
+    try {
+      await rpc('remove', { path: full });
+    } catch (err) {
+      return toast(`無法刪除「${name}」：${errText(err)}`, true);
+    }
+    for (const p of [...expanded]) if (p === full || p.startsWith(full + '/')) expanded.delete(p);
+    actions.removed(full);
+    emit('fs:changed', P.parent(full));
+  }
+
+  body.addEventListener('contextmenu', (ev) => {
+    if (!root) return;
+    showContextMenu(ev, [
+      { label: '新增檔案', run: () => create(root, false) },
+      { label: '新增資料夾', run: () => create(root, true) },
+      null,
+      { label: '重新整理', run: () => refresh() },
+    ]);
+  });
 
   function render() {
     el.classList.toggle('empty', !root);
