@@ -39,7 +39,7 @@ export function pickLanguage(monaco, anchor, currentId, autoId) {
       rows = items.map((item) => h('button', {
         type: 'button', role: 'option', 'data-lang': item.id, class: item.id === currentId ? 'on' : '',
         onclick: () => done(item.id),
-      }, h('span', null, item.name), h('span', { class: 'pc-lang-id' }, item.note || item.id)));
+      }, h('span', { title: item.name }, item.name), h('span', { class: 'pc-lang-id', title: item.note || item.id }, item.note || item.id)));
       list.replaceChildren(...(rows.length ? rows : [h('div', { class: 'pc-lang-none' }, '找不到這個語言')]));
       at = Math.max(0, q ? 0 : items.findIndex((i) => i.id === currentId));
       mark();
