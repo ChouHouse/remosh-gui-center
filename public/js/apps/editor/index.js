@@ -1,6 +1,7 @@
 // Procoder: a code editor built on Monaco. A window holds tabs and a file tree
 // (window.js); this file keeps track of the windows and decides which one a
 // file opens in.
+import './i18n.js'; // this app's texts in the other languages
 import { on } from '../../core/events.js';
 import { wm } from '../../shell/wm.js';
 import { registerApp, useAppStyle } from '../../shell/apps.js';
@@ -10,6 +11,7 @@ import { APP_NAME, data, toggleSide, themePref, setTheme } from './prefs.js';
 import { dialog } from '../../core/ui.js';
 import { effectiveMode, onDeviceModeChange } from '../../shell/style.js';
 import { createProcoder } from './window.js';
+import { tt } from '../../core/i18n.js';
 
 useAppStyle(import.meta.url);
 
@@ -50,9 +52,9 @@ async function askThemeOnce() {
   asking = true;
   const dark = effectiveMode() === 'dark';
   const choice = await dialog({
-    title: 'Procoder 要用亮色還是暗色？',
-    message: '之後可以從 Procoder 的「介面」選單更改。',
-    buttons: [{ label: '亮色', value: 'light', default: !dark }, { label: '暗色', value: 'dark', default: dark }],
+    title: tt('Procoder 要用亮色還是暗色？'),
+    message: tt('之後可以從 Procoder 的「介面」選單更改。'),
+    buttons: [{ label: tt('亮色'), value: 'light', default: !dark }, { label: tt('暗色'), value: 'dark', default: dark }],
   });
   asking = false;
   if (choice) setTheme(choice);

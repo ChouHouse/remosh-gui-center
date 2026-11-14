@@ -1,6 +1,7 @@
 // WebSocket connection to the server and the request/response helper.
 import { appError, ERROR_TEXT } from './errors.js';
 import { emit } from './events.js';
+import { tt } from './i18n.js';
 
 export const conn = { ws: null, seq: 0, pending: new Map(), info: null, pingTimer: null, closing: false };
 
@@ -21,7 +22,7 @@ export function openSocket() {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
     ws.onopen = () => resolve(ws);
-    ws.onerror = () => reject(appError('server-unreachable', '無法連上伺服器'));
+    ws.onerror = () => reject(appError('server-unreachable', tt('無法連上伺服器')));
     ws.onmessage = (ev) => {
       let msg;
       try {

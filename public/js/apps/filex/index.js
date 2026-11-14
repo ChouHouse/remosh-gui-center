@@ -1,6 +1,7 @@
 // Filex: sends files from this computer up to the host. Pick any number of
 // files (or drop them on the window); they go, one after another, into the
 // folder chosen at the top.
+import './i18n.js'; // this app's texts in the other languages
 import { h } from '../../core/dom.js';
 import { appStore } from '../../core/app-store.js';
 import { errText } from '../../core/errors.js';
@@ -15,6 +16,7 @@ import { createWindow } from '../../shell/wm.js';
 import { pickPath } from '../../shell/picker.js';
 import { registerApp, launchApp, useAppStyle } from '../../shell/apps.js';
 import { filexSvg } from './icon.js';
+import { tt } from '../../core/i18n.js';
 
 useAppStyle(import.meta.url);
 
@@ -35,16 +37,16 @@ function openFilex() {
   const input = h('input', { type: 'file', multiple: true, hidden: true });
   const list = h('div', { class: 'fx-list' });
   const summary = h('span');
-  const bClear = h('button', { type: 'button', class: 'fx-clear', onclick: clearDone }, '清除已完成');
+  const bClear = h('button', { type: 'button', class: 'fx-clear', onclick: clearDone }, tt('清除已完成'));
   const drop = h('div', { class: 'fx-drop' },
     h('span', { class: 'fx-drop-ico', html: filexSvg() }),
-    h('p', null, '把電腦裡的檔案拖到這裡，或'),
-    h('button', { type: 'button', class: 'fx-pick', onclick: () => input.click() }, '選擇檔案…'),
-    h('p', { class: 'fx-hint' }, '可以一次選很多個'));
+    h('p', null, tt('把電腦裡的檔案拖到這裡，或')),
+    h('button', { type: 'button', class: 'fx-pick', onclick: () => input.click() }, tt('選擇檔案…')),
+    h('p', { class: 'fx-hint' }, tt('可以一次選很多個')));
   win.body.append(
-    h('div', { class: 'fx-dest' }, h('span', { class: 'fx-dest-label' }, '上傳到'), h('span', { class: 'fx-dest-ico', html: ICON.folder }), destText,
-      h('button', { type: 'button', class: 'fx-change', onclick: changeDest }, '更改…'),
-      h('button', { type: 'button', class: 'fx-show', title: '在檔案櫃開啟這個資料夾', onclick: () => launchApp('files', { path: dest }) }, '開啟')),
+    h('div', { class: 'fx-dest' }, h('span', { class: 'fx-dest-label' }, tt('上傳到')), h('span', { class: 'fx-dest-ico', html: ICON.folder }), destText,
+      h('button', { type: 'button', class: 'fx-change', onclick: changeDest }, tt('更改…')),
+      h('button', { type: 'button', class: 'fx-show', title: tt('在檔案櫃開啟這個資料夾'), onclick: () => launchApp('files', { path: dest }) }, tt('開啟'))),
     h('div', { class: 'fx-main' }, drop, list, input),
     h('div', { class: 'statusbar' }, summary, h('span', { class: 'spacer' }), bClear));
 
@@ -52,7 +54,7 @@ function openFilex() {
     destText.textContent = destText.title = dest;
   }
   async function changeDest() {
-    const path = await pickPath({ mode: 'folder', title: '上傳到哪個資料夾', start: dest });
+    const path = await pickPath({ mode: 'folder', title: tt('上傳到哪個資料夾'), start: dest });
     if (!path || closed) return;
     dest = path;
     data.set('dest', dest);
@@ -63,7 +65,7 @@ function openFilex() {
     const pct = item.file.size ? Math.floor((item.sent / item.file.size) * 100) : item.state === 'done' ? 100 : 0;
     item.row.dataset.state = item.state;
     item.bar.style.width = (item.state === 'done' ? 100 : pct) + '%';
-    item.status.textContent = item.state === 'wait' ? '等待中' : item.state === 'run' ? `上傳中 ${pct}%` : item.state === 'done' ? '完成' : item.state === 'skip' ? '已略過' : `失敗：${item.note}`;
+    item.status.textContent = item.state === 'wait' ? tt('等待中') : item.state === 'run' ? tt('上傳中 {0}%', pct) : item.state === 'done' ? tt('完成') : item.state === 'skip' ? tt('已略過') : tt('失敗：{0}', item.note);
     item.status.title = item.state === 'fail' ? item.note : '';
     item.nameEl.textContent = item.name;
     item.where.textContent = item.state === 'done' ? P.parent(item.path) : '';
@@ -73,7 +75,7 @@ function openFilex() {
     const done = items.filter((i) => i.state === 'done').length;
     const left = items.filter((i) => i.state === 'wait' || i.state === 'run').length;
     const failed = items.filter((i) => i.state === 'fail').length;
-    summary.textContent = !items.length ? '還沒有要上傳的檔案' : left ? `上傳中，還有 ${left} 個` : `完成 ${done} 個` + (failed ? `，失敗 ${failed} 個` : '');
+    summary.textContent = !items.length ? tt('還沒有要上傳的檔案') : left ? tt('上傳中，還有 {0} 個', left) : tt('完成 {0} 個', done) + (failed ? tt('，失敗 {0} 個', failed) : '');
     bClear.hidden = !items.some((i) => i.state !== 'wait' && i.state !== 'run');
     win.body.classList.toggle('fx-has-items', items.length > 0);
     win.setTitle(left ? `${APP_NAME}（${left}）` : APP_NAME);
@@ -86,7 +88,7 @@ function openFilex() {
       item.status = h('span', { class: 'fx-status' });
       item.where = h('span', { class: 'fx-where' });
       item.bar = h('i');
-      item.remove = h('button', { type: 'button', class: 'fx-remove', title: '從清單移除', 'aria-label': '從清單移除', onclick: () => {
+      item.remove = h('button', { type: 'button', class: 'fx-remove', title: tt('從清單移除'), 'aria-label': tt('從清單移除'), onclick: () => {
         items.splice(items.indexOf(item), 1);
         item.row.remove();
         paintAll();
@@ -110,12 +112,12 @@ function openFilex() {
   async function settleName(item, taken) {
     if (!taken.has(item.name)) return true;
     const choice = await dialog({
-      title: `「${item.name}」已經存在`,
-      message: `${item.dest} 裡已經有同名的檔案。`,
+      title: tt('「{0}」已經存在', item.name),
+      message: tt('{0} 裡已經有同名的檔案。', item.dest),
       buttons: [
-        { label: '略過', value: 'skip', cancel: true },
-        { label: '保留兩者', value: 'both' },
-        { label: '取代', value: 'replace', danger: true, default: true },
+        { label: tt('略過'), value: 'skip', cancel: true },
+        { label: tt('保留兩者'), value: 'both' },
+        { label: tt('取代'), value: 'replace', danger: true, default: true },
       ],
     });
     if (choice === 'both') item.name = freeName(item.name, taken);
@@ -134,7 +136,7 @@ function openFilex() {
       const end = Math.min(offset + PIECE, file.size);
       const piece = new Uint8Array(await file.slice(offset, end).arrayBuffer());
       await rpc('writeChunk', { path: item.path, offset, data: toBase64(piece), last: end === file.size, ...(offset === 0 ? { force: true } : {}) });
-      if (closed) throw new Error('已取消');
+      if (closed) throw new Error(tt('已取消'));
       item.sent = end;
       paint(item);
     }
@@ -207,9 +209,9 @@ function openFilex() {
     if (!items.some((i) => i.state === 'wait' || i.state === 'run')) return true;
     win.focus();
     return dialog({
-      title: '還有檔案沒上傳完',
-      message: '現在關閉的話，還沒傳完的檔案不會出現在主機上。',
-      buttons: [{ label: '繼續上傳', value: false, cancel: true, default: true }, { label: '關閉', value: true, danger: true }],
+      title: tt('還有檔案沒上傳完'),
+      message: tt('現在關閉的話，還沒傳完的檔案不會出現在主機上。'),
+      buttons: [{ label: tt('繼續上傳'), value: false, cancel: true, default: true }, { label: tt('關閉'), value: true, danger: true }],
     });
   };
   win.destroy = () => {

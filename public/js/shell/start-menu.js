@@ -11,6 +11,7 @@ import { showContextMenu } from './context-menu.js';
 import { makeDraggable } from './drag.js';
 import { host, otherSessions, onSessionsChange } from './sessions.js';
 import { logout } from './desktop.js';
+import { tt } from '../core/i18n.js';
 
 const startBtn = $('#start-btn');
 const startMenu = $('#start-menu');
@@ -77,7 +78,7 @@ const pinnedIds = () => getSettings().start.pinned ?? listApps().map((app) => ap
 const setPinned = (ids) =>
   updateSettings((s) => {
     s.start.pinned = ids;
-  }, { optimistic: true }).catch((err) => toast(`無法儲存釘選：${errText(err)}`, true));
+  }, { optimistic: true }).catch((err) => toast(tt('無法儲存釘選：{0}', errText(err)), true));
 export const isPinned = (id) => pinnedIds().includes(id);
 export const pinApp = (id) => (isPinned(id) ? null : setPinned([...pinnedIds(), id]));
 export const unpinApp = (id) => setPinned(pinnedIds().filter((x) => x !== id));
@@ -92,7 +93,7 @@ const appButton = (app, prefix) =>
       closeStart();
       launchApp(app.id);
     },
-  }, h('span', { class: 'sm-ico', html: app.icon() }), app.name);
+  }, h('span', { class: 'sm-ico', html: app.icon() }), tt(app.name));
 
 function showView(all) {
   $('#sm-home').hidden = all;
@@ -104,7 +105,7 @@ function renderApps() {
   const pinned = pinnedIds().map(getApp).filter(Boolean);
   $('#sm-apps').replaceChildren(...(pinned.length
     ? pinned.map((app) => appButton(app, 'sm-'))
-    : [h('p', { class: 'sm-empty' }, '還沒有釘選的應用程式')]));
+    : [h('p', { class: 'sm-empty' }, tt('還沒有釘選的應用程式'))]));
   $('#sm-all-list').replaceChildren(...listApps().map((app) => appButton(app, 'sma-')));
 }
 
@@ -117,18 +118,18 @@ export function initStartMenu() {
       const app = getApp(ev.target.closest('button[data-app-id]')?.dataset.appId);
       if (!app) return;
       showContextMenu(ev, [
-        { label: '開啟', run: () => {
+        { label: tt('開啟'), run: () => {
           closeStart();
           launchApp(app.id);
         } },
         null,
-        isPinned(app.id) ? { label: '從開始取消釘選', run: () => unpinApp(app.id) } : { label: '釘選到開始', run: () => pinApp(app.id) },
+        isPinned(app.id) ? { label: tt('從開始取消釘選'), run: () => unpinApp(app.id) } : { label: tt('釘選到開始'), run: () => pinApp(app.id) },
       ]);
     });
     // Apps can be dragged out, e.g. onto the desktop.
     makeDraggable(list, (ev) => {
       const app = getApp(ev.target.closest('button[data-app-id]')?.dataset.appId);
-      return app && { type: 'app', name: app.name, icon: app.icon(), data: { id: app.id } };
+      return app && { type: 'app', name: tt(app.name), icon: app.icon(), data: { id: app.id } };
     });
   }
   $('#sm-all-btn').addEventListener('click', () => showView(true));
@@ -153,10 +154,10 @@ startMenu.addEventListener('pointerdown', (ev) => {
 startBtn.addEventListener('contextmenu', (ev) => {
   closeStart();
   showContextMenu(ev, [
-    ...['tasks', 'terminal', 'settings'].map(getApp).filter(Boolean).map((app) => ({ label: app.name, run: () => launchApp(app.id) })),
+    ...['tasks', 'terminal', 'settings'].map(getApp).filter(Boolean).map((app) => ({ label: tt(app.name), run: () => launchApp(app.id) })),
     null,
-    { label: '切換使用者', run: () => host.add() },
-    { label: '登出', danger: true, run: () => logout() },
+    { label: tt('切換使用者'), run: () => host.add() },
+    { label: tt('登出'), danger: true, run: () => logout() },
   ]);
 });
 // Other signed-in users: one click switches to them, no password needed.
@@ -167,7 +168,7 @@ function renderSessions() {
       class: 'sm-session',
       role: 'menuitem',
       'data-session': s.id,
-      title: `切換到 ${s.label}`,
+      title: tt('切換到 {0}', s.label),
       onclick: () => {
         closeStart();
         host.switchTo(s.id);

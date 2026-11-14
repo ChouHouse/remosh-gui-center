@@ -10,8 +10,9 @@ import { getSettings, updateSettings, whenSettingsReady } from '../core/settings
 import { rpc } from '../core/rpc.js';
 import { getApp, acceptsExt, appsForExt, launchApp } from './apps.js';
 import { shortcutKind, displayName, readShortcut } from './shortcuts.js';
+import { tt } from '../core/i18n.js';
 
-export const extLabel = (ext) => (ext ? `.${ext} 檔` : '沒有副檔名的檔案');
+export const extLabel = (ext) => (ext ? tt('.{0} 檔', ext) : tt('沒有副檔名的檔案'));
 
 // Asks which app to use. Resolves to { app, remember } or null when cancelled.
 // The dialog has a 「以後都用這個程式開啟」 checkbox; `rememberDefault` is its
@@ -33,14 +34,14 @@ export function chooseApp(name, { rememberDefault = false } = {}) {
     const remember = h('input', { type: 'checkbox', id: 'choose-remember', checked: rememberDefault });
     const choices = appsForExt(ext).map((app) =>
       h('button', { type: 'button', class: 'app-choice', 'data-app': app.id, onclick: () => done({ app, remember: remember.checked }) },
-        h('span', { class: 'ico', html: app.icon() }), app.name));
+        h('span', { class: 'ico', html: app.icon() }), tt(app.name)));
     const modal = h('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true' },
       h('div', { class: 'box' },
-        h('h2', null, `要用什麼開啟「${name}」？`),
-        h('p', null, rememberDefault ? `還沒有設定${extLabel(ext)}的開啟方式。` : '選擇這次要用的程式。'),
+        h('h2', null, tt('要用什麼開啟「{0}」？', name)),
+        h('p', null, rememberDefault ? tt('還沒有設定{0}的開啟方式。', extLabel(ext)) : tt('選擇這次要用的程式。')),
         h('div', { class: 'app-choices' }, choices),
-        h('label', { class: 'choose-remember' }, remember, `以後${extLabel(ext)}都用這個程式開啟`),
-        h('div', { class: 'btns' }, h('button', { type: 'button', onclick: () => done(null) }, '取消'))));
+        h('label', { class: 'choose-remember' }, remember, tt('以後{0}都用這個程式開啟', extLabel(ext))),
+        h('div', { class: 'btns' }, h('button', { type: 'button', onclick: () => done(null) }, tt('取消')))));
     document.body.append(modal);
     document.addEventListener('keydown', onKey, true);
     choices[0]?.focus();
@@ -53,7 +54,7 @@ async function remember(ext, app) {
       s.files.associations[ext] = app.id;
     });
   } catch (err) {
-    toast(`無法記住開啟方式：${errText(err)}`, true);
+    toast(tt('無法記住開啟方式：{0}', errText(err)), true);
   }
 }
 
@@ -71,11 +72,11 @@ export async function openShortcut(path) {
   try {
     sc = await readShortcut(path);
   } catch (err) {
-    return toast(`無法開啟「${displayName(P.base(path))}」：${errText(err)}`, true);
+    return toast(tt('無法開啟「{0}」：{1}', displayName(P.base(path)), errText(err)), true);
   }
-  if (!sc) return toast(`「${displayName(P.base(path))}」不是有效的捷徑`, true);
+  if (!sc) return toast(tt('「{0}」不是有效的捷徑', displayName(P.base(path))), true);
   if (sc.kind === 'app') {
-    if (!getApp(sc.id)) return toast('找不到這個應用程式', true);
+    if (!getApp(sc.id)) return toast(tt('找不到這個應用程式'), true);
     return launchApp(sc.id);
   }
   try {
@@ -83,7 +84,7 @@ export async function openShortcut(path) {
     if (entry.type === 'dir') return launchApp('files', { path: sc.target });
     return openFile(sc.target, entry.size);
   } catch (err) {
-    return toast(`捷徑指向的「${sc.target}」無法開啟：${errText(err)}`, true);
+    return toast(tt('捷徑指向的「{0}」無法開啟：{1}', sc.target, errText(err)), true);
   }
 }
 

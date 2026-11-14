@@ -1,6 +1,7 @@
 // Taskbar clock; clicking it opens a month calendar.
 import { $, h } from '../core/dom.js';
 import { on } from '../core/events.js';
+import { tt, tm } from '../core/i18n.js';
 
 const clock = $('#clock');
 const p = (x) => String(x).padStart(2, '0');
@@ -18,7 +19,7 @@ tickClock();
 setInterval(tickClock, 1000);
 
 // ---- calendar
-const panel = h('div', { id: 'calendar', role: 'dialog', 'aria-label': '日曆', hidden: true });
+const panel = h('div', { id: 'calendar', role: 'dialog', 'aria-label': tm('日曆'), 'data-i18n-aria-label': tm('日曆'), hidden: true });
 $('#desktop').append(panel);
 let shown = null; // first day of the month on display
 
@@ -42,14 +43,14 @@ function render() {
   };
   panel.replaceChildren(
     h('div', { class: 'cal-head' },
-      h('button', { type: 'button', class: 'cal-nav', 'aria-label': '上個月', onclick: go(-1) }, '‹'),
-      h('b', { id: 'cal-title' }, `${year} 年 ${month + 1} 月`),
-      h('button', { type: 'button', class: 'cal-nav', 'aria-label': '下個月', onclick: go(1) }, '›')),
-    h('div', { class: 'cal-grid' }, ['日', '一', '二', '三', '四', '五', '六'].map((w) => h('span', { class: 'wd' }, w)), days),
+      h('button', { type: 'button', class: 'cal-nav', 'aria-label': tt('上個月'), onclick: go(-1) }, '‹'),
+      h('b', { id: 'cal-title' }, tt('{0} 年 {1} 月', year, month + 1)),
+      h('button', { type: 'button', class: 'cal-nav', 'aria-label': tt('下個月'), onclick: go(1) }, '›')),
+    h('div', { class: 'cal-grid' }, [tt('日'), tt('一'), tt('二'), tt('三'), tt('四'), tt('五'), tt('六')].map((w) => h('span', { class: 'wd' }, w)), days),
     h('button', { type: 'button', id: 'cal-today', onclick: () => {
       shown = new Date(today.getFullYear(), today.getMonth(), 1);
       render();
-    } }, `今天：${today.getFullYear()}/${p(today.getMonth() + 1)}/${p(today.getDate())}`));
+    } }, tt('今天：{0}/{1}/{2}', today.getFullYear(), p(today.getMonth() + 1), p(today.getDate()))));
 }
 
 function close() {

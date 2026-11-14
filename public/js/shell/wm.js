@@ -1,6 +1,7 @@
 // Window manager: draggable/resizable windows with a taskbar entry each.
 import { $, h } from '../core/dom.js';
 import { animationMs } from '../core/settings.js';
+import { tt } from '../core/i18n.js';
 
 export const winLayer = $('#windows');
 export const dockItems = $('#dock-items');
@@ -22,16 +23,17 @@ const changed = () => {
 // title is the short name (shown in the taskbar); the title bar shows
 // "title — appName" so every window says which app it belongs to.
 export function createWindow({ title, appName, iconHtml, width, height }) {
-  const fullTitle = (t) => (appName && t !== appName ? `${t} — ${appName}` : t);
+  // appName stays as written (it identifies the app); what is shown is translated.
+  const fullTitle = (t) => (appName && t !== appName && t !== tt(appName) ? `${t} — ${tt(appName)}` : t);
   const win = { title, minimized: false, maximized: false, onClose: null, onFocus: null, workspace: wm.ws };
   const titleIcon = h('span', { class: 'ticon', html: iconHtml });
   const titleText = h('span', { class: 'ttext' }, fullTitle(title));
   const titleEl = h('div', { class: 'title' }, titleIcon, titleText);
   const bar = h('div', { class: 'titlebar' },
     h('div', { class: 'traffic' },
-      h('button', { type: 'button', class: 'close', title: '關閉', 'aria-label': '關閉', onclick: () => win.close() }),
-      h('button', { type: 'button', class: 'min', title: '縮到工作列', 'aria-label': '縮到工作列', onclick: () => win.minimize() }),
-      h('button', { type: 'button', class: 'max', title: '放大', 'aria-label': '放大', onclick: () => win.toggleMax() })),
+      h('button', { type: 'button', class: 'close', title: tt('關閉'), 'aria-label': tt('關閉'), onclick: () => win.close() }),
+      h('button', { type: 'button', class: 'min', title: tt('縮到工作列'), 'aria-label': tt('縮到工作列'), onclick: () => win.minimize() }),
+      h('button', { type: 'button', class: 'max', title: tt('放大'), 'aria-label': tt('放大'), onclick: () => win.toggleMax() })),
     titleEl);
   win.body = h('div', { class: 'win-body' });
   win.el = h('section', { class: 'win', 'data-app': appName || null }, bar, win.body,
@@ -55,7 +57,7 @@ export function createWindow({ title, appName, iconHtml, width, height }) {
     titleIcon.innerHTML = html;
   };
   win.dockEl = h('button', { type: 'button', class: 'dock-item open', 'data-app': appName || null, title },
-    ico, lbl, h('span', { class: 'dirty', title: '尚未儲存' }));
+    ico, lbl, h('span', { class: 'dirty', title: tt('尚未儲存') }));
   win.dockEl.addEventListener('click', () => {
     if (win.minimized) win.focus();
     else if (wm.focused === win) win.minimize();

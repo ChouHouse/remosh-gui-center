@@ -57,11 +57,11 @@ public/
   css/                  base, login, shell (the system's own styles)
   js/
     main.js             loads every app folder the server lists, then boots
-    core/               dom, store, errors, ui, format, path, icons, events, rpc, text-codec, settings
+    core/               dom, store, errors, ui, format, path, icons, events, rpc, text-codec, settings, i18n (+ i18n/en.js, ja.js)
     shell/              wm (windows), menubar, context-menu, drag, file-drop, shortcuts,
                         desktop-icons, login, gate, start-menu, clock, style, fullscreen,
                         desktop, apps (registry), file-open (associations)
-    apps/               one folder per app: index.js, icon.js, style.css
+    apps/               one folder per app: index.js, icon.js, style.css, i18n.js (its texts in English and Japanese)
       files/            檔案櫃
       editor/           Procoder: windows with tabs and a file tree (index.js, window.js, tree.js, welcome.js, prefs.js, monaco.js)
       notepad/          記事本
@@ -72,6 +72,16 @@ public/
       settings/         設定
   vs/  xterm/           Monaco and xterm.js, copied by `npm run assets` (not committed)
 ```
+
+### Languages
+
+The interface is written in Traditional Chinese; English and Japanese come from
+dictionaries keyed by the Chinese text. Code writes `tt('開啟')` (or
+`tt('已另存為 {0}', path)`) from `core/i18n.js`; a text kept in a constant is
+marked with `tm()` and passed through `tt()` where it is shown; static HTML uses
+`data-i18n`. Shared texts live in `core/i18n/en.js` and `ja.js`, an app's own in
+its `i18n.js` (`addStrings({ en, ja })`). The language is the system setting
+`system.lang` (設定 › 系統), `auto` following the browser.
 
 ### Adding an app
 

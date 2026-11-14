@@ -1,4 +1,5 @@
 // POSIX path helpers for remote paths.
+import { tt } from './i18n.js';
 export const P = {
   norm(path) {
     const out = [];
@@ -32,7 +33,7 @@ export function freeName(name, taken) {
   const stem = dot > 0 ? name.slice(0, dot) : name;
   const ext = dot > 0 ? name.slice(dot) : '';
   for (let i = 1; ; i++) {
-    const candidate = `${stem} 複本${i > 1 ? ' ' + i : ''}${ext}`;
+    const candidate = tt('{0} 複本{1}{2}', stem, i > 1 ? ' ' + i : '', ext);
     if (!taken.has(candidate)) return candidate;
   }
 }

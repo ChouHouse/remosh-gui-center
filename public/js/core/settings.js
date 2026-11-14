@@ -13,6 +13,7 @@ import { P } from './path.js';
 import { on, emit } from './events.js';
 import { toast } from './ui.js';
 import { toBase64, fromBase64 } from './text-codec.js';
+import { tt } from './i18n.js';
 
 export const SETTINGS_DIR = '.remosh-gui';
 export const SETTINGS_FILE = 'setting.inv-remosh_gui-config';
@@ -20,6 +21,7 @@ const LEGACY_FILE = 'setting.json';
 export const ANIMATION_SPEEDS = { fast: 120, normal: 200, slow: 350 }; // milliseconds
 
 const DEFAULTS = {
+  system: { lang: 'auto' }, // 'auto' (follow the browser) or a language id from core/i18n.js
   animation: { enabled: true, speed: 'normal' },
   files: {
     associations: {}, // extension ('' = no extension) -> app id
@@ -63,6 +65,7 @@ function normalise(obj) {
     if (EXT_PATTERN.test(ext) && typeof app === 'string' && app) associations[ext] = app;
   }
   return {
+    system: { lang: ['zh-TW', 'en', 'ja'].includes(obj?.system?.lang) ? obj.system.lang : DEFAULTS.system.lang },
     animation: {
       enabled: typeof a?.enabled === 'boolean' ? a.enabled : DEFAULTS.animation.enabled,
       speed: Object.hasOwn(ANIMATION_SPEEDS, a?.speed) ? a.speed : DEFAULTS.animation.speed,
@@ -141,8 +144,8 @@ export async function loadSettings() {
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) raw = parsed;
     else throw new SyntaxError('not an object');
   } catch (err) {
-    if (err instanceof SyntaxError) toast('設定檔的格式不正確，先使用預設設定', true);
-    else if (err.code !== 'not-found') toast(`無法讀取設定檔：${err.message}`, true);
+    if (err instanceof SyntaxError) toast(tt('設定檔的格式不正確，先使用預設設定'), true);
+    else if (err.code !== 'not-found') toast(tt('無法讀取設定檔：{0}', err.message), true);
   }
   current = normalise(raw);
   apply();

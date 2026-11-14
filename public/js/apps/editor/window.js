@@ -24,6 +24,7 @@ import {
   APP_NAME, UNTITLED, WELCOME, LARGE_FILE_BYTES, FONT_DEFAULT, FONT_MIN, FONT_MAX, SIDE_DEFAULT, clampSide,
   data, prefs, setFontSize, setMinimap, toggleWrap, recentList, remember, forget, sideShown, toggleSide, isFolderRef, chosenLang, setChosenLang, setTheme,
 } from './prefs.js';
+import { tt } from '../../core/i18n.js';
 
 // ---- documents
 const isDirty = (doc) => !!doc.model && doc.model.getAlternativeVersionId() !== doc.savedVersion;
@@ -78,21 +79,21 @@ export function createProcoder(hub, { folder = null } = {}) {
       state: h('span'),
       path: h('span', { class: 'path' }),
       pos: h('span'),
-      wrap: h('button', { type: 'button', title: '切換自動換行（Alt+Z）', onclick: toggleWrap }),
+      wrap: h('button', { type: 'button', title: tt('切換自動換行（Alt+Z）'), onclick: toggleWrap }),
       eol: h('span'),
       enc: h('span'),
-      lang: h('button', { type: 'button', class: 'pc-lang-btn', title: '切換語言', onclick: chooseLanguage }),
+      lang: h('button', { type: 'button', class: 'pc-lang-btn', title: tt('切換語言'), onclick: chooseLanguage }),
     };
     const menubar = h('div', { class: 'ed-menubar' });
     const tabsEl = h('div', { class: 'pc-tabs', role: 'tablist' });
     const host = h('div', { class: 'editor-host' });
     const pane = h('div', { class: 'pc-pane' });
     const tree = createTree({ openFile, openFolder: askOpenFolder, closeFolder, removed });
-    const grip = h('div', { class: 'pc-side-grip', title: '拖曳調整寬度，點兩下還原' });
+    const grip = h('div', { class: 'pc-side-grip', title: tt('拖曳調整寬度，點兩下還原') });
     const main = h('div', { class: 'pc-main' }, tree.el, grip,
       h('div', { class: 'pc-work' },
         h('div', { class: 'pc-tabbar' }, tabsEl,
-          h('button', { type: 'button', class: 'pc-tab-add', title: '新增檔案', 'aria-label': '新增檔案', onclick: () => openFile() }, '+')),
+          h('button', { type: 'button', class: 'pc-tab-add', title: tt('新增檔案'), 'aria-label': tt('新增檔案'), onclick: () => openFile() }, '+')),
         h('div', { class: 'pc-stage' }, host, pane)));
     grip.addEventListener('pointerdown', (down) => {
       if (down.button !== 0) return;
@@ -127,7 +128,7 @@ export function createProcoder(hub, { folder = null } = {}) {
     // as tabs; a dropped folder becomes the folder in the file tree.
     const offDrop = registerDropTarget(win.el, {
       accepts: (payload) => payload.type === 'file',
-      action: () => '用 Procoder 開啟',
+      action: () => tt('用 Procoder 開啟'),
       onDrop: (payload) => openDropped(payload.data.paths || [payload.data.path]),
     });
     win.onFocus = () => {
@@ -176,15 +177,15 @@ export function createProcoder(hub, { folder = null } = {}) {
     }));
     const { KeyMod, KeyCode } = monaco;
     const act = (id, label, keybindings, run) => editor.addAction({ id: 'sshdesk.' + id, label, keybindings, run });
-    act('save', '儲存到主機', [KeyMod.CtrlCmd | KeyCode.KeyS], () => active && saveDoc(active));
-    act('saveAs', '另存新檔…', [KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyS], () => active && saveDocAs(active));
-    act('fontLarger', '放大文字', [KeyMod.CtrlCmd | KeyCode.Equal, KeyMod.CtrlCmd | KeyCode.NumpadAdd], () => setFontSize(prefs.fontSize + 1));
-    act('fontSmaller', '縮小文字', [KeyMod.CtrlCmd | KeyCode.Minus, KeyMod.CtrlCmd | KeyCode.NumpadSubtract], () => setFontSize(prefs.fontSize - 1));
-    act('fontReset', '重設文字大小', [KeyMod.CtrlCmd | KeyCode.Digit0, KeyMod.CtrlCmd | KeyCode.Numpad0], () => setFontSize(FONT_DEFAULT));
-    act('toggleMinimap', '顯示／隱藏右側縮圖', undefined, () => setMinimap(!prefs.minimap));
-    act('toggleWordWrap', '切換自動換行', [KeyMod.Alt | KeyCode.KeyZ], toggleWrap);
-    act('toggleSide', '顯示／隱藏檔案樹', [KeyMod.CtrlCmd | KeyCode.KeyB], toggleSide);
-    act('closeTab', '關閉分頁', [KeyMod.Alt | KeyCode.KeyW], () => active && closeDoc(active));
+    act('save', tt('儲存到主機'), [KeyMod.CtrlCmd | KeyCode.KeyS], () => active && saveDoc(active));
+    act('saveAs', tt('另存新檔…'), [KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyS], () => active && saveDocAs(active));
+    act('fontLarger', tt('放大文字'), [KeyMod.CtrlCmd | KeyCode.Equal, KeyMod.CtrlCmd | KeyCode.NumpadAdd], () => setFontSize(prefs.fontSize + 1));
+    act('fontSmaller', tt('縮小文字'), [KeyMod.CtrlCmd | KeyCode.Minus, KeyMod.CtrlCmd | KeyCode.NumpadSubtract], () => setFontSize(prefs.fontSize - 1));
+    act('fontReset', tt('重設文字大小'), [KeyMod.CtrlCmd | KeyCode.Digit0, KeyMod.CtrlCmd | KeyCode.Numpad0], () => setFontSize(FONT_DEFAULT));
+    act('toggleMinimap', tt('顯示／隱藏右側縮圖'), undefined, () => setMinimap(!prefs.minimap));
+    act('toggleWordWrap', tt('切換自動換行'), [KeyMod.Alt | KeyCode.KeyZ], toggleWrap);
+    act('toggleSide', tt('顯示／隱藏檔案樹'), [KeyMod.CtrlCmd | KeyCode.KeyB], toggleSide);
+    act('closeTab', tt('關閉分頁'), [KeyMod.Alt | KeyCode.KeyW], () => active && closeDoc(active));
     editor.addCommand(KeyMod.CtrlCmd | KeyCode.KeyY, () => editor.trigger('keyboard', 'redo', null));
     editor.onDidChangeCursorPosition(refresh);
     return monaco;
@@ -197,41 +198,41 @@ export function createProcoder(hub, { folder = null } = {}) {
     const edit = (what) => app.editor.trigger('menu', what, null);
     return [
       {
-        label: '檔案',
+        label: tt('檔案'),
         items: [
-          { label: '開新視窗', run: () => hub.newWindow() },
+          { label: tt('開新視窗'), run: () => hub.newWindow() },
           null,
-          { label: '新增檔案', run: () => openFile() },
-          { label: '開啟檔案…', run: askOpen },
-          { label: '開啟資料夾…', run: askOpenFolder },
-          { label: '關閉資料夾', enabled: () => !!app.tree.root, run: closeFolder },
+          { label: tt('新增檔案'), run: () => openFile() },
+          { label: tt('開啟檔案…'), run: askOpen },
+          { label: tt('開啟資料夾…'), run: askOpenFolder },
+          { label: tt('關閉資料夾'), enabled: () => !!app.tree.root, run: closeFolder },
           null,
-          { label: '上一步（復原）', key: mod + 'Z', enabled: () => file() && active.model.canUndo(), run: () => edit('undo') },
-          { label: '下一步（重做）', key: mod + 'Y', enabled: () => file() && active.model.canRedo(), run: () => edit('redo') },
+          { label: tt('上一步（復原）'), key: mod + 'Z', enabled: () => file() && active.model.canUndo(), run: () => edit('undo') },
+          { label: tt('下一步（重做）'), key: mod + 'Y', enabled: () => file() && active.model.canRedo(), run: () => edit('redo') },
           null,
-          { label: '存檔', key: mod + 'S', enabled: file, run: () => saveDoc(active) },
-          { label: '另存新檔…', key: mod + (mod === '⌘' ? '⇧S' : 'Shift+S'), enabled: file, run: () => saveDocAs(active) },
+          { label: tt('存檔'), key: mod + 'S', enabled: file, run: () => saveDoc(active) },
+          { label: tt('另存新檔…'), key: mod + (mod === '⌘' ? '⇧S' : 'Shift+S'), enabled: file, run: () => saveDocAs(active) },
           null,
-          { label: '關閉分頁', key: 'Alt+W', enabled: () => !!active, run: () => closeDoc(active) },
-          { label: '結束 Procoder', run: () => app.win.close() },
+          { label: tt('關閉分頁'), key: 'Alt+W', enabled: () => !!active, run: () => closeDoc(active) },
+          { label: tt('結束 Procoder'), run: () => app.win.close() },
         ],
       },
       {
-        label: '介面',
+        label: tt('介面'),
         items: [
-          { label: '歡迎頁面', run: openWelcome },
-          { label: '切換語言…', enabled: () => !!active?.model, run: chooseLanguage },
+          { label: tt('歡迎頁面'), run: openWelcome },
+          { label: tt('切換語言…'), enabled: () => !!active?.model, run: chooseLanguage },
           null,
-          { label: '亮色', checked: () => procoderMode() === 'light', run: () => setTheme('light') },
-          { label: '暗色', checked: () => procoderMode() === 'dark', run: () => setTheme('dark') },
-          { label: '顯示檔案樹', key: mod + 'B', checked: sideShown, run: toggleSide },
+          { label: tt('亮色'), checked: () => procoderMode() === 'light', run: () => setTheme('light') },
+          { label: tt('暗色'), checked: () => procoderMode() === 'dark', run: () => setTheme('dark') },
+          { label: tt('顯示檔案樹'), key: mod + 'B', checked: sideShown, run: toggleSide },
           null,
-          { label: '放大文字', key: mod + '+', enabled: () => prefs.fontSize < FONT_MAX, run: () => setFontSize(prefs.fontSize + 1) },
-          { label: '縮小文字', key: mod + '-', enabled: () => prefs.fontSize > FONT_MIN, run: () => setFontSize(prefs.fontSize - 1) },
-          { label: () => `重設文字大小（目前 ${prefs.fontSize}）`, key: mod + '0', enabled: () => prefs.fontSize !== FONT_DEFAULT, run: () => setFontSize(FONT_DEFAULT) },
+          { label: tt('放大文字'), key: mod + '+', enabled: () => prefs.fontSize < FONT_MAX, run: () => setFontSize(prefs.fontSize + 1) },
+          { label: tt('縮小文字'), key: mod + '-', enabled: () => prefs.fontSize > FONT_MIN, run: () => setFontSize(prefs.fontSize - 1) },
+          { label: () => tt('重設文字大小（目前 {0}）', prefs.fontSize), key: mod + '0', enabled: () => prefs.fontSize !== FONT_DEFAULT, run: () => setFontSize(FONT_DEFAULT) },
           null,
-          { label: '顯示右側縮圖', checked: () => prefs.minimap, run: () => setMinimap(!prefs.minimap) },
-          { label: '自動換行', key: 'Alt+Z', checked: () => prefs.wordWrap === 'on', run: toggleWrap },
+          { label: tt('顯示右側縮圖'), checked: () => prefs.minimap, run: () => setMinimap(!prefs.minimap) },
+          { label: tt('自動換行'), key: 'Alt+Z', checked: () => prefs.wordWrap === 'on', run: toggleWrap },
         ],
       },
     ];
@@ -239,7 +240,7 @@ export function createProcoder(hub, { folder = null } = {}) {
 
   // ---- tabs
   function addDoc(doc) {
-    const close = h('button', { type: 'button', class: 'pc-tab-close', title: '關閉', 'aria-label': '關閉', onclick: () => closeDoc(doc) }, '×');
+    const close = h('button', { type: 'button', class: 'pc-tab-close', title: tt('關閉'), 'aria-label': tt('關閉'), onclick: () => closeDoc(doc) }, '×');
     doc.icoEl = h('span', { class: 'pc-tab-ico' });
     doc.nameEl = h('span', { class: 'pc-tab-name' });
     const tab = (doc.tabEl = h('div', { class: 'pc-tab', role: 'tab' }, doc.icoEl, doc.nameEl, close));
@@ -264,12 +265,12 @@ export function createProcoder(hub, { folder = null } = {}) {
       const others = docs.filter((d) => d !== doc);
       const right = docs.slice(docs.indexOf(doc) + 1);
       showContextMenu(ev, [
-        { label: '關閉', run: () => closeDoc(doc) },
-        { label: '關閉其他分頁', enabled: others.length > 0, run: () => closeMany(others) },
-        { label: '關閉右側分頁', enabled: right.length > 0, run: () => closeMany(right) },
-        { label: '關閉全部分頁', run: () => closeMany([...docs]) },
+        { label: tt('關閉'), run: () => closeDoc(doc) },
+        { label: tt('關閉其他分頁'), enabled: others.length > 0, run: () => closeMany(others) },
+        { label: tt('關閉右側分頁'), enabled: right.length > 0, run: () => closeMany(right) },
+        { label: tt('關閉全部分頁'), run: () => closeMany([...docs]) },
         doc.path ? null : false,
-        doc.path ? { label: '複製路徑', run: () => copyText(doc.path) } : false,
+        doc.path ? { label: tt('複製路徑'), run: () => copyText(doc.path) } : false,
       ].filter((item) => item !== false));
     });
     docs.push(doc);
@@ -361,16 +362,16 @@ export function createProcoder(hub, { folder = null } = {}) {
     win.setIcon(docIcon(doc));
     win.setDirty(docs.some(isDirty));
     const ready = !!doc.model && editor?.getModel() === doc.model;
-    s.state.textContent = !doc.model ? '' : doc.saving ? '儲存中…' : dirty ? '已修改' : '已儲存';
+    s.state.textContent = !doc.model ? '' : doc.saving ? tt('儲存中…') : dirty ? tt('已修改') : tt('已儲存');
     s.state.className = dirty ? 'dirty-flag' : '';
     s.path.textContent = s.path.title = doc.path || '';
     const pos = ready && editor.getPosition();
-    s.pos.textContent = pos ? `第 ${pos.lineNumber} 行，第 ${pos.column} 欄` : '';
+    s.pos.textContent = pos ? tt('第 {0} 行，第 {1} 欄', pos.lineNumber, pos.column) : '';
     s.lang.textContent = ready ? langName(app.monaco, doc.model.getLanguageId()) : '';
     s.lang.style.display = ready ? '' : 'none';
     s.enc.textContent = ready ? doc.encoding + (doc.bom ? ' BOM' : '') : '';
     s.eol.textContent = ready ? (doc.model.getEOL() === '\r\n' ? 'CRLF' : 'LF') : '';
-    s.wrap.textContent = ready ? (prefs.wordWrap === 'on' ? '換行：開' : '換行：關') : '';
+    s.wrap.textContent = ready ? (prefs.wordWrap === 'on' ? tt('換行：開') : tt('換行：關')) : '';
     s.wrap.style.display = ready ? '' : 'none';
   }
 
@@ -400,12 +401,12 @@ export function createProcoder(hub, { folder = null } = {}) {
     app.win.focus();
     activate(doc);
     const choice = await dialog({
-      title: `要儲存「${doc.name}」的修改嗎？`,
-      message: '不儲存的話，修改的內容會遺失。',
+      title: tt('要儲存「{0}」的修改嗎？', doc.name),
+      message: tt('不儲存的話，修改的內容會遺失。'),
       buttons: [
-        { label: '不儲存', value: 'discard', danger: true },
-        { label: '取消', value: 'cancel', cancel: true },
-        { label: '儲存', value: 'save', default: true },
+        { label: tt('不儲存'), value: 'discard', danger: true },
+        { label: tt('取消'), value: 'cancel', cancel: true },
+        { label: tt('儲存'), value: 'save', default: true },
       ],
     });
     if (choice === 'discard') return true;
@@ -426,7 +427,7 @@ export function createProcoder(hub, { folder = null } = {}) {
   // ---- opening
   function openWelcome() {
     ensureWindow();
-    activate(docs.find((d) => d.kind === 'welcome') || addDoc({ kind: 'welcome', name: WELCOME, path: null }));
+    activate(docs.find((d) => d.kind === 'welcome') || addDoc({ kind: 'welcome', name: tt(WELCOME), path: null }));
   }
 
   // With a path: that remote file (its tab, when it is already open). Without: a
@@ -437,7 +438,7 @@ export function createProcoder(hub, { folder = null } = {}) {
     const owner = path && hub.owner(path);
     if (owner) return owner.inst.showDoc(owner.doc);
     const seq = path ? 0 : hub.nextUntitled();
-    const doc = addDoc({ kind: 'file', path, name: path ? P.base(path) : seq > 1 ? `${UNTITLED} ${seq}` : UNTITLED, seq, model: null, saving: false });
+    const doc = addDoc({ kind: 'file', path, name: path ? P.base(path) : seq > 1 ? `${tt(UNTITLED)} ${seq}` : tt(UNTITLED), seq, model: null, saving: false });
     activate(doc);
     return loadDoc(doc, size);
   }
@@ -450,11 +451,11 @@ export function createProcoder(hub, { folder = null } = {}) {
     // A very large file is not opened straight away: the tab says so and waits
     // for the user to insist.
     if (size > LARGE_FILE_BYTES) {
-      const open = h('button', { type: 'button', class: 'ed-large-open', onclick: () => loadDoc(doc, 0) }, '仍要開啟');
-      setPage(h('div', { class: 'ed-large' }, h('p', null, `此檔案大小超過上限 (${Math.round(size / 1024 / 1024)} MB)`), open));
+      const open = h('button', { type: 'button', class: 'ed-large-open', onclick: () => loadDoc(doc, 0) }, tt('仍要開啟'));
+      setPage(h('div', { class: 'ed-large' }, h('p', null, tt('此檔案大小超過上限 ({0} MB)', Math.round(size / 1024 / 1024))), open));
       return;
     }
-    const loading = h('div', { class: 'editor-loading' }, '開啟中…');
+    const loading = h('div', { class: 'editor-loading' }, tt('開啟中…'));
     setPage(loading);
     const fail = (message) => {
       if (docs.includes(doc)) removeDoc(doc, { keepWindow: docs.length > 1 });
@@ -464,15 +465,15 @@ export function createProcoder(hub, { folder = null } = {}) {
     try {
       [monaco, res] = await Promise.all([ensureEditor(), doc.path ? readFile(doc.path, {
         onProgress: (done, total) => {
-          loading.textContent = `開啟中… ${Math.floor((done / total) * 100)}%`;
+          loading.textContent = tt('開啟中… {0}%', Math.floor((done / total) * 100));
         },
       }) : null]);
     } catch (err) {
-      return fail(`無法開啟「${doc.name}」：${errText(err)}`);
+      return fail(tt('無法開啟「{0}」：{1}', doc.name, errText(err)));
     }
     if (!docs.includes(doc)) return; // closed while loading
     const decoded = res ? decodeText(res.bytes) : { text: '', encoding: 'UTF-8', bom: false };
-    if (!decoded) return fail(`「${doc.name}」不是文字檔，無法在 Procoder 中開啟`);
+    if (!decoded) return fail(tt('「{0}」不是文字檔，無法在 Procoder 中開啟', doc.name));
     Object.assign(doc, { encoding: decoded.encoding, bom: decoded.bom, mtime: res ? res.mtime : null });
 
     const uri = monaco.Uri.from({ scheme: 'sftp', authority: 'remote', path: doc.path || `/untitled-${doc.seq}` });
@@ -500,7 +501,7 @@ export function createProcoder(hub, { folder = null } = {}) {
       await openFile(path, entry.size);
     } catch (err) {
       if (err.code === 'not-found') forget(ref);
-      toast(`無法開啟「${P.base(path)}」：${errText(err)}`, true);
+      toast(tt('無法開啟「{0}」：{1}', P.base(path), errText(err)), true);
     }
   }
 
@@ -543,7 +544,7 @@ export function createProcoder(hub, { folder = null } = {}) {
         if (entry.type === 'dir') folder = folder || path;
         else await openFile(path, entry.size);
       } catch (err) {
-        toast(`無法開啟「${P.base(path)}」：${errText(err)}`, true);
+        toast(tt('無法開啟「{0}」：{1}', P.base(path), errText(err)), true);
       }
     }
     if (folder) openFolder(folder);
@@ -556,7 +557,7 @@ export function createProcoder(hub, { folder = null } = {}) {
     try {
       bytes = encodeText(doc.model.getValue(), doc.encoding, doc.bom);
     } catch (err) {
-      toast(`無法儲存「${doc.name}」：${err.message}`, true);
+      toast(tt('無法儲存「{0}」：{1}', doc.name, err.message), true);
       return false;
     }
     const version = doc.model.getAlternativeVersionId();
@@ -571,13 +572,13 @@ export function createProcoder(hub, { folder = null } = {}) {
       if (err.code === 'changed-on-server') {
         doc.saving = false;
         const choice = await dialog({
-          title: '主機上的檔案已被修改',
-          message: `「${doc.name}」在你開啟之後，主機上的內容有變動。要用你的版本覆寫嗎？`,
-          buttons: [{ label: '取消', value: false, cancel: true }, { label: '覆寫', value: true, danger: true, default: true }],
+          title: tt('主機上的檔案已被修改'),
+          message: tt('「{0}」在你開啟之後，主機上的內容有變動。要用你的版本覆寫嗎？', doc.name),
+          buttons: [{ label: tt('取消'), value: false, cancel: true }, { label: tt('覆寫'), value: true, danger: true, default: true }],
         });
         return choice ? saveDoc(doc, true) : false;
       }
-      toast(`無法儲存「${doc.name}」：${errText(err)}`, true);
+      toast(tt('無法儲存「{0}」：{1}', doc.name, errText(err)), true);
       return false;
     } finally {
       doc.saving = false;
@@ -618,28 +619,28 @@ export function createProcoder(hub, { folder = null } = {}) {
 
   async function saveDocAs(doc) {
     if (!doc?.model || doc.saving) return false;
-    const target = await pickPath({ mode: 'save', start: doc.path ? P.parent(doc.path) : app?.tree.root || conn.info.home, name: doc.path ? doc.name : UNTITLED + '.txt' });
+    const target = await pickPath({ mode: 'save', start: doc.path ? P.parent(doc.path) : app?.tree.root || conn.info.home, name: doc.path ? doc.name : tt(UNTITLED) + '.txt' });
     if (!target) return false;
     if (target === doc.path) return saveDoc(doc);
     if (hub.owner(target)) {
-      toast(`「${P.base(target)}」已經在另一個分頁開啟，請先關閉它`, true);
+      toast(tt('「{0}」已經在另一個分頁開啟，請先關閉它', P.base(target)), true);
       return false;
     }
     try {
       const existing = await rpc('stat', { path: target });
       if (existing.entry.type === 'dir') {
-        toast(`「${target}」是資料夾，請輸入檔名`, true);
+        toast(tt('「{0}」是資料夾，請輸入檔名', target), true);
         return false;
       }
       const overwrite = await dialog({
-        title: `「${P.base(target)}」已經存在`,
-        message: `要取代 ${target} 嗎？原本的內容會被覆蓋。`,
-        buttons: [{ label: '取消', value: false, cancel: true, default: true }, { label: '取代', value: true, danger: true }],
+        title: tt('「{0}」已經存在', P.base(target)),
+        message: tt('要取代 {0} 嗎？原本的內容會被覆蓋。', target),
+        buttons: [{ label: tt('取消'), value: false, cancel: true, default: true }, { label: tt('取代'), value: true, danger: true }],
       });
       if (!overwrite) return false;
     } catch (err) {
       if (err.code !== 'not-found') {
-        toast(`無法另存到「${target}」：${errText(err)}`, true);
+        toast(tt('無法另存到「{0}」：{1}', target, errText(err)), true);
         return false;
       }
     }
@@ -647,7 +648,7 @@ export function createProcoder(hub, { folder = null } = {}) {
     try {
       bytes = encodeText(doc.model.getValue(), doc.encoding, doc.bom);
     } catch (err) {
-      toast(`無法儲存：${err.message}`, true);
+      toast(tt('無法儲存：{0}', err.message), true);
       return false;
     }
     const version = doc.model.getAlternativeVersionId();
@@ -661,10 +662,10 @@ export function createProcoder(hub, { folder = null } = {}) {
       relocate(doc, target);
       remember(target);
       emit('fs:changed', P.parent(target));
-      toast(`已另存為 ${target}`);
+      toast(tt('已另存為 {0}', target));
       return true;
     } catch (err) {
-      toast(`無法另存到「${target}」：${err.code === 'not-found' ? '資料夾不存在' : errText(err)}`, true);
+      toast(tt('無法另存到「{0}」：{1}', target, err.code === 'not-found' ? tt('資料夾不存在') : errText(err)), true);
       return false;
     } finally {
       doc.saving = false;

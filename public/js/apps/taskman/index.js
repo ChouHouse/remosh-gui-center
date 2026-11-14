@@ -1,5 +1,6 @@
 // 工作管理員: the SSH host's processes, and charts of CPU, memory, storage and
 // network (read-only). Two pages: 進程 and 圖表.
+import './i18n.js'; // this app's texts in the other languages
 import { h } from '../../core/dom.js';
 import { errText } from '../../core/errors.js';
 import { fmtSize, fmtDuration } from '../../core/format.js';
@@ -12,6 +13,7 @@ import { registerApp, useAppStyle } from '../../shell/apps.js';
 import { parseStats } from './stats.js';
 import { openProcessWindow } from './process.js';
 import { lineChart } from './chart.js';
+import { tt, tm } from '../../core/i18n.js';
 
 useAppStyle(import.meta.url);
 
@@ -30,7 +32,7 @@ const HISTORY = 60; // samples kept for the charts (3 s apart: three minutes)
 let taskman = null;
 function openTaskManager() {
   if (taskman) return taskman.focus();
-  const win = (taskman = createWindow({ title: '工作管理員', appName: '工作管理員', iconHtml: gaugeSvg(), width: 640, height: 520 }));
+  const win = (taskman = createWindow({ title: tt('工作管理員'), appName: tm('工作管理員'), iconHtml: gaugeSvg(), width: 640, height: 520 }));
   const meta = h('div', { class: 'tm-meta' });
   // One card on the 圖表 page: a figure, a line under it, a bar, and a chart.
   const meter = (key, title, withChart = true) => {
@@ -47,10 +49,10 @@ function openTaskManager() {
     return m;
   };
   const mCpu = meter('cpu', 'CPU');
-  const mMem = meter('mem', '記憶體');
-  const mDisk = meter('disk', '儲存空間', false);
-  const mNet = meter('net', '網路');
-  const perf = h('div', { class: 'tm-perf', role: 'tabpanel', 'aria-label': '圖表' }, mCpu.el, mMem.el, mDisk.el, mNet.el);
+  const mMem = meter('mem', tt('記憶體'));
+  const mDisk = meter('disk', tt('儲存空間'), false);
+  const mNet = meter('net', tt('網路'));
+  const perf = h('div', { class: 'tm-perf', role: 'tabpanel', 'aria-label': tt('圖表') }, mCpu.el, mMem.el, mDisk.el, mNet.el);
   const hist = { cpu: [], mem: [], rx: [], tx: [] };
   const push = (arr, v) => {
     arr.push(v);
@@ -59,17 +61,17 @@ function openTaskManager() {
   const note = h('div', { class: 'tm-note' });
   const tbody = h('tbody');
   const cols = [
-    { key: 'name', label: '名稱' },
+    { key: 'name', label: tt('名稱') },
     { key: 'pid', label: 'PID', num: true },
-    { key: 'user', label: '使用者' },
+    { key: 'user', label: tt('使用者') },
     { key: 'cpu', label: 'CPU', num: true },
-    { key: 'rss', label: '記憶體', num: true },
+    { key: 'rss', label: tt('記憶體'), num: true },
   ];
   const sort = { key: 'cpu', dir: -1 };
   const headRow = h('tr');
   const table = h('table', null, h('thead', null, headRow), tbody);
-  const list = h('div', { class: 'tm-list', role: 'tabpanel', 'aria-label': '進程' }, table);
-  const state = h('div', { class: 'state' }, '讀取中…');
+  const list = h('div', { class: 'tm-list', role: 'tabpanel', 'aria-label': tt('進程') }, table);
+  const state = h('div', { class: 'state' }, tt('讀取中…'));
   list.append(state);
   // ---- the two pages
   const tabBtns = {};
@@ -82,7 +84,7 @@ function openTaskManager() {
       b.setAttribute('aria-selected', String(k === key));
     }
   };
-  const tabs = h('div', { class: 'tm-tabs', role: 'tablist' }, [['procs', '進程'], ['perf', '圖表']].map(([k, label]) =>
+  const tabs = h('div', { class: 'tm-tabs', role: 'tablist' }, [['procs', tt('進程')], ['perf', tt('圖表')]].map(([k, label]) =>
     (tabBtns[k] = h('button', { type: 'button', role: 'tab', 'data-tab': k, onclick: () => showTab(k) }, label))));
   win.body.append(h('div', { class: 'tm-top' }, meta, tabs, note), list, perf);
   showTab(data.get('tab') === 'perf' ? 'perf' : 'procs');
@@ -112,7 +114,7 @@ function openTaskManager() {
       const r = typeof a[k] === 'string' ? a[k].localeCompare(b[k]) : (a[k] ?? -1) - (b[k] ?? -1);
       return (r || a.pid - b.pid) * sort.dir;
     });
-    tbody.replaceChildren(...sorted.map((p) => h('tr', { 'data-pid': p.pid, 'data-name': p.name, title: '點兩下查看詳細資料' },
+    tbody.replaceChildren(...sorted.map((p) => h('tr', { 'data-pid': p.pid, 'data-name': p.name, title: tt('點兩下查看詳細資料') },
       h('td', { title: p.name }, p.name),
       h('td', { class: 'num' }, p.pid),
       h('td', null, p.user),
@@ -135,39 +137,39 @@ function openTaskManager() {
         if (total > 0) used = Math.max(0, ((total - (s.sys.cpuIdle - prev.sys.cpuIdle)) / total) * s.nproc);
       }
     }
-    if (used == null) mCpu.set('計算中…', limit ? `上限 ${cores(limit)} 核` : '', null);
-    else if (limit) mCpu.set(`${((used / limit) * 100).toFixed(1)}%`, `${used.toFixed(2)} / ${cores(limit)} 核`, used / limit);
-    else mCpu.set(`${used.toFixed(2)} 核`, '這個容器沒有設定 CPU 上限', null);
+    if (used == null) mCpu.set(tt('計算中…'), limit ? tt('上限 {0} 核', cores(limit)) : '', null);
+    else if (limit) mCpu.set(`${((used / limit) * 100).toFixed(1)}%`, tt('{0} / {1} 核', used.toFixed(2), cores(limit)), used / limit);
+    else mCpu.set(tt('{0} 核', used.toFixed(2)), tt('這個容器沒有設定 CPU 上限'), null);
     mCpu.extra.textContent = s.cpuModel;
     mCpu.extra.title = s.cpuModel;
     if (used != null) push(hist.cpu, limit ? used / limit : Math.min(1, used / s.nproc));
     mCpu.chart.draw([{ values: hist.cpu }], 1);
 
-    if (!src) mMem.set('—', '讀不到記憶體資訊', null);
+    if (!src) mMem.set('—', tt('讀不到記憶體資訊'), null);
     else if (src.memLimit) mMem.set(`${((src.memUsed / src.memLimit) * 100).toFixed(1)}%`, `${fmtSize(src.memUsed)} / ${fmtSize(src.memLimit)}`, src.memUsed / src.memLimit);
-    else mMem.set(fmtSize(src.memUsed), '這個容器沒有設定記憶體上限', null);
+    else mMem.set(fmtSize(src.memUsed), tt('這個容器沒有設定記憶體上限'), null);
     const memTop = src?.memLimit || s.sys?.memLimit;
     if (src && memTop) push(hist.mem, src.memUsed / memTop);
-    mMem.extra.textContent = src && !src.memLimit && memTop ? `圖表以整台主機的 ${fmtSize(memTop)} 為上限` : '';
+    mMem.extra.textContent = src && !src.memLimit && memTop ? tt('圖表以整台主機的 {0} 為上限', fmtSize(memTop)) : '';
     mMem.chart.draw([{ values: hist.mem }], 1);
 
     const disk = s.disks[0];
-    if (!disk) mDisk.set('—', '讀不到儲存空間資訊（找不到 df）', null);
-    else mDisk.set(`${((disk.used / disk.size) * 100).toFixed(1)}%`, `${fmtSize(disk.used)} / ${fmtSize(disk.size)}，剩 ${fmtSize(disk.avail)}`, disk.used / disk.size);
+    if (!disk) mDisk.set('—', tt('讀不到儲存空間資訊（找不到 df）'), null);
+    else mDisk.set(`${((disk.used / disk.size) * 100).toFixed(1)}%`, tt('{0} / {1}，剩 {2}', fmtSize(disk.used), fmtSize(disk.size), fmtSize(disk.avail)), disk.used / disk.size);
     mDisk.extra.replaceChildren(...s.disks.slice(1).map((d) =>
-      h('div', null, `${d.mount}：${fmtSize(d.used)} / ${fmtSize(d.size)}，剩 ${fmtSize(d.avail)}`)));
+      h('div', null, tt('{0}：{1} / {2}，剩 {3}', d.mount, fmtSize(d.used), fmtSize(d.size), fmtSize(d.avail)))));
 
-    if (!s.net) mNet.set('—', '讀不到網路資訊', null);
+    if (!s.net) mNet.set('—', tt('讀不到網路資訊'), null);
     else if (dt > 0.2 && prev?.net) {
       const rx = Math.max(0, (s.net.rx - prev.net.rx) / dt);
       const tx = Math.max(0, (s.net.tx - prev.net.tx) / dt);
       push(hist.rx, rx);
       push(hist.tx, tx);
       mNet.set(`↓ ${fmtSize(Math.round(rx))}/s`, `↑ ${fmtSize(Math.round(tx))}/s`, null);
-    } else mNet.set('計算中…', '', null);
+    } else mNet.set(tt('計算中…'), '', null);
     if (s.net) {
       const top = Math.max(1024, ...hist.rx, ...hist.tx) * 1.15;
-      mNet.extra.textContent = `接收（藍）與傳送（橘），圖表上限 ${fmtSize(top)}/s`;
+      mNet.extra.textContent = tt('接收（藍）與傳送（橘），圖表上限 {0}/s', fmtSize(top));
       mNet.chart.draw([{ values: hist.rx, cls: 'rx' }, { values: hist.tx, cls: 'tx' }], top);
     }
 
@@ -180,14 +182,14 @@ function openTaskManager() {
     const count = s.useCgroup && s.cg.pids != null ? s.cg.pids : s.procs.length;
     const age = s.useCgroup ? s.pid1Age : s.uptime;
     meta.replaceChildren(
-      h('span', null, '範圍 ', h('b', { id: 'tm-scope' }, s.useCgroup ? '容器' : '整台主機')),
-      h('span', null, '主機名稱 ', h('b', null, s.host || '—')),
-      h('span', null, s.useCgroup ? '工作數 ' : '行程數 ', h('b', null, count)),
-      age != null && h('span', null, '已運作 ', h('b', null, fmtDuration(age))));
+      h('span', null, tt('範圍 '), h('b', { id: 'tm-scope' }, s.useCgroup ? tt('容器') : tt('整台主機'))),
+      h('span', null, tt('主機名稱 '), h('b', null, s.host || '—')),
+      h('span', null, s.useCgroup ? tt('工作數 ') : tt('行程數 '), h('b', null, count)),
+      age != null && h('span', null, tt('已運作 '), h('b', null, fmtDuration(age))));
     note.hidden = true;
     state.hidden = rows.length > 0;
     state.className = 'state';
-    state.textContent = rows.length ? '' : '這台主機沒有提供行程清單（找不到 ps）';
+    state.textContent = rows.length ? '' : tt('這台主機沒有提供行程清單（找不到 ps）');
     renderRows();
   }
 
@@ -208,7 +210,7 @@ function openTaskManager() {
         if (!last) {
           state.hidden = false;
           state.className = 'state err';
-          state.textContent = `無法讀取資源資訊：${errText(err)}`;
+          state.textContent = tt('無法讀取資源資訊：{0}', errText(err));
         }
         if (err.code === 'exec-failed') return; // will not start working by retrying
       }
@@ -229,4 +231,4 @@ function openTaskManager() {
   return win;
 }
 
-registerApp({ id: 'tasks', order: 70, name: '工作管理員', icon: gaugeSvg, startMenu: true, launch: openTaskManager });
+registerApp({ id: 'tasks', order: 70, name: tm('工作管理員'), icon: gaugeSvg, startMenu: true, launch: openTaskManager });

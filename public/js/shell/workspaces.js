@@ -9,20 +9,21 @@ import { wm, winLayer, onWindowsChange, switchWorkspace, addWorkspace, removeWor
 import { cloneWindow, copyScroll, windowRect } from './preview.js';
 import { showContextMenu } from './context-menu.js';
 import { setTaskbar } from './taskbar.js';
+import { tt } from '../core/i18n.js';
 
 const btn = $('#ws-btn');
 const num = btn.querySelector('.ws-num');
 const CARD_W = 200;
 const EDITABLE = 'input, textarea, select, [contenteditable=""], [contenteditable="true"], .monaco-editor, .xterm';
 
-export const workspaceName = (id) => `工作區 ${wm.workspaces.indexOf(id) + 1}`;
+export const workspaceName = (id) => tt('工作區 {0}', wm.workspaces.indexOf(id) + 1);
 
 // The number of the current workspace sits inside the screen icon once there are several.
 function renderButton() {
   const many = wm.workspaces.length > 1;
   num.hidden = !many;
   num.textContent = many ? wm.workspaces.indexOf(wm.ws) + 1 : '';
-  btn.title = many ? `${workspaceName(wm.ws)}（連按兩下 Tab 切換）` : '工作區（連按兩下 Tab）';
+  btn.title = many ? tt('{0}（連按兩下 Tab 切換）', workspaceName(wm.ws)) : tt('工作區（連按兩下 Tab）');
 }
 onWindowsChange(renderButton);
 renderButton();
@@ -65,7 +66,7 @@ function close() {
 function choose(card) {
   if (card.dataset.ws === 'new') {
     const id = addWorkspace();
-    if (id == null) return toast(`最多 ${MAX_WORKSPACES} 個工作區`);
+    if (id == null) return toast(tt('最多 {0} 個工作區', MAX_WORKSPACES));
     render(wm.workspaces.length - 1);
     return;
   }
@@ -82,7 +83,7 @@ function render(selected) {
       h('div', { class: 'ws-card-head' },
         h('span', { class: 'nm' }, workspaceName(id)),
         wm.workspaces.length > 1 && h('button', {
-          type: 'button', class: 'ws-close', title: `關閉${workspaceName(id)}（視窗會移到旁邊的工作區）`, 'aria-label': `關閉${workspaceName(id)}`,
+          type: 'button', class: 'ws-close', title: tt('關閉{0}（視窗會移到旁邊的工作區）', workspaceName(id)), 'aria-label': tt('關閉{0}', workspaceName(id)),
           onclick: (ev) => {
             ev.stopPropagation();
             removeWorkspace(id);
@@ -97,8 +98,8 @@ function render(selected) {
     const area = winLayer.getBoundingClientRect();
     const box = h('div', { class: 'ws-stage' }, '+');
     Object.assign(box.style, { width: CARD_W + 'px', height: Math.round((area.height * CARD_W) / area.width) + 'px' });
-    const card = h('div', { class: 'ws-card new', role: 'button', tabindex: '-1', 'data-ws': 'new', 'aria-label': '新增工作區' },
-      h('div', { class: 'ws-card-head' }, h('span', { class: 'nm' }, '新增工作區')), box);
+    const card = h('div', { class: 'ws-card new', role: 'button', tabindex: '-1', 'data-ws': 'new', 'aria-label': tt('新增工作區') },
+      h('div', { class: 'ws-card-head' }, h('span', { class: 'nm' }, tt('新增工作區'))), box);
     card.addEventListener('click', () => choose(card));
     cards.push(card);
   }
@@ -145,7 +146,7 @@ export function openWorkspaces(ev = null) {
   if (panel) return close();
   opener = ev;
   if ($('#desktop').hidden) return;
-  panel = h('div', { id: 'ws-panel', role: 'dialog', 'aria-label': '工作區' });
+  panel = h('div', { id: 'ws-panel', role: 'dialog', 'aria-label': tt('工作區') });
   document.body.append(panel);
   btn.setAttribute('aria-expanded', 'true');
   render();
@@ -160,11 +161,11 @@ btn.addEventListener('contextmenu', (ev) => {
   close();
   showContextMenu(ev, [
     ...wm.workspaces.map((id) => (id === wm.ws
-      ? { label: `${workspaceName(id)}（目前）`, enabled: false, run: () => {} }
+      ? { label: tt('{0}（目前）', workspaceName(id)), enabled: false, run: () => {} }
       : { label: workspaceName(id), run: () => switchWorkspace(id) })),
-    { label: '新增工作區', enabled: wm.workspaces.length < MAX_WORKSPACES, run: () => switchWorkspace(addWorkspace()) },
+    { label: tt('新增工作區'), enabled: wm.workspaces.length < MAX_WORKSPACES, run: () => switchWorkspace(addWorkspace()) },
     null,
-    { label: '隱藏這個小工具', run: () => setTaskbar({ workspaces: false }).catch((err) => toast(`無法儲存：${errText(err)}`, true)) },
+    { label: tt('隱藏這個小工具'), run: () => setTaskbar({ workspaces: false }).catch((err) => toast(tt('無法儲存：{0}', errText(err)), true)) },
   ]);
 });
 

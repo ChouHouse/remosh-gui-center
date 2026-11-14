@@ -20,8 +20,9 @@ import { acceptsDrop, dropAction, dropInto } from './file-drop.js';
 import { openFile } from './file-open.js';
 import { desktopDir, shortcutKind, displayName, readShortcut, writeText } from './shortcuts.js';
 import { isPinned, pinApp } from './start-menu.js';
+import { tt, tm } from '../core/i18n.js';
 
-const layer = h('div', { id: 'desktop-icons', tabindex: '0', 'aria-label': '桌面' });
+const layer = h('div', { id: 'desktop-icons', tabindex: '0', 'aria-label': tm('桌面'), 'data-i18n-aria-label': tm('桌面') });
 $('#windows').prepend(layer);
 
 let items = []; // { entry, path, label, icon, kind, shortcut }
@@ -79,7 +80,7 @@ function saveConfig() {
     try {
       await writeText(P.join(desktopDir(), CONFIG_NAME), JSON.stringify(list, null, 2) + '\n');
     } catch (err) {
-      toast(`無法記住圖示位置：${errText(err)}`, true);
+      toast(tt('無法記住圖示位置：{0}', errText(err)), true);
     }
     savePending = false;
   }, 300);
@@ -232,16 +233,16 @@ async function remove(what) {
   if (!list.length) return;
   const one = list.length === 1 ? list[0] : null;
   const ok = await dialog({
-    title: one ? `確定要刪除「${one.label}」嗎？` : `確定要刪除這 ${list.length} 個項目嗎？`,
-    message: list.every((it) => it.kind) ? '只會刪除捷徑，不會影響它指向的東西。' : list.some((it) => isDir(it.entry)) ? '資料夾裡的所有內容都會一起刪除，而且無法復原。' : '刪除後無法復原。',
-    buttons: [{ label: '取消', value: false, cancel: true, default: true }, { label: '刪除', value: true, danger: true }],
+    title: one ? tt('確定要刪除「{0}」嗎？', one.label) : tt('確定要刪除這 {0} 個項目嗎？', list.length),
+    message: list.every((it) => it.kind) ? tt('只會刪除捷徑，不會影響它指向的東西。') : list.some((it) => isDir(it.entry)) ? tt('資料夾裡的所有內容都會一起刪除，而且無法復原。') : tt('刪除後無法復原。'),
+    buttons: [{ label: tt('取消'), value: false, cancel: true, default: true }, { label: tt('刪除'), value: true, danger: true }],
   });
   if (!ok) return;
   for (const it of list) {
     try {
       await rpc('remove', { path: it.path });
     } catch (err) {
-      toast(`無法刪除「${it.label}」：${errText(err)}`, true);
+      toast(tt('無法刪除「{0}」：{1}', it.label, errText(err)), true);
     }
   }
   emit('fs:changed', desktopDir());
@@ -285,24 +286,24 @@ layer.addEventListener('contextmenu', (ev) => {
   if (it && sel.has(it.path) && sel.size > 1) {
     const list = chosen();
     return showContextMenu(ev, [
-      { label: `開啟 ${list.length} 個項目`, run: () => openMany(list) },
+      { label: tt('開啟 {0} 個項目', list.length), run: () => openMany(list) },
       null,
-      { label: `刪除 ${list.length} 個項目`, danger: true, run: () => remove(list) },
+      { label: tt('刪除 {0} 個項目', list.length), danger: true, run: () => remove(list) },
     ]);
   }
   setSel(it ? [it.path] : []);
   if (!it) {
     return showContextMenu(ev, [
-      { label: '重新整理', run: () => load(true) },
-      { label: '開啟桌面資料夾', run: () => launchApp('files', { path: desktopDir() }) },
+      { label: tt('重新整理'), run: () => load(true) },
+      { label: tt('開啟桌面資料夾'), run: () => launchApp('files', { path: desktopDir() }) },
     ]);
   }
   const appId = it.shortcut?.kind === 'app' ? it.shortcut.id : null;
   showContextMenu(ev, [
-    { label: '開啟', run: () => open(it) },
-    appId && getApp(appId) ? { label: '釘選到開始', enabled: !isPinned(appId), run: () => pinApp(appId) } : false,
+    { label: tt('開啟'), run: () => open(it) },
+    appId && getApp(appId) ? { label: tt('釘選到開始'), enabled: !isPinned(appId), run: () => pinApp(appId) } : false,
     null,
-    { label: '刪除', danger: true, run: () => remove(it) },
+    { label: tt('刪除'), danger: true, run: () => remove(it) },
   ].filter((x) => x !== false));
 });
 
@@ -313,7 +314,7 @@ makeDraggable(layer, (ev) => {
   const group = sel.has(it.path) && sel.size > 1 ? chosen() : [it];
   return {
     type: 'file',
-    name: group.length > 1 ? `${group.length} 個項目` : it.label,
+    name: group.length > 1 ? tt('{0} 個項目', group.length) : it.label,
     icon: it.icon,
     data: { path: it.path, paths: group.map((g) => g.path), isDir: isDir(it.entry), size: it.entry.size },
   };

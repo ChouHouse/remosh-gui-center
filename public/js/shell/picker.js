@@ -18,15 +18,16 @@ import { conn, rpc } from '../core/rpc.js';
 import { errText } from '../core/errors.js';
 import { fmtSize } from '../core/format.js';
 import { fileSvg, folderSvg, ICON, stroke } from '../core/icons.js';
+import { tt, tm } from '../core/i18n.js';
 
 const CHEVRON = stroke('<path d="m6 3.5 4.5 4.5L6 12.5"/>');
 const isFolder = (e) => e.type === 'dir' || e.targetType === 'dir';
 const byName = (a, b) => isFolder(b) - isFolder(a) || a.name.localeCompare(b.name, undefined, { numeric: true });
 const label = (path) => (path === '/' ? '/' : P.base(path));
-const TITLES = { file: '開啟檔案', folder: '開啟資料夾', save: '另存新檔' };
+const TITLES = { file: tm('開啟檔案'), folder: tm('開啟資料夾'), save: tm('另存新檔') };
 let showHidden = false; // kept while the page is open
 
-export function pickPath({ mode = 'file', title = TITLES[mode], start, name = '' } = {}) {
+export function pickPath({ mode = 'file', title = tt(TITLES[mode]), start, name = '' } = {}) {
   return new Promise((resolve) => {
     const home = conn.info.home;
     const first = P.norm(start || home);
@@ -39,7 +40,7 @@ export function pickPath({ mode = 'file', title = TITLES[mode], start, name = ''
 
     const cols = h('div', { class: 'pk-cols' });
     const where = h('span', { class: 'pk-where' });
-    const nameField = mode === 'save' ? h('input', { type: 'text', value: name, spellcheck: 'false', autocapitalize: 'off', 'aria-label': '檔案名稱' }) : null;
+    const nameField = mode === 'save' ? h('input', { type: 'text', value: name, spellcheck: 'false', autocapitalize: 'off', 'aria-label': tt('檔案名稱') }) : null;
     const ok = h('button', { type: 'button', class: 'default pk-ok', onclick: () => confirm() });
     const hidden = h('input', { type: 'checkbox', onchange: () => {
       showHidden = hidden.checked;
@@ -49,12 +50,12 @@ export function pickPath({ mode = 'file', title = TITLES[mode], start, name = ''
     const modal = h('div', { class: 'modal picker', role: 'dialog', 'aria-modal': 'true', 'data-mode': mode },
       h('div', { class: 'box pk-box' },
         h('div', { class: 'pk-head' }, h('h2', null, title),
-          h('button', { type: 'button', class: 'pk-home', title: home, onclick: () => go(home) }, h('span', { html: ICON.home }), '家目錄')),
+          h('button', { type: 'button', class: 'pk-home', title: home, onclick: () => go(home) }, h('span', { html: ICON.home }), tt('家目錄'))),
         cols,
-        nameField && h('label', { class: 'pk-name' }, h('span', null, '檔案名稱'), nameField),
+        nameField && h('label', { class: 'pk-name' }, h('span', null, tt('檔案名稱')), nameField),
         h('div', { class: 'pk-foot' },
-          h('label', { class: 'pk-hidden' }, hidden, '顯示隱藏檔'), where,
-          h('button', { type: 'button', class: 'pk-cancel', onclick: () => done(null) }, '取消'), ok)));
+          h('label', { class: 'pk-hidden' }, hidden, tt('顯示隱藏檔')), where,
+          h('button', { type: 'button', class: 'pk-cancel', onclick: () => done(null) }, tt('取消')), ok)));
 
     const folder = () => sub || base; // where a saved file goes; the chosen folder in 'folder' mode
     const result = () => {
@@ -125,17 +126,17 @@ export function pickPath({ mode = 'file', title = TITLES[mode], start, name = ''
 
     function column(path, side) {
       const head = h('div', { class: 'pk-col-head' },
-        h('button', { type: 'button', class: 'pk-back', title: '上一層', 'aria-label': '上一層', disabled: base === '/', html: ICON.back, onclick: up }),
+        h('button', { type: 'button', class: 'pk-back', title: tt('上一層'), 'aria-label': tt('上一層'), disabled: base === '/', html: ICON.back, onclick: up }),
         h('span', { class: 'pk-col-name', title: path }, label(path)));
       const list = h('div', { class: 'pk-list', 'data-path': path });
       list.addEventListener('scroll', () => scroll.set(path, list.scrollTop));
       const state = lists.get(path);
       if (!state) load(path);
-      if (!state || state.loading) list.append(h('div', { class: 'pk-note' }, '載入中…'));
+      if (!state || state.loading) list.append(h('div', { class: 'pk-note' }, tt('載入中…')));
       else if (state.error) list.append(h('div', { class: 'pk-note err' }, state.error));
       else {
         const shown = state.entries.filter((e) => showHidden || !e.name.startsWith('.'));
-        if (!shown.length) list.append(h('div', { class: 'pk-note' }, '（空的）'));
+        if (!shown.length) list.append(h('div', { class: 'pk-note' }, tt('（空的）')));
         for (const entry of shown) {
           const full = P.join(path, entry.name);
           const dir = isFolder(entry);
@@ -165,11 +166,11 @@ export function pickPath({ mode = 'file', title = TITLES[mode], start, name = ''
       } else {
         // Nothing picked on the left yet, or a file: say so in the right column.
         const head = h('div', { class: 'pk-col-head' },
-          h('button', { type: 'button', class: 'pk-back', title: '上一層', 'aria-label': '上一層', disabled: base === '/', html: ICON.back, onclick: up }),
+          h('button', { type: 'button', class: 'pk-back', title: tt('上一層'), 'aria-label': tt('上一層'), disabled: base === '/', html: ICON.back, onclick: up }),
           h('span', { class: 'pk-col-name' }, file ? file.entry.name : ''));
         const info = file
           ? h('div', { class: 'pk-info' }, h('span', { class: 'pk-info-ico', html: fileSvg(file.entry.name) }), h('strong', null, file.entry.name), h('span', null, fmtSize(file.entry.size || 0)))
-          : h('div', { class: 'pk-info' }, h('span', null, mode === 'file' ? '在左邊點資料夾看裡面的內容，點檔案來選它' : '在左邊點資料夾看裡面的內容'));
+          : h('div', { class: 'pk-info' }, h('span', null, mode === 'file' ? tt('在左邊點資料夾看裡面的內容，點檔案來選它') : tt('在左邊點資料夾看裡面的內容')));
         rightEl = h('div', { class: 'pk-col right', 'data-side': 'right' }, head, info);
       }
       cols.replaceChildren(left.el, rightEl);
@@ -179,9 +180,9 @@ export function pickPath({ mode = 'file', title = TITLES[mode], start, name = ''
         else col.list.querySelector('.pk-item.on')?.scrollIntoView({ block: 'center' });
       }
       const value = result();
-      ok.textContent = mode === 'file' ? '開啟' : mode === 'save' ? '儲存' : `選擇「${label(folder())}」`;
+      ok.textContent = mode === 'file' ? tt('開啟') : mode === 'save' ? tt('儲存') : tt('選擇「{0}」', label(folder()));
       ok.disabled = !value;
-      where.textContent = mode === 'file' ? (file ? file.path : '請選擇一個檔案') : mode === 'folder' ? folder() : `存到 ${folder()}`;
+      where.textContent = mode === 'file' ? (file ? file.path : tt('請選擇一個檔案')) : mode === 'folder' ? folder() : tt('存到 {0}', folder());
       where.title = where.textContent;
     }
 

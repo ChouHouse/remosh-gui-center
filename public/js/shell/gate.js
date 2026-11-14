@@ -1,6 +1,7 @@
 // Access-password screen (server env WEB_PASSWORD). Shown before the SSH login
 // when the server requires it; the server enforces it on /ws with a cookie.
 import { $ } from '../core/dom.js';
+import { tt } from '../core/i18n.js';
 
 const gateEl = $('#gate');
 const form = $('#gate-form');
@@ -41,9 +42,9 @@ function ask() {
           form.onsubmit = null;
           return resolve();
         }
-        error.textContent = body.locked ? `嘗試太多次，請 ${body.locked} 秒後再試` : '存取密碼不正確';
+        error.textContent = body.locked ? tt('嘗試太多次，請 {0} 秒後再試', body.locked) : tt('存取密碼不正確');
       } catch {
-        error.textContent = '無法連上伺服器';
+        error.textContent = tt('無法連上伺服器');
       } finally {
         btn.disabled = false;
       }

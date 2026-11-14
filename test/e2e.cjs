@@ -54,7 +54,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   fs.writeFileSync(home + '/project/hello.sh', '#!/bin/sh\necho RAN-$((40+2))\n', { mode: 0o644 });
   give(home + '/project/hello.sh');
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, permissions: ['clipboard-read', 'clipboard-write'] });
+  const ctx = await browser.newContext({ locale: 'zh-TW', viewport: { width: 1280, height: 800 }, permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
@@ -1747,7 +1747,8 @@ const { execSync: execSyncTop } = require('node:child_process');
   };
   await sw.waitFor();
   check((await sw.locator('.titlebar .ttext').textContent()) === '設定', 'settings window opens from the start menu');
-  check((await sw.locator('.set-nav button').allTextContents()).join() === '動畫,檔案關聯,樣式,工作列,帳號', 'settings categories');
+  check((await sw.locator('.set-nav button').allTextContents()).join() === '系統,動畫,檔案關聯,樣式,工作列,帳號', 'settings categories');
+  await page.locator('.set-nav button', { hasText: '動畫' }).click();
   check(await page.isChecked('#set-anim-enabled') && (await page.inputValue('#set-anim-speed')) === 'normal', 'defaults: animations on, normal speed');
   check(await page.isDisabled('#set-save'), 'nothing to save yet');
   await page.selectOption('#set-anim-speed', 'slow');
@@ -2053,6 +2054,39 @@ const { execSync: execSyncTop } = require('node:child_process');
   await page.fill('#acc-new', '');
   await page.fill('#acc-new2', '');
 
+  // ---- settings: 系統 › language (English, Japanese, Traditional Chinese)
+  {
+    await focusSettings();
+    const navText = () => sw.locator('.set-nav button').allTextContents().then((x) => x.join());
+    check((await navText()).startsWith('系統,動畫'), 'settings has a 系統 category, first in the list', await navText());
+    await sw.locator('.set-nav button', { hasText: '系統' }).click();
+    check((await sw.locator('#set-lang option').allTextContents()).join() === '跟隨瀏覽器,繁體中文,English,日本語' && (await sw.locator('#set-lang').inputValue()) === 'auto', 'it offers the languages; following the browser is the default');
+    await sw.locator('#set-lang').selectOption('en');
+    check(await waitSetting((st) => st.system?.lang === 'en'), 'the language is saved with the settings');
+    await page.waitForFunction(() => document.documentElement.lang === 'en');
+    await sw.locator('.set-nav button', { hasText: 'System' }).waitFor();
+    check((await navText()) === 'System,Animation,File associations,Style,Taskbar,Account' && (await sw.locator('.set-main h2').textContent()) === 'System', 'English: the settings window switches at once', await navText());
+    check((await page.getAttribute('#start-btn', 'title')) === 'Menu' && (await page.getAttribute('#show-desktop', 'title')) === 'Show desktop', 'the taskbar\'s own texts follow');
+    await page.click('#start-btn');
+    await page.waitForSelector('#start-menu:not([hidden])');
+    check((await page.locator('#sm-apps button').first().textContent()) === 'Files' && (await page.locator('#sm-all-btn span').first().textContent()) === 'All apps' && (await page.locator('#disconnect span[data-i18n]').textContent()) === 'Log out',
+      'the start menu and the app names are in English', await page.locator('#sm-apps button').allTextContents().then((x) => x.join()));
+    await page.locator('#sm-apps button', { hasText: 'Notepad' }).click();
+    const np2 = page.locator('.win[data-app="記事本"]').last();
+    await np2.locator('textarea').waitFor();
+    check((await np2.locator('.titlebar .ttext').textContent()) === 'Untitled — Notepad' && (await np2.locator('.menu-btn').allTextContents()).join() === 'File,View', 'a newly opened app is in English: title bar and menus', await np2.locator('.titlebar .ttext').textContent());
+    await np2.locator('.traffic .close').click();
+    check((await page.evaluate(() => localStorage.getItem('sshdesk.lang'))) === '"en"', 'the choice is also kept in the browser, for the login screen');
+    await focusSettings();
+    await sw.locator('#set-lang').selectOption('ja');
+    await sw.locator('.set-nav button', { hasText: 'システム' }).waitFor();
+    check((await page.getAttribute('#start-btn', 'title')) === 'メニュー' && (await sw.locator('.set-row label, .set-row .lbl, .set-row').first().textContent()).includes('言語'), 'Japanese works the same way');
+    await sw.locator('#set-lang').selectOption('zh-TW');
+    await sw.locator('.set-nav button', { hasText: '系統' }).waitFor();
+    await sw.locator('#set-lang').selectOption('auto');
+    check(await waitSetting((st) => st.system?.lang === 'auto') && (await page.evaluate(() => document.documentElement.lang)) === 'zh-TW' && (await page.getAttribute('#start-btn', 'title')) === '選單', 'back to Traditional Chinese (the browser\'s language here)');
+  }
+
   // ---- settings: 檔案關聯 lists what was remembered and lets it be changed
   await sw.locator('.set-nav button', { hasText: '檔案關聯' }).click();
   const rowExts = await sw.locator('.assoc-row code').allTextContents();
@@ -2241,6 +2275,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   await cab.locator('.traffic .close').click();
   await page.click('#start-btn');
   await page.click('#sm-settings');
+  await page.locator('.set-nav button', { hasText: '動畫' }).click();
   check(!(await page.isChecked('#set-anim-enabled')) && (await page.inputValue('#set-anim-speed')) === 'fast', 'settings window shows the loaded values');
   await page.check('#set-anim-enabled');
   await page.click('#set-save');

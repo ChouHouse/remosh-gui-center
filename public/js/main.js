@@ -1,6 +1,7 @@
 // Entry point. The apps are not listed here: the server says which folders
 // are in js/apps (see /api/apps) and each one is loaded and registers itself.
 // An app's `order` (shell/apps.js) decides its place in the start menu.
+import './shell/language.js'; // first: everything after it is shown in the chosen language
 import './shell/sessions.js';
 import './shell/desktop.js';
 import './shell/context-menu.js';

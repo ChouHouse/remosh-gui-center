@@ -3,6 +3,7 @@ import { h } from '../../core/dom.js';
 import { P } from '../../core/path.js';
 import { fileSvg, folderSvg } from '../../core/icons.js';
 import { procoderSvg } from './icon.js';
+import { tt } from '../../core/i18n.js';
 
 // actions: { newFile(), openFile(), openFolder(), openRecent(ref), forget(ref) }
 export function buildWelcome(recent, actions) {
@@ -17,19 +18,19 @@ export function buildWelcome(recent, actions) {
           h('span', { class: 'pc-w-ico', html: isDir || ref === '/' ? folderSvg() : fileSvg(P.base(path)) }),
           h('span', { class: 'pc-w-name' }, P.base(path) || '/'),
           h('span', { class: 'pc-w-dir' }, P.parent(path))),
-        h('button', { type: 'button', class: 'pc-w-forget', title: '從清單移除', 'aria-label': '從清單移除', onclick: () => actions.forget(ref) }, '×'));
+        h('button', { type: 'button', class: 'pc-w-forget', title: tt('從清單移除'), 'aria-label': tt('從清單移除'), onclick: () => actions.forget(ref) }, '×'));
     })
-    : h('p', { class: 'pc-w-empty' }, '還沒有開啟過檔案');
+    : h('p', { class: 'pc-w-empty' }, tt('還沒有開啟過檔案'));
   return h('div', { class: 'pc-welcome' },
     h('div', { class: 'pc-w-in' },
       h('div', { class: 'pc-w-head' },
         h('span', { class: 'pc-w-logo', html: procoderSvg() }),
-        h('div', null, h('h1', null, 'Procoder'), h('p', null, '直接編輯主機上的檔案'))),
+        h('div', null, h('h1', null, 'Procoder'), h('p', null, tt('直接編輯主機上的檔案')))),
       h('div', { class: 'pc-w-cols' },
-        h('section', { class: 'pc-w-start' }, h('h2', null, '開始'),
-          link('新增檔案', actions.newFile),
-          link('開啟檔案…', actions.openFile),
-          link('開啟資料夾…', actions.openFolder)),
-        h('section', { class: 'pc-w-recents' }, h('h2', null, '最近開啟'), list)),
-      h('p', { class: 'pc-w-tip' }, '也可以從檔案櫃把檔案或資料夾拖進這個視窗來開啟。')));
+        h('section', { class: 'pc-w-start' }, h('h2', null, tt('開始')),
+          link(tt('新增檔案'), actions.newFile),
+          link(tt('開啟檔案…'), actions.openFile),
+          link(tt('開啟資料夾…'), actions.openFolder)),
+        h('section', { class: 'pc-w-recents' }, h('h2', null, tt('最近開啟')), list)),
+      h('p', { class: 'pc-w-tip' }, tt('也可以從檔案櫃把檔案或資料夾拖進這個視窗來開啟。'))));
 }

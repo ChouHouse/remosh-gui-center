@@ -21,32 +21,32 @@
 <body>
 <div id="desktop" hidden>
   <main id="windows"></main>
-  <div id="start-menu" role="menu" aria-label="開始選單" hidden>
+  <div id="start-menu" role="menu" aria-label="開始選單" data-i18n-aria-label="開始選單" hidden>
     <div id="sm-home">
-      <div class="sm-title">已釘選</div>
+      <div class="sm-title" data-i18n>已釘選</div>
       <div id="sm-apps"></div>
-      <button type="button" id="sm-all-btn" role="menuitem"><span>所有應用程式</span><span class="chev" aria-hidden="true">›</span></button>
+      <button type="button" id="sm-all-btn" role="menuitem"><span data-i18n>所有應用程式</span><span class="chev" aria-hidden="true">›</span></button>
     </div>
     <div id="sm-all" hidden>
-      <button type="button" id="sm-back" role="menuitem"><span class="chev" aria-hidden="true">‹</span><span>所有應用程式</span></button>
+      <button type="button" id="sm-back" role="menuitem"><span class="chev" aria-hidden="true">‹</span><span data-i18n>所有應用程式</span></button>
       <div id="sm-all-list"></div>
     </div>
     <div class="sm-sep"></div>
-    <button type="button" id="sm-user" aria-expanded="false" title="帳號選項">
+    <button type="button" id="sm-user" aria-expanded="false" title="帳號選項" data-i18n-title="帳號選項">
       <span class="avatar" id="sm-avatar"></span>
       <span class="who"><b id="sm-username"></b><small id="conn-label"></small></span>
       <span class="chev" aria-hidden="true">›</span>
     </button>
     <div id="sm-logout-row" hidden>
       <div id="sm-sessions"></div>
-      <button type="button" id="sm-switch" role="menuitem"><span class="sm-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5.2" r="2.4"/><path d="M1.8 13c.5-2.3 2.1-3.6 4.2-3.6 1 0 1.9.3 2.6.9M11.5 8.5v5M9 11h5"/></svg></span><span>切換使用者</span></button>
+      <button type="button" id="sm-switch" role="menuitem"><span class="sm-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5.2" r="2.4"/><path d="M1.8 13c.5-2.3 2.1-3.6 4.2-3.6 1 0 1.9.3 2.6.9M11.5 8.5v5M9 11h5"/></svg></span><span data-i18n>切換使用者</span></button>
       <button type="button" id="sm-fullscreen" role="menuitem" hidden><span class="sm-ico" id="sm-fullscreen-ico"></span><span id="sm-fullscreen-label">全螢幕</span></button>
-      <button type="button" id="disconnect" role="menuitem"><span class="sm-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 2.5H3.5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3M10.5 5 13.5 8l-3 3M13.5 8H6.5"/></svg></span><span>登出</span></button>
+      <button type="button" id="disconnect" role="menuitem"><span class="sm-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 2.5H3.5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3M10.5 5 13.5 8l-3 3M13.5 8H6.5"/></svg></span><span data-i18n>登出</span></button>
     </div>
   </div>
-  <nav id="dock" aria-label="工作列">
+  <nav id="dock" aria-label="工作列" data-i18n-aria-label="工作列">
     <div id="dock-main">
-    <button type="button" id="start-btn" aria-haspopup="menu" aria-expanded="false" title="選單" aria-label="選單">
+    <button type="button" id="start-btn" aria-haspopup="menu" aria-expanded="false" title="選單" data-i18n-title="選單" aria-label="選單" data-i18n-aria-label="選單">
       <svg viewBox="0 0 22 22" aria-hidden="true">
         <rect class="frame" x="1.5" y="1.5" width="19" height="19" rx="5.5"/>
         <circle class="d1" cx="7.4" cy="7.4" r="2.5"/>
@@ -57,57 +57,57 @@
     <div id="dock-items"></div>
     </div>
     <div id="dock-tray">
-      <button type="button" id="ws-btn" title="工作區（連按兩下 Tab）" aria-label="工作區" aria-haspopup="dialog" aria-expanded="false">
+      <button type="button" id="ws-btn" title="工作區（連按兩下 Tab）" data-i18n-title="工作區（連按兩下 Tab）" aria-label="工作區" data-i18n-aria-label="工作區" aria-haspopup="dialog" aria-expanded="false">
         <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="3.5" width="16" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 17.5h6M10 14.5v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         <span class="ws-num" hidden></span>
       </button>
       <div id="clock" title=""><span id="clock-time"></span><span id="clock-date"></span></div>
     </div>
-    <button type="button" id="show-desktop" title="顯示桌面" aria-label="顯示桌面"></button>
+    <button type="button" id="show-desktop" title="顯示桌面" data-i18n-title="顯示桌面" aria-label="顯示桌面" data-i18n-aria-label="顯示桌面"></button>
   </nav>
 </div>
 
 <div id="login" class="overlay" hidden>
   <form id="login-form" class="card" autocomplete="on">
     <h1>Remosh GUI</h1>
-    <p class="sub" id="login-sub">連線到 SSH 主機，瀏覽並編輯上面的檔案</p>
+    <p class="sub" id="login-sub" data-i18n>連線到 SSH 主機，瀏覽並編輯上面的檔案</p>
     <div class="row">
-      <label class="grow">主機位置
+      <label class="grow"><span data-i18n>主機位置</span>
         <input id="f-host" name="host" required placeholder="example.com" autocapitalize="off" spellcheck="false">
       </label>
-      <label class="port">連接埠
+      <label class="port"><span data-i18n>連接埠</span>
         <input id="f-port" name="port" type="number" min="1" max="65535" value="22" required>
       </label>
     </div>
-    <label>帳號
+    <label><span data-i18n>帳號</span>
       <input id="f-user" name="username" required autocomplete="username" autocapitalize="off" spellcheck="false">
     </label>
-    <label><span id="pass-label">密碼</span>
+    <label><span id="pass-label" data-i18n>密碼</span>
       <input id="f-pass" name="password" type="password" autocomplete="current-password">
     </label>
     <div class="keyrow">
       <input type="file" id="f-key" hidden>
-      <button type="button" id="key-pick">選擇私鑰檔…</button>
-      <span id="key-name">未選擇（選填，改用金鑰登入）</span>
-      <button type="button" id="key-clear" hidden>移除</button>
+      <button type="button" id="key-pick" data-i18n>選擇私鑰檔…</button>
+      <span id="key-name" data-i18n>未選擇（選填，改用金鑰登入）</span>
+      <button type="button" id="key-clear" hidden data-i18n>移除</button>
     </div>
     <div id="login-error" class="error" role="alert" hidden></div>
-    <button type="submit" id="login-btn" class="primary">登入</button>
-    <p class="note">密碼與私鑰不會被儲存。</p>
-    <aside id="saved-servers" aria-label="登入過的主機"></aside>
+    <button type="submit" id="login-btn" class="primary" data-i18n>登入</button>
+    <p class="note" data-i18n>密碼與私鑰不會被儲存。</p>
+    <aside id="saved-servers" aria-label="登入過的主機" data-i18n-aria-label="登入過的主機"></aside>
   </form>
-  <div id="kept-sessions" aria-label="已登入的使用者"></div>
+  <div id="kept-sessions" aria-label="已登入的使用者" data-i18n-aria-label="已登入的使用者"></div>
 </div>
 
 <div id="gate" class="overlay" hidden>
   <form id="gate-form" class="card" autocomplete="off">
     <h1>Remosh GUI</h1>
-    <p class="sub">這個站台需要存取密碼</p>
-    <label>存取密碼
+    <p class="sub" data-i18n>這個站台需要存取密碼</p>
+    <label><span data-i18n>存取密碼</span>
       <input id="gate-pass" type="password" autocomplete="off" required>
     </label>
     <div id="gate-error" class="error" role="alert" hidden></div>
-    <button type="submit" id="gate-btn" class="primary">進入</button>
+    <button type="submit" id="gate-btn" class="primary" data-i18n>進入</button>
   </form>
 </div>
 

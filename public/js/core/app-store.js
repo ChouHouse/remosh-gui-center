@@ -17,6 +17,7 @@ import { toast } from './ui.js';
 import { errText } from './errors.js';
 import { toBase64, fromBase64 } from './text-codec.js';
 import { settingsDir, whenSettingsReady } from './settings.js';
+import { tt } from './i18n.js';
 
 export const APPS_DIR = 'app';
 const FILE = 'config.inv-remosh_gui-config';
@@ -45,7 +46,7 @@ export function appStore(appId, { defaults = {}, migrate = null } = {}) {
       await rpc('mkdir', { path: P.join(settingsDir(), APPS_DIR) });
       await rpc('mkdir', { path: folder() });
       await rpc('write', { path: file(), data: toBase64(new TextEncoder().encode(JSON.stringify(data, null, 2) + '\n')) });
-    }).catch((err) => toast(`無法儲存 ${appId} 的資料：${errText(err)}`, true));
+    }).catch((err) => toast(tt('無法儲存 {0} 的資料：{1}', appId, errText(err)), true));
   };
   const save = () => {
     clearTimeout(timer);

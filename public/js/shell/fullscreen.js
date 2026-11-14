@@ -3,6 +3,7 @@
 import { $ } from '../core/dom.js';
 import { on } from '../core/events.js';
 import { host } from './sessions.js';
+import { tt } from '../core/i18n.js';
 
 // Full screen is a property of the tab: act on the top document, also when this
 // page is one of several sessions in a frame.
@@ -41,8 +42,10 @@ export async function leaveFullscreen() {
 
 const button = $('#sm-fullscreen');
 const sync = () => {
-  $('#sm-fullscreen-label').textContent = isFullscreen() ? '離開全螢幕' : '全螢幕';
+  $('#sm-fullscreen-label').textContent = isFullscreen() ? tt('離開全螢幕') : tt('全螢幕');
 };
+on('lang:changed', sync);
+sync();
 if (canFullscreen) {
   button.hidden = false;
   $('#sm-fullscreen-ico').innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg>';

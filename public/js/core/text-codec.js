@@ -1,5 +1,6 @@
 // Bytes <-> text for the editor (UTF-8 and Big5) and base64 for the wire.
 import { appError } from './errors.js';
+import { tt } from './i18n.js';
 
 export let big5Table = null;
 export function big5Encoder() {
@@ -55,7 +56,7 @@ export function encodeText(text, encoding, bom) {
     if (cp < 0x80) out.push(cp);
     else {
       const v = table.get(ch);
-      if (v == null) throw appError('unencodable', `字元「${ch}」無法用 Big5 儲存`);
+      if (v == null) throw appError('unencodable', tt('字元「{0}」無法用 Big5 儲存', ch));
       out.push(v >> 8, v & 0xff);
     }
   }

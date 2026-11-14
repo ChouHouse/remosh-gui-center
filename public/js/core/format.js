@@ -1,4 +1,5 @@
 // Formatting of sizes, dates and durations.
+import { tt } from './i18n.js';
 export function fmtSize(n) {
   if (n < 1024) return n + ' B';
   const units = ['KB', 'MB', 'GB', 'TB'];
@@ -14,9 +15,9 @@ export function fmtDuration(sec) {
   const d = Math.floor(sec / 86400);
   const hr = Math.floor((sec % 86400) / 3600);
   const min = Math.floor((sec % 3600) / 60);
-  if (d) return `${d} 天 ${hr} 小時`;
-  if (hr) return `${hr} 小時 ${min} 分`;
-  return `${min} 分`;
+  if (d) return tt('{0} 天 {1} 小時', d, hr);
+  if (hr) return tt('{0} 小時 {1} 分', hr, min);
+  return tt('{0} 分', min);
 }
 export function fmtTime(sec) {
   if (!sec) return '';

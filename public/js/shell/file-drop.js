@@ -8,12 +8,13 @@ import { rpc } from '../core/rpc.js';
 import { emit } from '../core/events.js';
 import { getApp } from './apps.js';
 import { appFile, linkFile, writeText } from './shortcuts.js';
+import { tt } from '../core/i18n.js';
 
 export const acceptsDrop = (payload) => payload.type === 'file' || payload.type === 'app';
 
 export function dropAction(payload, mods) {
-  if (payload.type === 'app' || mods.altKey) return '建立捷徑';
-  return mods.ctrlKey ? '複製' : '移動';
+  if (payload.type === 'app' || mods.altKey) return tt('建立捷徑');
+  return mods.ctrlKey ? tt('複製') : tt('移動');
 }
 
 // payload.data.paths lists every file being dragged (data.path is the first).
@@ -25,7 +26,7 @@ export async function dropInto(dir, payload, mods) {
     if (payload.type === 'app') {
       const file = appFile(getApp(payload.data.id));
       if (taken.has(file.name)) {
-        toast(`這裡已經有「${payload.name}」了`);
+        toast(tt('這裡已經有「{0}」了', payload.name));
         return made;
       }
       await writeText(P.join(dir, file.name), file.text);
@@ -52,13 +53,13 @@ export async function dropInto(dir, payload, mods) {
           taken.add(name);
           made.push(name);
         } catch (err) {
-          toast(`無法把「${P.base(from)}」放到這裡：${errText(err)}`, true);
+          toast(tt('無法把「{0}」放到這裡：{1}', P.base(from), errText(err)), true);
         }
       }
     }
     if (made.length) emit('fs:changed', dir);
   } catch (err) {
-    toast(`無法放到這裡：${errText(err)}`, true);
+    toast(tt('無法放到這裡：{0}', errText(err)), true);
   }
   return made;
 }

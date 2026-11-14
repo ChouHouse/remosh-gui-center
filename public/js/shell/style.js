@@ -6,6 +6,7 @@ import { rpc } from '../core/rpc.js';
 import { on } from '../core/events.js';
 import { toBase64, fromBase64 } from '../core/text-codec.js';
 import { getSettings, updateSettings, settingsDir, wallpaperDir, animationMs, MAX_WALLPAPERS } from '../core/settings.js';
+import { tt, tm } from '../core/i18n.js';
 
 // ---- system colour and light/dark mode
 // The system colour is the one accent of the desktop: buttons, switches, the
@@ -19,18 +20,18 @@ import { getSettings, updateSettings, settingsDir, wallpaperDir, animationMs, MA
 const WHITE = '#ffffff';
 const tone = (color, shade, ink) => ({ color, shade, ink });
 export const COLORS = [
-  { id: 'default', label: '預設' },
-  { id: 'pink', label: '桃紅', deep: tone('#d6337f', '#a81f5f', WHITE), pale: tone('#ff9cc4', '#f070a4', '#3a0f22') },
-  { id: 'blue', label: '藍', deep: tone('#1f5fbf', '#174a96', WHITE), pale: tone('#7db8f5', '#4a9bea', '#0b2545') },
-  { id: 'green', label: '綠', deep: tone('#1f8a4c', '#166a39', WHITE), pale: tone('#8fdcae', '#5fc48a', '#0d3320') },
-  { id: 'yellow', label: '黃', deep: tone('#a87900', '#805c00', WHITE), pale: tone('#f5cc3d', '#dba91a', '#3a2c00') },
-  { id: 'orange', label: '橘', deep: tone('#c9620e', '#9c4a08', WHITE), pale: tone('#f59a3d', '#db7a1a', '#3a1c00') },
-  { id: 'gray', label: '灰', deep: tone('#5b6470', '#434a54', WHITE), pale: tone('#c3c9d1', '#a3abb5', '#1f2429') },
+  { id: 'default', label: tm('預設') },
+  { id: 'pink', label: tm('桃紅'), deep: tone('#d6337f', '#a81f5f', WHITE), pale: tone('#ff9cc4', '#f070a4', '#3a0f22') },
+  { id: 'blue', label: tm('藍'), deep: tone('#1f5fbf', '#174a96', WHITE), pale: tone('#7db8f5', '#4a9bea', '#0b2545') },
+  { id: 'green', label: tm('綠'), deep: tone('#1f8a4c', '#166a39', WHITE), pale: tone('#8fdcae', '#5fc48a', '#0d3320') },
+  { id: 'yellow', label: tm('黃'), deep: tone('#a87900', '#805c00', WHITE), pale: tone('#f5cc3d', '#dba91a', '#3a2c00') },
+  { id: 'orange', label: tm('橘'), deep: tone('#c9620e', '#9c4a08', WHITE), pale: tone('#f59a3d', '#db7a1a', '#3a1c00') },
+  { id: 'gray', label: tm('灰'), deep: tone('#5b6470', '#434a54', WHITE), pale: tone('#c3c9d1', '#a3abb5', '#1f2429') },
 ];
 // Names used by earlier versions, when deep and pale were separate choices.
 const OLD_IDS = { 'gray-light': 'gray', 'off-white': 'gray' };
 const colourId = (id) => OLD_IDS[id] || String(id).replace(/-(dark|light)$/, '');
-export const MODES = [['auto', '跟隨裝置'], ['light', '淺色'], ['dark', '深色']];
+export const MODES = [['auto', tm('跟隨裝置')], ['light', tm('淺色')], ['dark', tm('深色')]];
 
 const darkQuery = matchMedia('(prefers-color-scheme: dark)');
 export const effectiveMode = () => {
@@ -132,7 +133,7 @@ async function toJpeg(file, maxSide = 2560) {
   canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close?.();
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.86));
-  if (!blob) throw new Error('無法處理這張圖片');
+  if (!blob) throw new Error(tt('無法處理這張圖片'));
   return new Uint8Array(await blob.arrayBuffer());
 }
 
@@ -155,7 +156,7 @@ async function promote(name) {
 }
 
 export async function uploadWallpaper(file) {
-  if (!file.type.startsWith('image/')) throw new Error('請選擇圖片檔');
+  if (!file.type.startsWith('image/')) throw new Error(tt('請選擇圖片檔'));
   const bytes = await toJpeg(file);
   const name = `wp-${Date.now()}.jpg`;
   await rpc('mkdir', { path: settingsDir() });

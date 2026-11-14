@@ -2,10 +2,11 @@
 // and saved in ~/.remosh-gui/app/editor/.
 import { store } from '../../core/store.js';
 import { appStore } from '../../core/app-store.js';
+import { tm } from '../../core/i18n.js';
 
 export const APP_NAME = 'Procoder';
-export const UNTITLED = '未命名';
-export const WELCOME = '歡迎';
+export const UNTITLED = tm('未命名');
+export const WELCOME = tm('歡迎');
 export const LARGE_FILE_BYTES = 200 * 1024 * 1024; // above this the user is asked first
 export const RECENT_MAX = 10;
 

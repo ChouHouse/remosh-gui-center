@@ -1,9 +1,10 @@
 // Procoder's language list: a small pop-up over the status bar to say what
 // language a file is really written in, whatever its name ends with.
 import { h } from '../../core/dom.js';
+import { tt } from '../../core/i18n.js';
 
 export const langName = (monaco, id) =>
-  (id === 'plaintext' ? '純文字' : monaco.languages.getLanguages().find((l) => l.id === id)?.aliases?.[0] || id);
+  (id === 'plaintext' ? tt('純文字') : monaco.languages.getLanguages().find((l) => l.id === id)?.aliases?.[0] || id);
 
 // Resolves to a language id, 'auto' (go by the file name again) or null (closed).
 // autoId: what "auto" would pick, shown next to that choice.
@@ -12,9 +13,9 @@ export function pickLanguage(monaco, anchor, currentId, autoId) {
     const all = monaco.languages.getLanguages()
       .map((l) => ({ id: l.id, name: langName(monaco, l.id) }))
       .sort((a, b) => a.name.localeCompare(b.name));
-    const input = h('input', { type: 'text', placeholder: '搜尋語言…', spellcheck: 'false', autocapitalize: 'off', 'aria-label': '搜尋語言' });
+    const input = h('input', { type: 'text', placeholder: tt('搜尋語言…'), spellcheck: 'false', autocapitalize: 'off', 'aria-label': tt('搜尋語言') });
     const list = h('div', { class: 'pc-lang-list', role: 'listbox' });
-    const box = h('div', { class: 'pc-lang', role: 'dialog', 'aria-label': '選擇語言' }, input, list);
+    const box = h('div', { class: 'pc-lang', role: 'dialog', 'aria-label': tt('選擇語言') }, input, list);
     let rows = [];
     let at = 0;
 
@@ -33,14 +34,14 @@ export function pickLanguage(monaco, anchor, currentId, autoId) {
     function render() {
       const q = input.value.trim().toLowerCase();
       const items = [
-        ...(q ? [] : [{ id: 'auto', name: '自動偵測', note: `依檔名：${langName(monaco, autoId)}` }]),
+        ...(q ? [] : [{ id: 'auto', name: tt('自動偵測'), note: tt('依檔名：{0}', langName(monaco, autoId)) }]),
         ...all.filter((l) => !q || l.name.toLowerCase().includes(q) || l.id.includes(q)),
       ];
       rows = items.map((item) => h('button', {
         type: 'button', role: 'option', 'data-lang': item.id, class: item.id === currentId ? 'on' : '',
         onclick: () => done(item.id),
       }, h('span', { title: item.name }, item.name), h('span', { class: 'pc-lang-id', title: item.note || item.id }, item.note || item.id)));
-      list.replaceChildren(...(rows.length ? rows : [h('div', { class: 'pc-lang-none' }, '找不到這個語言')]));
+      list.replaceChildren(...(rows.length ? rows : [h('div', { class: 'pc-lang-none' }, tt('找不到這個語言'))]));
       at = Math.max(0, q ? 0 : items.findIndex((i) => i.id === currentId));
       mark();
     }

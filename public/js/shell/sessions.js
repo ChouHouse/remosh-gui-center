@@ -6,6 +6,7 @@
 // at the top keeps the list; iframes reach it through window.parent.
 import { on } from '../core/events.js';
 import { conn } from '../core/rpc.js';
+import { tt } from '../core/i18n.js';
 
 const PARAM = 'session';
 
@@ -56,7 +57,7 @@ function createHost() {
       const id = 's' + ++seq;
       const frame = document.createElement('iframe');
       frame.className = 'session-frame';
-      frame.title = '另一個使用者';
+      frame.title = tt('另一個使用者');
       frame.allow = 'fullscreen; clipboard-read; clipboard-write';
       frame.src = `${location.pathname}?${PARAM}=${id}`;
       document.body.append(frame);

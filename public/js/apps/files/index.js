@@ -1,5 +1,6 @@
 // 檔案櫃: Finder-style browser for the remote file system, with right-click
 // menus for open / open with / copy / cut / paste / delete / properties.
+import './i18n.js'; // this app's texts in the other languages
 import { h } from '../../core/dom.js';
 import { store } from '../../core/store.js';
 import { errText } from '../../core/errors.js';
@@ -22,6 +23,7 @@ import { isPinned, pinApp } from '../../shell/start-menu.js';
 import { openFile, openWith } from '../../shell/file-open.js';
 import { showContextMenu } from '../../shell/context-menu.js';
 import { putFiles, takeFiles, clearFiles, cutPaths } from './clipboard.js';
+import { tt, tm } from '../../core/i18n.js';
 
 useAppStyle(import.meta.url);
 
@@ -55,7 +57,7 @@ const data = appStore('files', {
 const COL_MAX = 900;
 
 function createFinder(home, startPath = home) {
-  const win = createWindow({ title: '檔案櫃', appName: '檔案櫃', iconHtml: fileCabinetSvg(), width: 860, height: 540 });
+  const win = createWindow({ title: tt('檔案櫃'), appName: tm('檔案櫃'), iconHtml: fileCabinetSvg(), width: 860, height: 540 });
   const st = {
     path: home,
     history: [],
@@ -72,20 +74,20 @@ function createFinder(home, startPath = home) {
   };
 
   const btn = (icon, title, onclick) => h('button', { type: 'button', class: 'tb-btn', title, 'aria-label': title, html: icon, onclick });
-  const bBack = btn(ICON.back, '上一頁', () => go(-1));
-  const bFwd = btn(ICON.fwd, '下一頁', () => go(1));
-  const bUp = btn(ICON.up, '上層資料夾', () => navigate(P.parent(st.path)));
-  const bRefresh = btn(ICON.refresh, '重新整理', () => navigate(st.path, false));
-  const bHidden = btn(ICON.eye, '顯示隱藏檔', () => {
+  const bBack = btn(ICON.back, tt('上一頁'), () => go(-1));
+  const bFwd = btn(ICON.fwd, tt('下一頁'), () => go(1));
+  const bUp = btn(ICON.up, tt('上層資料夾'), () => navigate(P.parent(st.path)));
+  const bRefresh = btn(ICON.refresh, tt('重新整理'), () => navigate(st.path, false));
+  const bHidden = btn(ICON.eye, tt('顯示隱藏檔'), () => {
     st.showHidden = !st.showHidden;
     data.set('showHidden', st.showHidden);
     render();
   });
-  const bGrid = btn(ICON.grid, '圖示檢視', () => setView('grid'));
-  const bList = btn(ICON.list, '列表檢視', () => setView('list'));
-  const crumbs = h('div', { class: 'crumbs', title: '點空白處可直接輸入路徑' });
+  const bGrid = btn(ICON.grid, tt('圖示檢視'), () => setView('grid'));
+  const bList = btn(ICON.list, tt('列表檢視'), () => setView('list'));
+  const crumbs = h('div', { class: 'crumbs', title: tt('點空白處可直接輸入路徑') });
   const side = h('aside', { class: 'sidebar' });
-  const sideGrip = h('div', { class: 'side-resize', title: '拖曳調整寬度，點兩下還原', 'data-no-marquee': '' });
+  const sideGrip = h('div', { class: 'side-resize', title: tt('拖曳調整寬度，點兩下還原'), 'data-no-marquee': '' });
   const files = h('div', { class: 'files', tabindex: '0' });
   const status = h('span');
   const statusPath = h('span', { class: 'path' });
@@ -98,11 +100,11 @@ function createFinder(home, startPath = home) {
   // ---- sidebar: the user's folders (settings), editable by right-click
   const defaultPlaces = [home, '/', '/tmp', '/etc', '/var'];
   const sidebarPaths = () => data.get('sidebar') || defaultPlaces;
-  const placeLabel = (p) => (p === home ? '家目錄' : p === '/' ? '根目錄' : P.base(p));
+  const placeLabel = (p) => (p === home ? tt('家目錄') : p === '/' ? tt('根目錄') : P.base(p));
   const placeIcon = (p) => (p === home ? ICON.home : p === '/' ? ICON.disk : ICON.folder);
   function renderSidebar() {
     side.style.width = clampSide(data.get('sidebarWidth')) + 'px';
-    side.replaceChildren(h('h3', null, '位置'), ...sidebarPaths().map((p) =>
+    side.replaceChildren(h('h3', null, tt('位置')), ...sidebarPaths().map((p) =>
       h('button', { type: 'button', title: p, 'data-path': p, class: p === st.path ? 'current' : '', onclick: () => navigate(p) },
         h('span', { html: placeIcon(p), style: 'display:flex' }), h('span', null, placeLabel(p)))));
   }
@@ -118,14 +120,14 @@ function createFinder(home, startPath = home) {
     const paths = sidebarPaths();
     const target = ev.target.closest('button[data-path]')?.dataset.path;
     showContextMenu(ev, [
-      target && { label: '開啟', run: () => navigate(target) },
-      target && { label: '上移', enabled: paths.indexOf(target) > 0, run: () => moveTo(paths, target, paths.indexOf(target) - 1) },
-      target && { label: '下移', enabled: paths.indexOf(target) < paths.length - 1, run: () => moveTo(paths, target, paths.indexOf(target) + 1) },
+      target && { label: tt('開啟'), run: () => navigate(target) },
+      target && { label: tt('上移'), enabled: paths.indexOf(target) > 0, run: () => moveTo(paths, target, paths.indexOf(target) - 1) },
+      target && { label: tt('下移'), enabled: paths.indexOf(target) < paths.length - 1, run: () => moveTo(paths, target, paths.indexOf(target) + 1) },
       target && null,
-      target && { label: '從側邊欄移除', run: () => setSidebar(paths.filter((p) => p !== target)) },
+      target && { label: tt('從側邊欄移除'), run: () => setSidebar(paths.filter((p) => p !== target)) },
       target && null,
-      { label: `加入目前的資料夾（${placeLabel(st.path)}）`, enabled: !paths.includes(st.path), run: () => setSidebar([...paths, st.path]) },
-      { label: '還原成預設', enabled: data.has('sidebar'), run: () => setSidebar(null) },
+      { label: tt('加入目前的資料夾（{0}）', placeLabel(st.path)), enabled: !paths.includes(st.path), run: () => setSidebar([...paths, st.path]) },
+      { label: tt('還原成預設'), enabled: data.has('sidebar'), run: () => setSidebar(null) },
     ].filter((x) => x !== undefined && x !== false));
   });
   const offSettings = data.onChange(renderSidebar);
@@ -147,7 +149,7 @@ function createFinder(home, startPath = home) {
   const marker = h('div', { class: 'side-insert' });
   const offSideDrop = registerDropTarget(side, {
     accepts: (payload) => payload.type === 'place' || (payload.type === 'file' && payload.data.isDir),
-    action: (payload) => (payload.type === 'place' ? '移動' : '加到側邊欄'),
+    action: (payload) => (payload.type === 'place' ? tt('移動') : tt('加到側邊欄')),
     onOver(_payload, at) {
       const buttons = [...side.querySelectorAll('button[data-path]')];
       const i = dropIndex(at.clientY);
@@ -166,7 +168,7 @@ function createFinder(home, startPath = home) {
         if (from < 0) return;
         paths.splice(from, 1);
         if (from < index) index--;
-      } else if (from >= 0) return toast('這個資料夾已經在側邊欄了');
+      } else if (from >= 0) return toast(tt('這個資料夾已經在側邊欄了'));
       paths.splice(index, 0, payload.data.path);
       setSidebar(paths);
     },
@@ -240,7 +242,7 @@ function createFinder(home, startPath = home) {
   async function navigate(path, push = true) {
     path = P.norm(path);
     const token = ++st.token;
-    files.replaceChildren(h('div', { class: 'state' }, '讀取中…'));
+    files.replaceChildren(h('div', { class: 'state' }, tt('讀取中…')));
     try {
       const res = await rpc('list', { path });
       if (token !== st.token) return;
@@ -257,7 +259,7 @@ function createFinder(home, startPath = home) {
       files.scrollTop = 0;
     } catch (err) {
       if (token !== st.token) return;
-      files.replaceChildren(h('div', { class: 'state err' }, `無法開啟 ${path}：${errText(err)}`));
+      files.replaceChildren(h('div', { class: 'state err' }, tt('無法開啟 {0}：{1}', path, errText(err))));
       status.textContent = '';
       renderChrome(path);
     }
@@ -268,11 +270,11 @@ function createFinder(home, startPath = home) {
   }
 
   function kind(e) {
-    if (isDir(e)) return e.type === 'link' ? '資料夾捷徑' : '資料夾';
-    if (e.type === 'link') return e.targetType === 'broken' ? '失效捷徑' : '捷徑';
-    if (e.type !== 'file') return '特殊檔';
+    if (isDir(e)) return e.type === 'link' ? tt('資料夾捷徑') : tt('資料夾');
+    if (e.type === 'link') return e.targetType === 'broken' ? tt('失效捷徑') : tt('捷徑');
+    if (e.type !== 'file') return tt('特殊檔');
     const ext = P.ext(e.name);
-    return ext ? ext.toUpperCase() + ' 檔' : '檔案';
+    return ext ? tt('{0} 檔', ext.toUpperCase()) : tt('檔案');
   }
 
   function renderChrome(path) {
@@ -291,12 +293,12 @@ function createFinder(home, startPath = home) {
     });
     crumbs.replaceChildren(...kids);
     statusPath.textContent = path;
-    win.setTitle(P.base(path) === '/' ? '檔案櫃' : P.base(path));
+    win.setTitle(P.base(path) === '/' ? tt('檔案櫃') : P.base(path));
   }
 
   crumbs.addEventListener('click', (ev) => {
     if (ev.target !== crumbs) return;
-    const input = h('input', { value: st.path, spellcheck: 'false', 'aria-label': '路徑' });
+    const input = h('input', { value: st.path, spellcheck: 'false', 'aria-label': tt('路徑') });
     const finish = (commit) => {
       if (!input.isConnected) return;
       const v = input.value.trim();
@@ -331,10 +333,10 @@ function createFinder(home, startPath = home) {
     st.shown = listable.filter((e) => st.showHidden || !e.name.startsWith('.')).sort(cmp);
     files.className = 'files ' + st.view;
     const hidden = listable.length - st.shown.length;
-    st.statusBase = `${st.shown.length} 個項目` + (hidden ? `（另有 ${hidden} 個隱藏項目）` : '');
+    st.statusBase = tt('{0} 個項目', st.shown.length) + (hidden ? tt('（另有 {0} 個隱藏項目）', hidden) : '');
     status.textContent = st.statusBase;
     if (!st.shown.length) {
-      files.replaceChildren(h('div', { class: 'empty' }, hidden ? '這個資料夾只有隱藏檔' : '這個資料夾是空的'));
+      files.replaceChildren(h('div', { class: 'empty' }, hidden ? tt('這個資料夾只有隱藏檔') : tt('這個資料夾是空的')));
       return;
     }
     // A header cell: click sorts, the grip at its right edge resizes the column.
@@ -348,7 +350,7 @@ function createFinder(home, startPath = home) {
           render();
         },
       }, label + (st.sort.key === k ? (st.sort.dir > 0 ? ' ▲' : ' ▼') : '')),
-      h('span', { class: 'col-resize', 'data-col': k, title: '拖曳調整欄寬', 'aria-hidden': 'true' }));
+      h('span', { class: 'col-resize', 'data-col': k, title: tt('拖曳調整欄寬'), 'aria-hidden': 'true' }));
     const items = st.shown.map((e, i) => {
       const icon = isDir(e) ? folderSvg() : fileSvg(e.name);
       const el = h('div', { class: 'item' + (e.name.startsWith('.') ? ' hiddenfile' : '') + (cut.has(P.join(st.path, e.name)) ? ' cut' : ''), 'data-i': i, title: e.name },
@@ -361,7 +363,7 @@ function createFinder(home, startPath = home) {
       return el;
     });
     files.replaceChildren(
-      h('div', { class: 'list-head', 'data-no-marquee': '' }, head('name', '名稱'), head('mtime', '修改日期'), head('size', '大小'), head('kind', '種類')),
+      h('div', { class: 'list-head', 'data-no-marquee': '' }, head('name', tt('名稱')), head('mtime', tt('修改日期')), head('size', tt('大小')), head('kind', tt('種類'))),
       h('div', { class: 'items' }, items));
     paint();
   }
@@ -370,7 +372,7 @@ function createFinder(home, startPath = home) {
   // last clicked (the cursor for the keyboard and the anchor for Shift).
   function paint() {
     for (const el of files.querySelectorAll('.item')) el.classList.toggle('selected', st.sel.has(st.shown[Number(el.dataset.i)]?.name));
-    if (st.statusBase != null && !files.querySelector('.state')) status.textContent = st.statusBase + (st.sel.size > 1 ? `，已選取 ${st.sel.size} 個` : '');
+    if (st.statusBase != null && !files.querySelector('.state')) status.textContent = st.statusBase + (st.sel.size > 1 ? tt('，已選取 {0} 個', st.sel.size) : '');
   }
   // Select exactly one item (or none with -1).
   function select(i) {
@@ -398,7 +400,7 @@ function createFinder(home, startPath = home) {
     const full = P.join(st.path, e.name);
     if (isDir(e)) return navigate(full);
     if (e.type === 'file' || (e.type === 'link' && e.targetType === 'file')) return openFile(full, e.size);
-    toast(`無法開啟「${e.name}」：${kind(e)}`, true);
+    toast(tt('無法開啟「{0}」：{1}', e.name, kind(e)), true);
   }
 
   // Open several items: files in their apps, folders in file cabinet windows of their own.
@@ -406,9 +408,9 @@ function createFinder(home, startPath = home) {
     if (list.length <= 1) return open(list[0]);
     if (list.length > 10) {
       const ok = await dialog({
-        title: `要一次開啟 ${list.length} 個項目嗎？`,
-        message: '每個項目都會開一個視窗。',
-        buttons: [{ label: '取消', value: false, cancel: true, default: true }, { label: '開啟', value: true }],
+        title: tt('要一次開啟 {0} 個項目嗎？', list.length),
+        message: tt('每個項目都會開一個視窗。'),
+        buttons: [{ label: tt('取消'), value: false, cancel: true, default: true }, { label: tt('開啟'), value: true }],
       });
       if (!ok) return;
     }
@@ -466,20 +468,20 @@ function createFinder(home, startPath = home) {
 
   async function rename(e) {
     const answer = await dialog({
-      title: '重新命名',
-      message: `「${e.name}」的新名稱：`,
+      title: tt('重新命名'),
+      message: tt('「{0}」的新名稱：', e.name),
       input: e.name,
-      buttons: [{ label: '取消', value: false, cancel: true }, { label: '重新命名', value: true, default: true }],
+      buttons: [{ label: tt('取消'), value: false, cancel: true }, { label: tt('重新命名'), value: true, default: true }],
     });
     const name = answer.value ? answer.text.trim() : '';
     if (!answer.value || name === e.name) return;
-    if (!name || name === '.' || name === '..' || name.includes('/')) return toast('名稱不能是空的，也不能包含 /', true);
+    if (!name || name === '.' || name === '..' || name.includes('/')) return toast(tt('名稱不能是空的，也不能包含 /'), true);
     const from = P.join(st.path, e.name);
     const to = P.join(st.path, name);
     try {
       await rpc('move', { from, to });
     } catch (err) {
-      return toast(`無法重新命名「${e.name}」：${errText(err)}`, true);
+      return toast(tt('無法重新命名「{0}」：{1}', e.name, errText(err)), true);
     }
     emit('fs:moved', from, to); // open documents follow the file
     emit('fs:changed', st.path);
@@ -491,14 +493,14 @@ function createFinder(home, startPath = home) {
     if (!list.length) return;
     await putFiles(mode, list.map((e) => P.join(st.path, e.name)));
     render(); // cut items are dimmed
-    const which = list.length > 1 ? `${list.length} 個項目` : `「${list[0].name}」`;
-    toast(mode === 'cut' ? `已剪下${which}，到目的資料夾按貼上` : `已複製${which}`);
+    const which = list.length > 1 ? tt('{0} 個項目', list.length) : `「${list[0].name}」`;
+    toast(mode === 'cut' ? tt('已剪下{0}，到目的資料夾按貼上', which) : tt('已複製{0}', which));
   }
 
   async function paste() {
     const clip = await takeFiles();
-    if (!clip) return toast('剪貼簿裡沒有檔案', true);
-    if (clip.foreign) return toast('不可跨域貼上：這些檔案是從另一台主機或另一個帳號複製的', true);
+    if (!clip) return toast(tt('剪貼簿裡沒有檔案'), true);
+    if (clip.foreign) return toast(tt('不可跨域貼上：這些檔案是從另一台主機或另一個帳號複製的'), true);
     const dir = st.path;
     const taken = new Set(st.entries.map((e) => e.name));
     let done = 0;
@@ -515,7 +517,7 @@ function createFinder(home, startPath = home) {
           emit('fs:changed', P.parent(from));
         }
       } catch (err) {
-        toast(`無法貼上「${P.base(from)}」：${errText(err)}`, true);
+        toast(tt('無法貼上「{0}」：{1}', P.base(from), errText(err)), true);
       }
     }
     if (clip.mode === 'cut') await clearFiles();
@@ -529,16 +531,16 @@ function createFinder(home, startPath = home) {
     if (!list.length) return;
     const dirLike = list.some((e) => e.type === 'dir');
     const ok = await dialog({
-      title: list.length > 1 ? `確定要刪除這 ${list.length} 個項目嗎？` : `確定要刪除「${list[0].name}」嗎？`,
-      message: dirLike ? '資料夾裡的所有內容都會一起刪除，而且無法復原。' : '刪除後無法復原。',
-      buttons: [{ label: '取消', value: false, cancel: true, default: true }, { label: '刪除', value: true, danger: true }],
+      title: list.length > 1 ? tt('確定要刪除這 {0} 個項目嗎？', list.length) : tt('確定要刪除「{0}」嗎？', list[0].name),
+      message: dirLike ? tt('資料夾裡的所有內容都會一起刪除，而且無法復原。') : tt('刪除後無法復原。'),
+      buttons: [{ label: tt('取消'), value: false, cancel: true, default: true }, { label: tt('刪除'), value: true, danger: true }],
     });
     if (!ok) return;
     for (const e of list) {
       try {
         await rpc('remove', { path: P.join(st.path, e.name) });
       } catch (err) {
-        toast(`無法刪除「${e.name}」：${errText(err)}`, true);
+        toast(tt('無法刪除「{0}」：{1}', e.name, errText(err)), true);
       }
     }
     emit('fs:changed', st.path);
@@ -551,18 +553,18 @@ function createFinder(home, startPath = home) {
   };
   function properties(e, path) {
     const rows = [
-      ['名稱', e.name],
-      ['位置', P.parent(path)],
-      ['種類', kind(e)],
-      !isDir(e) && ['大小', `${fmtSize(e.size)}（${e.size.toLocaleString()} 位元組）`],
-      ['修改時間', fmtTime(e.mtime) || '—'],
-      ['權限', modeText(e.mode)],
-      e.uid != null && ['擁有者', `UID ${e.uid}，GID ${e.gid}`],
+      [tt('名稱'), e.name],
+      [tt('位置'), P.parent(path)],
+      [tt('種類'), kind(e)],
+      !isDir(e) && [tt('大小'), tt('{0}（{1} 位元組）', fmtSize(e.size), e.size.toLocaleString())],
+      [tt('修改時間'), fmtTime(e.mtime) || '—'],
+      [tt('權限'), modeText(e.mode)],
+      e.uid != null && [tt('擁有者'), `UID ${e.uid}，GID ${e.gid}`],
     ].filter(Boolean);
     dialog({
-      title: `「${e.name}」的內容`,
+      title: tt('「{0}」的內容', e.name),
       message: h('dl', { class: 'props' }, rows.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)])),
-      buttons: [{ label: '關閉', value: true, default: true, cancel: true }],
+      buttons: [{ label: tt('關閉'), value: true, default: true, cancel: true }],
     });
   }
   async function folderProperties() {
@@ -570,25 +572,25 @@ function createFinder(home, startPath = home) {
       const res = await rpc('stat', { path: st.path });
       properties({ ...res.entry, name: P.base(st.path) }, st.path);
     } catch (err) {
-      toast(`無法讀取內容：${errText(err)}`, true);
+      toast(tt('無法讀取內容：{0}', errText(err)), true);
     }
   }
 
   async function newFolder() {
     const answer = await dialog({
-      title: '新增資料夾',
-      message: '資料夾名稱：',
-      input: '新資料夾',
-      buttons: [{ label: '取消', value: false, cancel: true }, { label: '建立', value: true, default: true }],
+      title: tt('新增資料夾'),
+      message: tt('資料夾名稱：'),
+      input: tt('新資料夾'),
+      buttons: [{ label: tt('取消'), value: false, cancel: true }, { label: tt('建立'), value: true, default: true }],
     });
     const name = answer.value ? answer.text.trim() : '';
     if (!answer.value) return;
-    if (!name || name === '.' || name === '..' || name.includes('/')) return toast('資料夾名稱不能是空的，也不能包含 /', true);
+    if (!name || name === '.' || name === '..' || name.includes('/')) return toast(tt('資料夾名稱不能是空的，也不能包含 /'), true);
     try {
       const res = await rpc('mkdir', { path: P.join(st.path, name), mode: 0o755 });
-      if (!res.created) return toast(`已經有「${name}」這個資料夾`, true);
+      if (!res.created) return toast(tt('已經有「{0}」這個資料夾', name), true);
     } catch (err) {
-      return toast(`無法建立「${name}」：${errText(err)}`, true);
+      return toast(tt('無法建立「{0}」：{1}', name, errText(err)), true);
     }
     emit('fs:changed', st.path);
   }
@@ -604,7 +606,7 @@ function createFinder(home, startPath = home) {
     const group = st.sel.has(e.name) && st.sel.size > 1 ? chosen() : [e];
     return {
       type: 'file',
-      name: group.length > 1 ? `${group.length} 個項目` : e.name,
+      name: group.length > 1 ? tt('{0} 個項目', group.length) : e.name,
       icon,
       data: { path, paths: group.map((g) => P.join(st.path, g.name)), isDir: isDir(e), size: e.size },
     };
@@ -636,53 +638,53 @@ function createFinder(home, startPath = home) {
     if (e && st.sel.has(e.name) && st.sel.size > 1) {
       const list = chosen();
       return showContextMenu(ev, [
-        { label: `開啟 ${list.length} 個項目`, run: () => openMany(list) },
+        { label: tt('開啟 {0} 個項目', list.length), run: () => openMany(list) },
         null,
-        { label: `複製 ${list.length} 個項目`, run: () => copyOrCut('copy', list) },
-        { label: `剪下 ${list.length} 個項目`, run: () => copyOrCut('cut', list) },
-        { label: '貼上', run: paste },
+        { label: tt('複製 {0} 個項目', list.length), run: () => copyOrCut('copy', list) },
+        { label: tt('剪下 {0} 個項目', list.length), run: () => copyOrCut('cut', list) },
+        { label: tt('貼上'), run: paste },
         null,
-        { label: `刪除 ${list.length} 個項目`, danger: true, run: () => remove(list) },
+        { label: tt('刪除 {0} 個項目', list.length), danger: true, run: () => remove(list) },
       ]);
     }
     select(el ? Number(el.dataset.i) : -1);
     if (!e) {
       return showContextMenu(ev, [
-        { label: '新增資料夾', run: newFolder },
-        { label: '在這裡開啟終端機', run: () => launchApp('terminal', { cwd: st.path }) },
+        { label: tt('新增資料夾'), run: newFolder },
+        { label: tt('在這裡開啟終端機'), run: () => launchApp('terminal', { cwd: st.path }) },
         null,
-        { label: '貼上', run: paste },
-        { label: '重新整理', run: refresh },
+        { label: tt('貼上'), run: paste },
+        { label: tt('重新整理'), run: refresh },
         null,
-        { label: '內容', run: folderProperties },
+        { label: tt('內容'), run: folderProperties },
       ]);
     }
     const full = P.join(st.path, e.name);
     const paths = sidebarPaths();
     showContextMenu(ev, [
-      { label: '開啟', run: () => open(e) },
-      isFile(e) && !shortcutKind(e.name) && { label: '開啟程式…', run: () => openWith(full, e.size) },
-      shortcutKind(e.name) === 'app' && { label: '釘選到開始', run: async () => {
+      { label: tt('開啟'), run: () => open(e) },
+      isFile(e) && !shortcutKind(e.name) && { label: tt('開啟程式…'), run: () => openWith(full, e.size) },
+      shortcutKind(e.name) === 'app' && { label: tt('釘選到開始'), run: async () => {
         try {
           const sc = await readShortcut(full);
-          if (sc?.kind !== 'app' || !getApp(sc.id)) return toast('這不是有效的應用程式捷徑', true);
-          if (isPinned(sc.id)) return toast('已經釘選在開始了');
+          if (sc?.kind !== 'app' || !getApp(sc.id)) return toast(tt('這不是有效的應用程式捷徑'), true);
+          if (isPinned(sc.id)) return toast(tt('已經釘選在開始了'));
           pinApp(sc.id);
         } catch (err) {
-          toast(`無法讀取捷徑：${errText(err)}`, true);
+          toast(tt('無法讀取捷徑：{0}', errText(err)), true);
         }
       } },
-      isDir(e) && { label: '在終端機開啟', run: () => launchApp('terminal', { cwd: full }) },
-      isDir(e) && { label: '加到側邊欄', enabled: !paths.includes(full), run: () => setSidebar([...paths, full]) },
+      isDir(e) && { label: tt('在終端機開啟'), run: () => launchApp('terminal', { cwd: full }) },
+      isDir(e) && { label: tt('加到側邊欄'), enabled: !paths.includes(full), run: () => setSidebar([...paths, full]) },
       null,
-      { label: '複製', run: () => copyOrCut('copy', e) },
-      { label: '剪下', run: () => copyOrCut('cut', e) },
-      { label: '貼上', run: paste },
+      { label: tt('複製'), run: () => copyOrCut('copy', e) },
+      { label: tt('剪下'), run: () => copyOrCut('cut', e) },
+      { label: tt('貼上'), run: paste },
       null,
-      { label: '重新命名', run: () => rename(e) },
-      { label: '刪除', danger: true, run: () => remove(e) },
+      { label: tt('重新命名'), run: () => rename(e) },
+      { label: tt('刪除'), danger: true, run: () => remove(e) },
       null,
-      { label: '內容', run: () => properties(e, full) },
+      { label: tt('內容'), run: () => properties(e, full) },
     ].filter((x) => x !== false));
   });
 
@@ -738,4 +740,4 @@ on('session:resume', () => {
   for (const f of finders) f.navigate(f.getPath(), false);
 });
 
-registerApp({ id: 'files', order: 10, name: '檔案櫃', icon: fileCabinetSvg, startMenu: true, launch: openFinder });
+registerApp({ id: 'files', order: 10, name: tm('檔案櫃'), icon: fileCabinetSvg, startMenu: true, launch: openFinder });

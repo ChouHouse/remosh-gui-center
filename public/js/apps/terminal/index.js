@@ -1,6 +1,7 @@
 // 終端機: an interactive shell on the SSH host (xterm.js in the page, an SSH
 // PTY channel on the server). Opening a file with it makes the file executable
 // (chmod 777) and runs it as ./name from its own folder.
+import './i18n.js'; // this app's texts in the other languages
 import { h } from '../../core/dom.js';
 import { errText } from '../../core/errors.js';
 import { toast } from '../../core/ui.js';
@@ -13,6 +14,7 @@ import { createWindow } from '../../shell/wm.js';
 import { registerApp, useAppStyle } from '../../shell/apps.js';
 import { showContextMenu } from '../../shell/context-menu.js';
 import { copyText, readText } from '../../core/clipboard.js';
+import { tt, tm } from '../../core/i18n.js';
 
 useAppStyle(import.meta.url);
 
@@ -42,7 +44,7 @@ function loadXterm() {
 const quote = (s) => `'${s.replace(/'/g, `'\\''`)}'`;
 
 async function openTerminal({ path = null, cwd = null } = {}) {
-  const win = createWindow({ title: path ? P.base(path) : cwd ? P.base(cwd) : '終端機', appName: '終端機', iconHtml: terminalSvg(), width: 720, height: 440 });
+  const win = createWindow({ title: path ? P.base(path) : cwd ? P.base(cwd) : tt('終端機'), appName: tm('終端機'), iconHtml: terminalSvg(), width: 720, height: 440 });
   const host = h('div', { class: 'term-host' });
   win.body.append(host);
   let tid = null;
@@ -82,11 +84,11 @@ async function openTerminal({ path = null, cwd = null } = {}) {
     offs.push(on('remote:term:exit', (m) => {
       if (m.tid !== tid) return;
       tid = null;
-      term.write('\r\n\x1b[90m[工作階段已結束]\x1b[0m\r\n');
+      term.write(tt('\r\n\u001b[90m[工作階段已結束]\u001b[0m\r\n'));
     }));
     offs.push(on('conn:lost', () => {
       tid = null;
-      term.write('\r\n\x1b[90m[連線已中斷]\x1b[0m\r\n');
+      term.write(tt('\r\n\u001b[90m[連線已中斷]\u001b[0m\r\n'));
     }));
 
     const res = await rpc('termOpen', { cols: term.cols, rows: term.rows });
@@ -103,12 +105,12 @@ async function openTerminal({ path = null, cwd = null } = {}) {
     const copy = async () => {
       const text = term.getSelection();
       if (!text) return;
-      if (!(await copyText(text))) toast('瀏覽器不允許寫入剪貼簿', true);
+      if (!(await copyText(text))) toast(tt('瀏覽器不允許寫入剪貼簿'), true);
       term.focus();
     };
     const paste = async () => {
       const text = await readText();
-      if (text == null) return toast(`瀏覽器不允許讀取剪貼簿（需要 https），請改用 ${PASTE_KEY}`, true);
+      if (text == null) return toast(tt('瀏覽器不允許讀取剪貼簿（需要 https），請改用 {0}', PASTE_KEY), true);
       term.paste(text);
       term.focus();
     };
@@ -129,11 +131,11 @@ async function openTerminal({ path = null, cwd = null } = {}) {
     });
     host.addEventListener('contextmenu', (ev) => {
       showContextMenu(ev, [
-        { label: `複製（${COPY_KEY}）`, enabled: term.hasSelection(), run: copy },
-        { label: `貼上（${PASTE_KEY}）`, run: paste },
+        { label: tt('複製（{0}）', COPY_KEY), enabled: term.hasSelection(), run: copy },
+        { label: tt('貼上（{0}）', PASTE_KEY), run: paste },
         null,
-        { label: '全選', run: () => term.selectAll() },
-        { label: '清除畫面', run: () => {
+        { label: tt('全選'), run: () => term.selectAll() },
+        { label: tt('清除畫面'), run: () => {
           term.clear();
           term.focus();
         } },
@@ -156,14 +158,14 @@ async function openTerminal({ path = null, cwd = null } = {}) {
     else if (cwd) send(`cd -- ${quote(cwd)} && clear\n`);
   } catch (err) {
     await win.close(true);
-    toast(`無法開啟終端機：${errText(err)}`, true);
+    toast(tt('無法開啟終端機：{0}', errText(err)), true);
   }
 }
 
 registerApp({
   id: 'terminal',
   order: 60,
-  name: '終端機',
+  name: tm('終端機'),
   icon: terminalSvg,
   startMenu: true,
   extensions: ['', 'sh', 'bash', 'out', 'run', 'bin', 'elf', 'py', 'pl', 'rb'],

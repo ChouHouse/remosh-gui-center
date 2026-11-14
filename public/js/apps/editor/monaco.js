@@ -1,8 +1,11 @@
 // Loads Monaco (the VS Code editor component) on demand and configures it.
 import { on } from '../../core/events.js';
+import { getLang } from '../../core/i18n.js';
 import { effectiveMode, onDeviceModeChange } from '../../shell/style.js';
 import { data, themePref } from './prefs.js';
 export let monacoPromise = null;
+// Monaco's own menus and messages, in the system language (English is built in).
+const MONACO_LOCALE = { 'zh-TW': 'zh-tw', ja: 'ja' };
 // The code editor is its own app with its own colours: it does not take the
 // system colour. Light or dark is the user's choice for Procoder (prefs.js);
 // until they have chosen, it goes by the desktop.
@@ -13,7 +16,7 @@ export function loadMonaco() {
   if (monacoPromise) return monacoPromise;
   monacoPromise = new Promise((resolve, reject) => {
     // Absolute URL: the language-service web workers resolve it from a blob: context.
-    window.require.config({ paths: { vs: location.origin + '/vs' }, 'vs/nls': { availableLanguages: { '*': 'zh-tw' } } });
+    window.require.config({ paths: { vs: location.origin + '/vs' }, 'vs/nls': { availableLanguages: MONACO_LOCALE[getLang()] ? { '*': MONACO_LOCALE[getLang()] } : {} } });
     window.require(['vs/editor/editor.main'], () => {
       const monaco = window.monaco;
       const ts = monaco.languages.typescript;

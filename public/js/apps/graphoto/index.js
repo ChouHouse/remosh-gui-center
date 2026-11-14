@@ -1,5 +1,6 @@
 // Graphoto: the image viewer. Zoom (wheel, buttons, keys), drag to move,
 // rotate, and step through the other pictures in the same folder.
+import './i18n.js'; // this app's texts in the other languages
 import { h } from '../../core/dom.js';
 import { errText } from '../../core/errors.js';
 import { fmtSize } from '../../core/format.js';
@@ -13,6 +14,7 @@ import { createWindow } from '../../shell/wm.js';
 import { registerApp, launchApp, useAppStyle } from '../../shell/apps.js';
 import { showContextMenu } from '../../shell/context-menu.js';
 import { registerDropTarget } from '../../shell/drag.js';
+import { tt } from '../../core/i18n.js';
 
 useAppStyle(import.meta.url);
 
@@ -50,12 +52,12 @@ function openViewer({ path = null } = {}) {
   viewers.add(v);
 
   const btn = (icon, title, run) => h('button', { type: 'button', class: 'gp-btn', title, 'aria-label': title, html: icon, onclick: run });
-  const bPrev = btn(I.prev, '上一張（←）', () => step(-1));
-  const bNext = btn(I.next, '下一張（→）', () => step(1));
-  const zoomLabel = h('button', { type: 'button', class: 'gp-zoom', title: '點一下符合視窗' }, '—');
+  const bPrev = btn(I.prev, tt('上一張（←）'), () => step(-1));
+  const bNext = btn(I.next, tt('下一張（→）'), () => step(1));
+  const zoomLabel = h('button', { type: 'button', class: 'gp-zoom', title: tt('點一下符合視窗') }, '—');
   zoomLabel.addEventListener('click', () => fit());
   const img = h('img', { class: 'gp-img', alt: '', draggable: 'false' });
-  const empty = h('div', { class: 'gp-empty' }, '從檔案櫃開啟圖片，或把圖片拖到這裡');
+  const empty = h('div', { class: 'gp-empty' }, tt('從檔案櫃開啟圖片，或把圖片拖到這裡'));
   const stage = h('div', { class: 'gp-stage', tabindex: '0' }, img, empty);
   const sIndex = h('span');
   const sDims = h('span');
@@ -64,9 +66,9 @@ function openViewer({ path = null } = {}) {
   win.body.append(
     h('div', { class: 'gp-toolbar' },
       bPrev, bNext, h('span', { class: 'gp-sep' }),
-      btn(I.zoomOut, '縮小（-）', () => zoomBy(1 / 1.25)), zoomLabel, btn(I.zoomIn, '放大（+）', () => zoomBy(1.25)),
-      btn(I.fit, '符合視窗（0）', () => fit()), btn(I.actual, '實際大小（1）', () => actual()), h('span', { class: 'gp-sep' }),
-      btn(I.rotL, '向左旋轉（Shift+R）', () => rotate(-90)), btn(I.rotR, '向右旋轉（R）', () => rotate(90))),
+      btn(I.zoomOut, tt('縮小（-）'), () => zoomBy(1 / 1.25)), zoomLabel, btn(I.zoomIn, tt('放大（+）'), () => zoomBy(1.25)),
+      btn(I.fit, tt('符合視窗（0）'), () => fit()), btn(I.actual, tt('實際大小（1）'), () => actual()), h('span', { class: 'gp-sep' }),
+      btn(I.rotL, tt('向左旋轉（Shift+R）'), () => rotate(-90)), btn(I.rotR, tt('向右旋轉（R）'), () => rotate(90))),
     stage,
     h('div', { class: 'statusbar' }, sIndex, sDims, sSize, h('span', { class: 'spacer' }), sPath));
 
@@ -140,7 +142,7 @@ function openViewer({ path = null } = {}) {
     v.path = path;
     win.setTitle(P.base(path));
     empty.hidden = false;
-    empty.textContent = '開啟中…';
+    empty.textContent = tt('開啟中…');
     stage.classList.add('loading');
     if (relist) loadList();
     status();
@@ -148,12 +150,12 @@ function openViewer({ path = null } = {}) {
     try {
       ({ bytes } = await readFile(path, {
         onProgress: (done, total) => {
-          if (token === v.token) empty.textContent = `開啟中… ${Math.floor((done / total) * 100)}%`;
+          if (token === v.token) empty.textContent = tt('開啟中… {0}%', Math.floor((done / total) * 100));
         },
       }));
     } catch (err) {
       if (token !== v.token) return;
-      empty.textContent = `無法開啟「${P.base(path)}」：${errText(err)}`;
+      empty.textContent = tt('無法開啟「{0}」：{1}', P.base(path), errText(err));
       img.hidden = true;
       return;
     }
@@ -166,7 +168,7 @@ function openViewer({ path = null } = {}) {
     } catch {
       URL.revokeObjectURL(url);
       if (token !== v.token) return;
-      empty.textContent = `「${P.base(path)}」不是可以顯示的圖片`;
+      empty.textContent = tt('「{0}」不是可以顯示的圖片', P.base(path));
       img.hidden = true;
       v.natural = { w: 0, h: 0 };
       status();
@@ -249,25 +251,25 @@ function openViewer({ path = null } = {}) {
   stage.addEventListener('contextmenu', (ev) => {
     const has = !!v.natural.w;
     showContextMenu(ev, [
-      { label: '上一張', enabled: v.list.length > 1, run: () => step(-1) },
-      { label: '下一張', enabled: v.list.length > 1, run: () => step(1) },
+      { label: tt('上一張'), enabled: v.list.length > 1, run: () => step(-1) },
+      { label: tt('下一張'), enabled: v.list.length > 1, run: () => step(1) },
       null,
-      { label: '放大', enabled: has, run: () => zoomBy(1.25) },
-      { label: '縮小', enabled: has, run: () => zoomBy(1 / 1.25) },
-      { label: '符合視窗', enabled: has, run: fit },
-      { label: '實際大小', enabled: has, run: actual },
-      { label: '向左旋轉', enabled: has, run: () => rotate(-90) },
-      { label: '向右旋轉', enabled: has, run: () => rotate(90) },
+      { label: tt('放大'), enabled: has, run: () => zoomBy(1.25) },
+      { label: tt('縮小'), enabled: has, run: () => zoomBy(1 / 1.25) },
+      { label: tt('符合視窗'), enabled: has, run: fit },
+      { label: tt('實際大小'), enabled: has, run: actual },
+      { label: tt('向左旋轉'), enabled: has, run: () => rotate(-90) },
+      { label: tt('向右旋轉'), enabled: has, run: () => rotate(90) },
       null,
-      { label: '在檔案櫃中顯示', enabled: !!v.path, run: () => launchApp('files', { path: P.parent(v.path) }) },
-      { label: '下載到這台電腦', enabled: has, run: () => h('a', { href: v.url, download: P.base(v.path) }).click() },
+      { label: tt('在檔案櫃中顯示'), enabled: !!v.path, run: () => launchApp('files', { path: P.parent(v.path) }) },
+      { label: tt('下載到這台電腦'), enabled: has, run: () => h('a', { href: v.url, download: P.base(v.path) }).click() },
     ]);
   });
 
   // Pictures dragged in from the file cabinet or the desktop.
   const offDrop = registerDropTarget(win.el, {
     accepts: (payload) => payload.type === 'file' && !payload.data.isDir && (payload.data.paths || [payload.data.path]).some((p) => isImage(P.base(p))),
-    action: () => '用 Graphoto 開啟',
+    action: () => tt('用 Graphoto 開啟'),
     onDrop: (payload) => {
       const pics = (payload.data.paths || [payload.data.path]).filter((p) => isImage(P.base(p)));
       show(pics[0]);

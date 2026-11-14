@@ -8,6 +8,7 @@ import { conn, rpc, openSocket } from '../core/rpc.js';
 import { on, emit } from '../core/events.js';
 import { ensureGate } from './gate.js';
 import { host, otherSessions, onSessionsChange } from './sessions.js';
+import { tt, tm } from '../core/i18n.js';
 
 const loginEl = $('#login');
 const form = $('#login-form');
@@ -23,10 +24,10 @@ const fKey = $('#f-key');
 function setKey(text, name) {
   keyText = text;
   fKey.value = '';
-  $('#key-name').textContent = text ? name : '未選擇（選填，改用金鑰登入）';
+  $('#key-name').textContent = text ? name : tt('未選擇（選填，改用金鑰登入）');
   $('#key-clear').hidden = !text;
   $('.keyrow').classList.toggle('has-key', !!text);
-  $('#pass-label').textContent = text ? '金鑰密碼（沒有設定可留空）' : '密碼';
+  $('#pass-label').textContent = text ? tt('金鑰密碼（沒有設定可留空）') : tt('密碼');
 }
 $('#key-pick').addEventListener('click', () => fKey.click());
 $('#key-clear').addEventListener('click', () => setKey('', ''));
@@ -35,7 +36,7 @@ fKey.addEventListener('change', async () => {
   if (!file) return;
   loginErr.hidden = true;
   if (file.size > 32 * 1024) {
-    loginErr.textContent = '這個檔案太大，不像是私鑰檔';
+    loginErr.textContent = tt('這個檔案太大，不像是私鑰檔');
     loginErr.hidden = false;
     return setKey('', '');
   }
@@ -68,10 +69,10 @@ function renderServers() {
   const list = readServers();
   const now = { host: fHost.value.trim(), port: Number(fPort.value) || 22, username: fUser.value };
   $('#saved-servers').replaceChildren(...(list.length
-    ? [h('h2', null, '登入過的主機'), ...list.map((s) =>
+    ? [h('h2', null, tt('登入過的主機')), ...list.map((s) =>
       h('div', { class: 'saved-server' + (sameServer(s, now) ? ' on' : '') },
         h('button', {
-          type: 'button', class: 'fill', title: '填入這台主機的位置、連接埠和帳號',
+          type: 'button', class: 'fill', title: tt('填入這台主機的位置、連接埠和帳號'),
           onclick: () => {
             fHost.value = s.host;
             fPort.value = s.port || 22;
@@ -80,8 +81,8 @@ function renderServers() {
             renderServers();
             fPass.focus();
           },
-        }, h('strong', null, s.username + '@' + s.host), h('span', null, '連接埠 ' + (s.port || 22))),
-        h('button', { type: 'button', class: 'forget', title: '從清單移除', 'aria-label': '從清單移除', onclick: () => writeServers(readServers().filter((o) => !sameServer(o, s))) }, '×')))]
+        }, h('strong', null, s.username + '@' + s.host), h('span', null, tt('連接埠 ') + (s.port || 22))),
+        h('button', { type: 'button', class: 'forget', title: tt('從清單移除'), 'aria-label': tt('從清單移除'), onclick: () => writeServers(readServers().filter((o) => !sameServer(o, s))) }, '×')))]
     : []));
 }
 for (const f of [fHost, fPort, fUser]) f.addEventListener('input', renderServers);
@@ -90,7 +91,7 @@ export function showLogin(message, relogin) {
   loginEl.hidden = false;
   form.classList.toggle('relogin', !!relogin);
   renderServers();
-  $('#login-sub').textContent = message || '連線到 SSH 主機，瀏覽並編輯上面的檔案';
+  $('#login-sub').textContent = message || tt('連線到 SSH 主機，瀏覽並編輯上面的檔案');
   for (const f of [fHost, fPort, fUser]) f.readOnly = !!relogin;
   loginErr.hidden = true;
   fPass.value = '';
@@ -134,7 +135,7 @@ async function doLogin() {
   const btn = $('#login-btn');
   loginErr.hidden = true;
   btn.disabled = true;
-  btn.textContent = '連線中…';
+  btn.textContent = tt('連線中…');
   try {
     await connectWith({
       host,
@@ -150,7 +151,7 @@ async function doLogin() {
     loginErr.hidden = false;
   } finally {
     btn.disabled = false;
-    btn.textContent = '登入';
+    btn.textContent = tt('登入');
   }
 }
 
@@ -158,13 +159,13 @@ async function doLogin() {
 // password no longer works, or the host stays unreachable) is the user asked.
 const RETRY_WAITS_MS = [0, 2000, 5000];
 const NO_RETRY = new Set(['auth-failed', 'bad-key', 'key-needs-passphrase', 'key-bad-passphrase', 'host-not-allowed']);
-const banner = h('div', { id: 'reconnecting', hidden: true, role: 'status' }, '連線中斷，正在重新連線…');
+const banner = h('div', { id: 'reconnecting', hidden: true, role: 'status', 'data-i18n': tm('連線中斷，正在重新連線…') }, tm('連線中斷，正在重新連線…'));
 document.body.append(banner);
 let reconnecting = false;
 async function reconnect() {
   if (reconnecting) return;
   const creds = saved;
-  if (!creds) return showLogin('連線已中斷，請重新輸入密碼登入。開著的視窗會保留。', true);
+  if (!creds) return showLogin(tt('連線已中斷，請重新輸入密碼登入。開著的視窗會保留。'), true);
   reconnecting = true;
   banner.hidden = false;
   let ok = false;
@@ -183,7 +184,7 @@ async function reconnect() {
   reconnecting = false;
   if (!ok && saved === creds) {
     saved = null;
-    showLogin('連線已中斷，自動重新連線沒有成功，請重新輸入密碼登入。開著的視窗會保留。', true);
+    showLogin(tt('連線已中斷，自動重新連線沒有成功，請重新輸入密碼登入。開著的視窗會保留。'), true);
   }
 }
 
@@ -203,8 +204,8 @@ on('session:end', () => {
 function renderKept() {
   const others = otherSessions();
   $('#kept-sessions').replaceChildren(...(others.length
-    ? [h('h2', null, '已登入'), ...others.map((s) =>
-      h('button', { type: 'button', 'data-session': s.id, title: `回到 ${s.label}`, onclick: () => host.switchTo(s.id) },
+    ? [h('h2', null, tt('已登入')), ...others.map((s) =>
+      h('button', { type: 'button', 'data-session': s.id, title: tt('回到 {0}', s.label), onclick: () => host.switchTo(s.id) },
         h('span', { class: 'avatar' }, [...s.label][0]), h('span', null, s.label)))]
     : []));
 }

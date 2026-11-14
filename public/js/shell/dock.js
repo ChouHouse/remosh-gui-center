@@ -9,12 +9,13 @@ import { wm, dockItems, onWindowsChange, moveToWorkspace } from './wm.js';
 import { listApps, getApp, launchApp } from './apps.js';
 import { showContextMenu } from './context-menu.js';
 import { setTaskbar } from './taskbar.js';
+import { tt } from '../core/i18n.js';
 
 const dock = $('#dock');
 const pins = h('div', { id: 'dock-pins' });
 dockItems.before(pins);
 
-const save = (change) => setTaskbar(change).catch((err) => toast(`無法儲存：${errText(err)}`, true));
+const save = (change) => setTaskbar(change).catch((err) => toast(tt('無法儲存：{0}', errText(err)), true));
 const winOf = (el) => wm.wins.find((w) => w.dockEl === el) || null;
 // A window says which app it is by that app's name.
 const appOf = (win) => listApps().find((app) => app.name === win.el.dataset.app) || null;
@@ -26,7 +27,7 @@ const unpin = (id) => save({ pinned: pinnedIds().filter((x) => x !== id) });
 
 function renderPins() {
   pins.replaceChildren(...pinnedIds().map(getApp).filter(Boolean).map((app) =>
-    h('button', { type: 'button', class: 'dock-item dock-pin', 'data-pin': app.id, title: app.name, 'aria-label': `開啟 ${app.name}`, onclick: () => launchApp(app.id) },
+    h('button', { type: 'button', class: 'dock-item dock-pin', 'data-pin': app.id, title: tt(app.name), 'aria-label': tt('開啟 {0}', tt(app.name)), onclick: () => launchApp(app.id) },
       h('span', { class: 'ico', html: app.icon() }))));
   sync();
 }
@@ -100,31 +101,31 @@ dock.addEventListener('contextmenu', (ev) => {
   if (pinEl) {
     const app = getApp(pinEl.dataset.pin);
     return showContextMenu(ev, [
-      { label: '開啟', run: () => launchApp(app.id) },
+      { label: tt('開啟'), run: () => launchApp(app.id) },
       null,
-      { label: '從工作列取消釘選', run: () => unpin(app.id) },
+      { label: tt('從工作列取消釘選'), run: () => unpin(app.id) },
     ]);
   }
   if (win) {
     const app = appOf(win);
     return showContextMenu(ev, [
-      { label: '專注模式', run: () => focusMode(win) },
+      { label: tt('專注模式'), run: () => focusMode(win) },
       ...wm.workspaces.filter((id) => id !== win.workspace).map((id) =>
-        ({ label: `移到工作區 ${wm.workspaces.indexOf(id) + 1}`, run: () => moveToWorkspace(win, id) })),
+        ({ label: tt('移到工作區 {0}', wm.workspaces.indexOf(id) + 1), run: () => moveToWorkspace(win, id) })),
       null,
       app && (pinnedIds().includes(app.id)
-        ? { label: '從工作列取消釘選', run: () => unpin(app.id) }
-        : { label: '釘選到工作列', run: () => pin(app.id) }),
-      { label: '關閉應用程式', danger: true, run: async () => {
+        ? { label: tt('從工作列取消釘選'), run: () => unpin(app.id) }
+        : { label: tt('釘選到工作列'), run: () => pin(app.id) }),
+      { label: tt('關閉應用程式'), danger: true, run: async () => {
         // One at a time: each may ask about unsaved changes.
         for (const w of grouping() ? groupOf(win) : [win]) if ((await w.close()) === false) break;
       } },
     ].filter((item) => item !== false && item !== undefined));
   }
   if (ev.target.closest('#clock')) {
-    return showContextMenu(ev, [{ label: '移除這個時鐘', run: () => save({ clock: false }) }]);
+    return showContextMenu(ev, [{ label: tt('移除這個時鐘'), run: () => save({ clock: false }) }]);
   }
-  showContextMenu(ev, [{ label: '工作列設定', run: () => launchApp('settings', { category: 'taskbar' }) }]);
+  showContextMenu(ev, [{ label: tt('工作列設定'), run: () => launchApp('settings', { category: 'taskbar' }) }]);
 });
 
 // ---- drag an entry left or right to move it

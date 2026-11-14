@@ -6,6 +6,7 @@ import { P } from '../core/path.js';
 import { rpc } from '../core/rpc.js';
 import { settingsDir } from '../core/settings.js';
 import { toBase64, fromBase64 } from '../core/text-codec.js';
+import { tt } from '../core/i18n.js';
 
 export const APP_EXT = 'remosh_gui-app';
 export const LNK_EXT = 'remosh_gui-lnk';
@@ -14,7 +15,7 @@ export const desktopDir = () => P.join(settingsDir(), 'desktop');
 export const shortcutKind = (name) => (name.endsWith('.' + APP_EXT) ? 'app' : name.endsWith('.' + LNK_EXT) ? 'lnk' : null);
 // File name without the shortcut extension, for display.
 export const displayName = (name) => (shortcutKind(name) ? name.slice(0, name.lastIndexOf('.')) : name);
-export const appFile = (app) => ({ name: `${app.name}.${APP_EXT}`, text: `app:${app.id}\n` });
+export const appFile = (app) => ({ name: `${tt(app.name)}.${APP_EXT}`, text: `app:${app.id}\n` });
 export const linkFile = (target) => ({ name: `${P.base(target) === '/' ? 'root' : P.base(target)}.${LNK_EXT}`, text: `lnk:${target}\n` });
 
 export const writeText = (path, text) => rpc('write', { path, data: toBase64(new TextEncoder().encode(text)) });
