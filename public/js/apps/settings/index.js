@@ -348,4 +348,4 @@ function openSettings(args) {
   refresh();
 }
 
-registerApp({ id: 'settings', name: '設定', icon: settingsSvg, startMenu: true, launch: openSettings });
+registerApp({ id: 'settings', order: 900, name: '設定', icon: settingsSvg, startMenu: true, launch: openSettings });

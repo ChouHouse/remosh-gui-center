@@ -311,6 +311,7 @@ on('fs:moved', (from, to) => {
 
 registerApp({
   id: 'graphoto',
+  order: 40,
   name: APP_NAME,
   icon: graphotoSvg,
   startMenu: true,

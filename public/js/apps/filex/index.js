@@ -225,4 +225,4 @@ on('session:end', () => {
   open = null;
 });
 
-registerApp({ id: 'filex', name: APP_NAME, icon: filexSvg, startMenu: true, launch: openFilex });
+registerApp({ id: 'filex', order: 50, name: APP_NAME, icon: filexSvg, startMenu: true, launch: openFilex });

@@ -1,12 +1,12 @@
 // ssh-desk: Node entry, used by the Docker image (`node server/main.js`).
-// Serves public/, /ws and /api/gate.
+// Serves public/, /ws, /api/gate and /api/apps.
 //
 // Environment:
 //   PORT           port to listen on (default 8080)
 //   WEB_PASSWORD   access password asked before the SSH login screen
 //   ALLOWED_HOSTS  optional comma-separated allowlist of SSH targets
 import http from 'node:http';
-import { createReadStream, statSync } from 'node:fs';
+import { createReadStream, readdirSync, statSync } from 'node:fs';
 import { dirname, extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
@@ -70,6 +70,16 @@ async function readBody(req, limit = 8192) {
   return Buffer.concat(chunks);
 }
 
+// The apps that are installed: every folder in public/js/apps with an
+// index.js. The page loads each of them, so adding an app is adding a folder.
+function installedApps() {
+  const dir = join(PUBLIC, 'js', 'apps');
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && /^[a-z0-9][a-z0-9_-]*$/i.test(e.name) && statSync(join(dir, e.name, 'index.js'), { throwIfNoEntry: false })?.isFile())
+    .map((e) => e.name)
+    .sort();
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
@@ -81,6 +91,10 @@ const server = http.createServer(async (req, res) => {
       return res.end(await response.text());
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') return res.writeHead(405).end();
+    if (url.pathname === '/api/apps') {
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      return res.end(JSON.stringify(installedApps()));
+    }
     serveStatic(req, res, url.pathname);
   } catch (err) {
     console.error('request failed:', err);

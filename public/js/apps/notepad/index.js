@@ -240,6 +240,7 @@ on('fs:moved', (from, to) => {
 
 registerApp({
   id: 'notepad',
+  order: 30,
   name: '記事本',
   icon: notepadSvg,
   startMenu: true,

@@ -111,6 +111,7 @@ on('session:start', () => loadMonaco().catch(() => {})); // warm up so the first
 
 registerApp({
   id: 'editor',
+  order: 20,
   name: APP_NAME,
   icon: procoderSvg,
   startMenu: true,

@@ -4,6 +4,8 @@
 // registerApp({
 //   id,                 unique string
 //   name,               shown in the start menu
+//   order?: number,     place in the start menu, lowest first (apps without
+//                       one come last, by name)
 //   icon: () => svg,    start-menu icon
 //   launch(args),       open (or focus) the app
 //   startMenu?: bool,   list it under 工具
@@ -28,7 +30,7 @@ export function registerApp(app) {
   apps.set(app.id, app);
 }
 
-export const listApps = () => [...apps.values()];
+export const listApps = () => [...apps.values()].sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity) || a.name.localeCompare(b.name));
 
 export function launchApp(id, args) {
   const app = apps.get(id);

@@ -1,17 +1,10 @@
-// Entry point. Importing an app module registers it; the order here is the
-// order of the start menu.
+// Entry point. The apps are not listed here: the server says which folders
+// are in js/apps (see /api/apps) and each one is loaded and registers itself.
+// An app's `order` (shell/apps.js) decides its place in the start menu.
 import './shell/sessions.js';
 import './shell/desktop.js';
 import './shell/context-menu.js';
 import './shell/style.js';
-import './apps/files/index.js';
-import './apps/editor/index.js';
-import './apps/notepad/index.js';
-import './apps/graphoto/index.js';
-import './apps/filex/index.js';
-import './apps/terminal/index.js';
-import './apps/taskman/index.js';
-import './apps/settings/index.js';
 import './shell/clock.js';
 import './shell/taskbar.js';
 import './shell/dock.js';
@@ -23,6 +16,9 @@ import './shell/fullscreen.js';
 import { initStartMenu } from './shell/start-menu.js';
 import { initLogin } from './shell/login.js';
 import { ensureGate } from './shell/gate.js';
+
+const appIds = await fetch('/api/apps').then((r) => (r.ok ? r.json() : []), () => []);
+await Promise.all(appIds.map((id) => import(`./apps/${id}/index.js`).catch((err) => console.error(`App "${id}" did not load:`, err))));
 
 initStartMenu();
 await ensureGate(); // access password first, when the server asks for one

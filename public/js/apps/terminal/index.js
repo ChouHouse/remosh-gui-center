@@ -162,6 +162,7 @@ async function openTerminal({ path = null, cwd = null } = {}) {
 
 registerApp({
   id: 'terminal',
+  order: 60,
   name: '終端機',
   icon: terminalSvg,
   startMenu: true,

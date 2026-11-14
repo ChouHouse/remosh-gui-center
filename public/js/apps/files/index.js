@@ -738,4 +738,4 @@ on('session:resume', () => {
   for (const f of finders) f.navigate(f.getPath(), false);
 });
 
-registerApp({ id: 'files', name: '檔案櫃', icon: fileCabinetSvg, startMenu: true, launch: openFinder });
+registerApp({ id: 'files', order: 10, name: '檔案櫃', icon: fileCabinetSvg, startMenu: true, launch: openFinder });

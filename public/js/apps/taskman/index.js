@@ -229,4 +229,4 @@ function openTaskManager() {
   return win;
 }
 
-registerApp({ id: 'tasks', name: '工作管理員', icon: gaugeSvg, startMenu: true, launch: openTaskManager });
+registerApp({ id: 'tasks', order: 70, name: '工作管理員', icon: gaugeSvg, startMenu: true, launch: openTaskManager });

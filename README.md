@@ -41,7 +41,7 @@ browser ──WebSocket /ws──▶ Node server ──TCP──▶ SSH server
 Nothing is bundled for the browser: the page loads native ES modules.
 
 ```
-server/main.js          entry: static files, /ws, /api/gate
+server/main.js          entry: static files, /ws, /api/gate, /api/apps (the app folders)
 docker/                 run.sh, cloudflared supervisor
 src/
   session.js            one SSH/SFTP session per WebSocket, login, op dispatch
@@ -56,7 +56,7 @@ public/
   index.html
   css/                  base, login, shell (the system's own styles)
   js/
-    main.js             imports the apps (start-menu order) and boots
+    main.js             loads every app folder the server lists, then boots
     core/               dom, store, errors, ui, format, path, icons, events, rpc, text-codec, settings
     shell/              wm (windows), menubar, context-menu, drag, file-drop, shortcuts,
                         desktop-icons, login, gate, start-menu, clock, style, fullscreen,
@@ -83,10 +83,11 @@ public/
    registerApp({ id: 'notes', name: '記事本', icon: () => svg, startMenu: true, launch: openNotes });
    ```
 
-   Optional fields: `autostart`, `extensions` (`'all'` or a list such as
+   Optional fields: `order` (place in the start menu, lowest first), `autostart`, `extensions` (`'all'` or a list such as
    `['txt', 'md']`; `launch({ path, size })` then opens a remote file) and
    `unsavedCount()` (asked before logout).
-2. Import it in `public/js/main.js`. Everything else belongs in the app's folder:
+2. That is all: the folder is found by itself (the server lists `js/apps/*/index.js`
+   and the page loads each one), nothing else has to be edited. Everything belongs in the app's folder:
    its icon (`icon.js`) and its styles (`style.css`, loaded by the app with
    `useAppStyle(import.meta.url)` from `shell/apps.js`). `core/` and `shell/` hold
    only what the whole system shares (file and folder icons, toolbar icons,
