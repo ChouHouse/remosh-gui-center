@@ -43,3 +43,22 @@ button.primary:disabled { opacity: .6; cursor: progress; }
 .warn code { font-size: 11px; user-select: text; }
 .warn button { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--warn-border); background: transparent; }
 #gate { z-index: 100001; }
+
+/* Servers logged in to before, beside the login card: one click fills in the
+   host, port and account. */
+#login-form { position: relative; }
+#saved-servers { position: absolute; left: calc(100% + 14px); top: 0; width: 230px; max-height: 100%; overflow-y: auto; display: grid; gap: 6px; align-content: start; }
+#saved-servers:empty, #login-form.relogin #saved-servers { display: none; }
+#saved-servers h2 { margin: 0 2px 2px; font-size: 11px; font-weight: 600; color: #ffffff; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
+.saved-server { display: flex; align-items: stretch; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 4px 14px rgba(20, 30, 50, .18); overflow: hidden; }
+.saved-server .fill { flex: 1; min-width: 0; display: grid; gap: 1px; padding: 7px 10px; border: 0; background: transparent; color: var(--text); text-align: left; }
+.saved-server .fill:hover, .saved-server .forget:hover { background: var(--surface-3); }
+.saved-server.on { border-color: var(--accent); }
+.saved-server strong { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-server span { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-server .forget { flex: none; width: 28px; border: 0; background: transparent; color: var(--muted); font-size: 15px; }
+@media (max-width: 920px) {
+  #saved-servers { position: static; width: auto; max-height: 150px; }
+  #saved-servers h2 { color: var(--muted); text-shadow: none; }
+  .saved-server { box-shadow: none; }
+}

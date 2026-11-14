@@ -98,6 +98,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   await page.waitForSelector('#login-error:not([hidden])', { timeout: 30000 });
   check((await page.textContent('#login-error')).includes('登入失敗'), 'wrong password shows an error');
   check(await page.isHidden('#desktop'), 'desktop stays hidden after failed login');
+  check((await page.locator('#saved-servers .saved-server').count()) === 0, 'a failed login is not remembered as a server');
 
   await page.fill('#f-pass', password);
   await page.click('#login-btn');
@@ -2118,6 +2119,27 @@ const { execSync: execSyncTop } = require('node:child_process');
   await page.evaluate(() => localStorage.setItem('sshdesk.fontSize', '20'));
   give(home + '/.remosh-gui');
   give(legacySettings);
+  // servers logged in to before sit beside the form and fill it in
+  {
+    const mine = page.locator('#saved-servers .saved-server', { hasText: user + '@' + host });
+    check((await mine.count()) === 1 && (await mine.locator('span').textContent()) === '連接埠 ' + port && await mine.evaluate((el) => el.classList.contains('on')), 'the login screen lists the server logged in to before');
+    await page.fill('#f-host', 'elsewhere.example');
+    await page.fill('#f-port', '2200');
+    await page.fill('#f-user', 'nobody');
+    check(!(await mine.evaluate((el) => el.classList.contains('on'))), 'it is no longer marked once the form says something else');
+    await mine.locator('.fill').click();
+    check((await page.inputValue('#f-host')) === host && (await page.inputValue('#f-port')) === String(port) && (await page.inputValue('#f-user')) === user && (await page.inputValue('#f-pass')) === ''
+      && await page.evaluate(() => document.activeElement.id === 'f-pass'), 'one click fills in host, port and account; the password is left to type');
+    const cookie = (await ctx.cookies()).find((k) => k.name === 'remosh_servers');
+    const kept = cookie ? JSON.parse(decodeURIComponent(cookie.value)) : null;
+    check(kept && kept.some((k) => k.host === host && k.port === Number(port) && k.username === user) && kept.every((k) => Object.keys(k).sort().join() === 'host,port,username') && !cookie.value.includes(encodeURIComponent(password)),
+      'they are kept in a cookie: host, port and account only, never the password', cookie && cookie.value);
+    await page.evaluate(() => { document.cookie = 'remosh_servers=' + encodeURIComponent(JSON.stringify([{ host: 'old.example', port: 22, username: 'x' }, ...JSON.parse(decodeURIComponent(document.cookie.split('; ').find((c) => c.startsWith('remosh_servers=')).slice(15)))])) + '; Path=/'; });
+    await page.fill('#f-user', user + ' ');
+    await page.fill('#f-user', user);
+    await page.locator('#saved-servers .saved-server', { hasText: 'x@old.example' }).locator('.forget').click();
+    check((await page.locator('#saved-servers .saved-server', { hasText: 'old.example' }).count()) === 0 && (await mine.count()) === 1, 'a server can be taken off the list');
+  }
   await page.fill('#f-pass', password);
   await page.click('#login-btn');
   await page.waitForSelector('#desktop:not([hidden])');

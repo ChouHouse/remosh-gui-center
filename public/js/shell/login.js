@@ -43,8 +43,53 @@ fKey.addEventListener('change', async () => {
   fPass.focus();
 });
 
+// ---- servers logged in to before: host, port and account in a cookie (never
+// the password or a key), listed beside the form to fill it in with one click.
+const SERVERS_COOKIE = 'remosh_servers';
+const SERVERS_MAX = 8;
+const sameServer = (a, b) => a.host === b.host && Number(a.port) === Number(b.port) && a.username === b.username;
+function readServers() {
+  const hit = document.cookie.split('; ').find((c) => c.startsWith(SERVERS_COOKIE + '='));
+  if (!hit) return [];
+  try {
+    const list = JSON.parse(decodeURIComponent(hit.slice(SERVERS_COOKIE.length + 1)));
+    return Array.isArray(list) ? list.filter((s) => s && typeof s.host === 'string' && typeof s.username === 'string').slice(0, SERVERS_MAX) : [];
+  } catch {
+    return [];
+  }
+}
+function writeServers(list) {
+  const secure = location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${SERVERS_COOKIE}=${encodeURIComponent(JSON.stringify(list.slice(0, SERVERS_MAX)))}; Max-Age=${list.length ? 365 * 86400 : 0}; Path=/; SameSite=Lax${secure}`;
+  renderServers();
+}
+const rememberServer = (server) => writeServers([server, ...readServers().filter((s) => !sameServer(s, server))]);
+function renderServers() {
+  const list = readServers();
+  const now = { host: fHost.value.trim(), port: Number(fPort.value) || 22, username: fUser.value };
+  $('#saved-servers').replaceChildren(...(list.length
+    ? [h('h2', null, '登入過的主機'), ...list.map((s) =>
+      h('div', { class: 'saved-server' + (sameServer(s, now) ? ' on' : '') },
+        h('button', {
+          type: 'button', class: 'fill', title: '填入這台主機的位置、連接埠和帳號',
+          onclick: () => {
+            fHost.value = s.host;
+            fPort.value = s.port || 22;
+            fUser.value = s.username;
+            loginErr.hidden = true;
+            renderServers();
+            fPass.focus();
+          },
+        }, h('strong', null, s.username + '@' + s.host), h('span', null, '連接埠 ' + (s.port || 22))),
+        h('button', { type: 'button', class: 'forget', title: '從清單移除', 'aria-label': '從清單移除', onclick: () => writeServers(readServers().filter((o) => !sameServer(o, s))) }, '×')))]
+    : []));
+}
+for (const f of [fHost, fPort, fUser]) f.addEventListener('input', renderServers);
+
 export function showLogin(message, relogin) {
   loginEl.hidden = false;
+  form.classList.toggle('relogin', !!relogin);
+  renderServers();
   $('#login-sub').textContent = message || '連線到 SSH 主機，瀏覽並編輯上面的檔案';
   for (const f of [fHost, fPort, fUser]) f.readOnly = !!relogin;
   loginErr.hidden = true;
@@ -98,6 +143,7 @@ async function doLogin() {
       ...(keyText ? { privateKey: keyText, passphrase: fPass.value } : { password: fPass.value }),
     });
     store.set('last', { host, port, username });
+    rememberServer({ host, port, username });
     fPass.value = '';
   } catch (err) {
     loginErr.textContent = errText(err);
@@ -172,6 +218,8 @@ export function initLogin() {
     fHost.value = last.host || '';
     fPort.value = last.port || 22;
     fUser.value = last.username || '';
+    // Logged in with an earlier version: start the list with that server.
+    if (last.host && last.username && !readServers().length) writeServers([{ host: last.host, port: last.port || 22, username: last.username }]);
   }
   showLogin();
 }
