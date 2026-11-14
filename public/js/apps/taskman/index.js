@@ -163,7 +163,7 @@ function openTaskManager() {
       const tx = Math.max(0, (s.net.tx - prev.net.tx) / dt);
       push(hist.rx, rx);
       push(hist.tx, tx);
-      mNet.set(`↓ ${fmtSize(rx)}/s`, `↑ ${fmtSize(tx)}/s`, null);
+      mNet.set(`↓ ${fmtSize(Math.round(rx))}/s`, `↑ ${fmtSize(Math.round(tx))}/s`, null);
     } else mNet.set('計算中…', '', null);
     if (s.net) {
       const top = Math.max(1024, ...hist.rx, ...hist.tx) * 1.15;

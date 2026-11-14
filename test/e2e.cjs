@@ -446,7 +446,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   const value = () => page.evaluate(() => window.monaco.editor.getModels().find((m) => m.uri.path.endsWith('math.ts')).getValue()); // model keeps its URI after save-as
   const original = await value();
   check(original.includes('export function add'), 'editor shows the file content');
-  const edWin = page.locator('.win', { has: page.locator('.monaco-editor') }).first();
+  const edWin = page.locator('.win[data-app="Procoder"]');
   const state = () => edWin.locator('.statusbar span').first().textContent();
   check((await edWin.locator('.statusbar').textContent()).includes('typescript'), 'language detected as typescript');
   check((await page.$$('.dock-item')).length === 2, 'dock has Finder + the editor');
@@ -587,16 +587,57 @@ const { execSync: execSyncTop } = require('node:child_process');
   const raw = fs.readFileSync(home + '/docs/legacy.asp');
   const expected = Buffer.concat([Buffer.from([0xc1, 0x63, 0xc5, 0xe9]), fs.readFileSync(home + '/docs/legacy.orig')]);
   check(raw.equals(expected), 'Big5 file saved back as Big5 with CRLF intact', raw.toString('hex'));
-  check((await page.$$('.dock-item')).length === 3, 'dock shows both editors');
+  const pcTab = (name) => page.locator('.win[data-app="Procoder"] .pc-tab[data-name="' + name + '"]');
+  const pcTabs = () => page.locator('.win[data-app="Procoder"] .pc-tab .pc-tab-name').allTextContents().then((a) => a.join());
+  check((await page.$$('.dock-item')).length === 2 && (await page.locator('.win[data-app="Procoder"]').count()) === 1 && (await pcTabs()) === 'math.ts,legacy.asp',
+    'a second file opens as a tab in the one Procoder window', await pcTabs());
+  check(await pcTab('legacy.asp').evaluate((el) => el.classList.contains('active')) && (await page.evaluate(() => window.monaco.editor.getEditors().length)) === 1, 'the new tab is in front, and the tabs share one editor');
 
   await page.locator('.dock-item').first().click();
   await openItem('blob.bin');
   await page.waitForSelector('.toast.err');
   check((await page.textContent('.toast.err')).includes('不是文字檔'), 'binary file is refused with a message');
-  check((await page.$$('.dock-item')).length === 3, 'no window left behind for the binary file');
+  check((await page.$$('.dock-item')).length === 2 && (await pcTabs()) === 'math.ts,legacy.asp', 'no tab left behind for the binary file', await pcTabs());
+
+  // ---- tabs: switch, keep each file's state, reorder, close
+  await pcTab('math.ts').click();
+  check((await edWin.locator('.titlebar .ttext').textContent()) === 'math.ts — Procoder' && (await edWin.locator('.statusbar').textContent()).includes('typescript') && (await edWin.locator('.statusbar .path').textContent()) === home + '/project/src/math.ts',
+    'clicking a tab shows that file: title, language and path follow');
+  check((await edWin.locator('.monaco-editor .view-lines').textContent()).includes('export'), 'the editor shows the tab\'s content');
+  {
+    const a = await pcTab('math.ts').boundingBox();
+    const b = await pcTab('legacy.asp').boundingBox();
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(b.x + b.width / 2 + 10, b.y + b.height / 2, { steps: 6 });
+    await page.mouse.up();
+    check((await pcTabs()) === 'legacy.asp,math.ts', 'dragging a tab sideways reorders the tabs', await pcTabs());
+  }
+  await pcTab('legacy.asp').click({ button: 'right' });
+  check((await page.locator('.ctx-menu button').allTextContents()).join('|') === '關閉|關閉其他分頁|關閉右側分頁|關閉全部分頁|複製路徑', 'a tab has its own right-click menu');
+  await page.keyboard.press('Escape');
+  await pcTab('math.ts').click({ button: 'right' });
+  await page.locator('.ctx-menu button', { hasText: '關閉其他分頁' }).click();
+  await sleep(150);
+  check((await pcTabs()) === 'math.ts' && (await edWin.locator('.titlebar .ttext').textContent()) === 'math.ts — Procoder', '"close the other tabs" leaves only this one', await pcTabs());
+  await edWin.locator('.monaco-editor .view-lines').click();
+  await page.keyboard.type('y');
+  check(await pcTab('math.ts').evaluate((el) => el.classList.contains('dirty')), 'a modified tab is marked');
+  await pcTab('math.ts').locator('.pc-tab-close').click();
+  await page.waitForSelector('.modal');
+  check((await page.textContent('.modal h2')).includes('math.ts'), 'closing a modified tab asks first');
+  await page.locator('.modal button', { hasText: '不儲存' }).click();
+  await page.waitForSelector('.pc-welcome');
+  check((await pcTabs()) === '歡迎' && (await edWin.locator('.titlebar .ttext').textContent()) === '歡迎 — Procoder', 'closing the last file brings the welcome page back');
+  check((await page.locator('.pc-w-recent .pc-w-name').allTextContents()).slice(0, 2).join() === 'legacy.asp,math.ts', 'the welcome page lists the files opened lately', (await page.locator('.pc-w-recent .pc-w-name').allTextContents()).join());
+  await page.locator('.pc-w-recent', { hasText: 'math.ts' }).locator('.pc-w-link').click();
+  await edWin.locator('.monaco-editor .view-lines').waitFor();
+  await page.waitForFunction(() => document.querySelector('.win[data-app="Procoder"] .pc-pane').style.display === 'none');
+  check((await pcTabs()) === '歡迎,math.ts', 'a recent file opens from the welcome page as a tab');
+  await pcTab('歡迎').hover();
+  await pcTab('歡迎').locator('.pc-tab-close').click();
 
   // ---- unsaved-changes guard
-  await dockEd.click();
   await edWin.locator('.monaco-editor .view-lines').click();
   await page.keyboard.type('x');
   await edWin.locator('.traffic .close').click();
@@ -607,7 +648,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   await edWin.locator('.traffic .close').click();
   await page.locator('.modal button', { hasText: '不儲存' }).click();
   await sleep(200);
-  check((await page.$$('.dock-item')).length === 2, 'discard closes the window and its dock item');
+  check((await page.$$('.dock-item')).length === 1, 'discard closes the window and its dock item');
   check(fs.readFileSync(home + '/project/src/math.ts', 'utf8') === onDisk, 'discarded edit was not written');
 
   // ---- File menu: undo / redo / save / save as / close
@@ -629,7 +670,7 @@ const { execSync: execSyncTop } = require('node:child_process');
     await mWin.locator('.menu button', { hasText: label }).click();
   };
   await mWin.locator('.menu-btn', { hasText: '檔案' }).click();
-  check((await mWin.locator('.menu button .lbl').allTextContents()).join('|') === '上一步（復原）|下一步（重做）|存檔|另存新檔…|關閉', 'File menu lists the five commands');
+  check((await mWin.locator('.menu button .lbl').allTextContents()).join('|') === '新增檔案|開啟檔案…|上一步（復原）|下一步（重做）|存檔|另存新檔…|關閉分頁|結束 Procoder', 'File menu lists its commands');
   check(await mWin.locator('.menu button', { hasText: '上一步' }).isDisabled(), 'undo is disabled when there is nothing to undo');
   await page.keyboard.press('Escape');
   check((await mWin.locator('.menu').count()) === 0, 'Escape closes the menu');
@@ -698,18 +739,21 @@ const { execSync: execSyncTop } = require('node:child_process');
   check(await waitApp('editor', (d) => d.fontSize === 14 && d.minimap === false), 'preferences are saved in ~/.remosh-gui/app/editor');
   await page.locator('.dock-item', { hasText: 'copy.py' }).click(); // minimise so the Finder is reachable
   await openItem('app.py');
-  await page.waitForFunction(() => window.monaco.editor.getEditors().length === 3);
-  check(await page.evaluate(() => window.monaco.editor.getEditors().every((e) => e.getRawOptions().fontSize === 14 && e.getRawOptions().minimap.enabled === false)), 'new and existing editors share the preferences');
-  await page.locator('.win', { has: page.locator('.titlebar .title', { hasText: 'app.py' }) }).locator('.traffic .close').click();
-  await page.locator('.dock-item', { hasText: 'copy.py' }).click();
+  await pcTab('app.py').waitFor();
+  await page.waitForFunction(() => window.monaco.editor.getEditors()[0].getModel()?.uri.path.endsWith('app.py'));
+  check(await page.evaluate(() => window.monaco.editor.getEditors().every((e) => e.getRawOptions().fontSize === 14 && e.getRawOptions().minimap.enabled === false)), 'another tab has the same preferences');
+  await page.locator('.win[data-app="Procoder"] .monaco-editor').click();
+  await page.keyboard.press('Alt+w');
+  await sleep(150);
+  check((await pcTabs()) === 'copy.py', 'Alt+W closes the tab in front', await pcTabs());
   await view('重設文字大小');
   await view('顯示右側縮圖');
   check((await opt('fontSize')) === 13 && (await opt('minimap')) === true, 'reset restores the defaults');
 
   await cWin.locator('.menu-btn', { hasText: '檔案' }).click();
-  await cWin.locator('.menu button', { hasText: '關閉' }).click();
+  await cWin.locator('.menu button', { hasText: '結束 Procoder' }).click();
   await sleep(200);
-  check((await cWin.count()) === 0 && (await page.$$('.dock-item')).length === 2, 'menu close closes the window');
+  check((await cWin.count()) === 0 && (await page.$$('.dock-item')).length === 1, 'the menu\'s quit closes the window');
   fs.rmSync(copyPath, { force: true });
 
   // ---- start menu, clock, task manager
@@ -731,7 +775,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   check(await page.isVisible('#start-menu') && await menuGone(), 'Escape closes the start menu, fading out first');
 
   await page.locator('.win', { has: page.locator('.finder-main') }).locator('.traffic .close').click();
-  check((await page.locator('.finder-main').count()) === 0 && (await page.$$('.dock-item')).length === 1, 'file cabinet can be closed');
+  check((await page.locator('.finder-main').count()) === 0 && (await page.$$('.dock-item')).length === 0, 'file cabinet can be closed');
   await page.click('#start-btn');
   await page.click('#sm-files');
   await page.waitForSelector('.files .item');
@@ -849,6 +893,22 @@ const { execSync: execSyncTop } = require('node:child_process');
   await page.click('#sm-back');
   check((await page.locator('#sm-apps button').last().textContent()) === '工作管理員', 'pinning adds it at the end');
   await page.click('#sm-editor');
+  const pcWin = page.locator('.win[data-app="Procoder"]');
+  await pcWin.locator('.pc-welcome').waitFor();
+  check((await pcWin.locator('.titlebar .ttext').textContent()) === '歡迎 — Procoder' && (await pcWin.locator('.pc-tab').count()) === 1 && (await pcWin.locator('.pc-w-head h1').textContent()) === 'Procoder',
+    'the code editor starts on its welcome page, in a tab');
+  check((await pcWin.locator('.pc-w-start .pc-w-link').allTextContents()).join() === '新增檔案,開啟檔案…', 'the welcome page offers a new file and opening one');
+  await page.click('#start-btn');
+  await page.click('#sm-editor');
+  check((await page.locator('.win[data-app="Procoder"]').count()) === 1 && (await pcWin.locator('.pc-tab').count()) === 1, 'starting it again does not open a second Procoder');
+  await pcWin.locator('.pc-w-link', { hasText: '開啟檔案…' }).click();
+  await page.fill('.modal input', home + '/project/README.md');
+  await page.keyboard.press('Enter');
+  await pcWin.locator('.pc-tab[data-name="README.md"]').waitFor();
+  check((await pcWin.locator('.pc-tab.active .pc-tab-name').textContent()) === 'README.md', '"open file" opens the typed path as a tab');
+  await pcWin.locator('.pc-tab[data-name="README.md"]').click({ button: 'middle' });
+  await pcWin.locator('.pc-welcome').waitFor();
+  await pcWin.locator('.pc-w-link', { hasText: '新增檔案' }).click();
   const blankEd = page.locator('.win', { has: page.locator('.titlebar .title', { hasText: '未命名 — Procoder' }) });
   await blankEd.locator('.monaco-editor .view-lines').click();
   await page.keyboard.insertText('fresh');
