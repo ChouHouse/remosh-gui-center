@@ -18,6 +18,7 @@ import { attachMenuBar } from '../../shell/menubar.js';
 import { showContextMenu } from '../../shell/context-menu.js';
 import { registerApp, useAppStyle } from '../../shell/apps.js';
 import { registerDropTarget } from '../../shell/drag.js';
+import { pickPath } from '../../shell/picker.js';
 import { loadMonaco, themeName, NAME_LANG, EXT_LANG } from './monaco.js';
 import { buildWelcome } from './welcome.js';
 import { createTree } from './tree.js';
@@ -530,32 +531,16 @@ function closeFolder() {
   app?.tree.setRoot(null);
 }
 
-async function askPath(title, message) {
-  const answer = await dialog({
-    title,
-    message,
-    input: (active?.path ? P.parent(active.path) : app?.tree.root || conn.info.home).replace(/\/?$/, '/'),
-    buttons: [{ label: '取消', value: false, cancel: true }, { label: '開啟', value: true, default: true }],
-  });
-  const typed = answer.value ? answer.text.trim() : '';
-  return typed ? P.norm(typed.startsWith('/') ? typed : P.join(conn.info.home, typed)) : null;
-}
+const startDir = () => (active?.path ? P.parent(active.path) : app?.tree.root || conn.info.home);
 
 async function askOpen() {
-  const path = await askPath('開啟檔案', '輸入主機上的檔案路徑：');
+  const path = await pickPath({ mode: 'file', start: startDir() });
   if (path) await openPath(path);
 }
 
 async function askOpenFolder() {
-  const path = await askPath('開啟資料夾', '輸入主機上的資料夾路徑：');
-  if (!path) return;
-  try {
-    const { entry } = await rpc('stat', { path });
-    if (entry.type !== 'dir') return toast(`「${path}」不是資料夾`, true);
-    openFolder(path);
-  } catch (err) {
-    toast(`無法開啟「${path}」：${errText(err)}`, true);
-  }
+  const path = await pickPath({ mode: 'folder', start: app?.tree.root || startDir() });
+  if (path) openFolder(path);
 }
 
 async function openDropped(paths) {
@@ -620,18 +605,8 @@ function relocate(doc, target) {
 
 async function saveDocAs(doc) {
   if (!doc?.model || doc.saving) return false;
-  const answer = await dialog({
-    title: '另存新檔',
-    message: '輸入要存到主機上的路徑：',
-    input: doc.path || P.join(conn.info.home, UNTITLED + '.txt'),
-    buttons: [{ label: '取消', value: false, cancel: true }, { label: '儲存', value: true, default: true }],
-  });
-  const typed = answer.value ? answer.text.trim() : '';
-  if (!typed || typed.endsWith('/')) {
-    if (answer.value) toast('請輸入包含檔名的路徑', true);
-    return false;
-  }
-  const target = P.norm(typed.startsWith('/') ? typed : P.join(doc.path ? P.parent(doc.path) : conn.info.home, typed));
+  const target = await pickPath({ mode: 'save', start: doc.path ? P.parent(doc.path) : app?.tree.root || conn.info.home, name: doc.path ? doc.name : UNTITLED + '.txt' });
+  if (!target) return false;
   if (target === doc.path) return saveDoc(doc);
   if (findDoc(target)) {
     toast(`「${P.base(target)}」已經在另一個分頁開啟，請先關閉它`, true);

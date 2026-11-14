@@ -12,6 +12,7 @@ import { on, emit } from '../../core/events.js';
 import { decodeText, encodeText, toBase64, fromBase64 } from '../../core/text-codec.js';
 import { createWindow } from '../../shell/wm.js';
 import { attachMenuBar } from '../../shell/menubar.js';
+import { pickPath } from '../../shell/picker.js';
 import { registerApp, useAppStyle } from '../../shell/apps.js';
 import { showContextMenu } from '../../shell/context-menu.js';
 
@@ -123,19 +124,8 @@ async function openNotepad({ path = null, size = 0 } = {}) {
   }
 
   async function saveAs() {
-    const answer = await dialog({
-      title: '另存新檔',
-      message: '輸入要存到主機上的路徑：',
-      input: note.path || P.join(conn.info.home, UNTITLED + '.txt'),
-      buttons: [{ label: '取消', value: false, cancel: true }, { label: '儲存', value: true, default: true }],
-    });
-    const typed = answer.value ? answer.text.trim() : '';
-    if (!typed || typed.endsWith('/')) {
-      if (answer.value) toast('請輸入包含檔名的路徑', true);
-      return false;
-    }
-    const base = note.path ? P.parent(note.path) : conn.info.home;
-    const target = P.norm(typed.startsWith('/') ? typed : P.join(base, typed));
+    const target = await pickPath({ mode: 'save', start: note.path ? P.parent(note.path) : conn.info.home, name: note.path ? P.base(note.path) : UNTITLED + '.txt' });
+    if (!target) return false;
     if (target === note.path) return save();
     if ([...notes].some((n) => n !== note && n.path === target)) {
       toast(`「${P.base(target)}」已經在另一個記事本視窗開啟`, true);
