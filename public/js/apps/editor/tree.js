@@ -24,6 +24,7 @@ export function createTree(actions) {
   let root = null;
   let current = null; // path of the file in the active tab
   const expanded = new Set();
+  let focusNext = null; // path of the row to give the focus to at the next redraw
   const dirs = new Map(); // path -> { entries } | { error } | { loading: true }
   const title = h('span', { class: 'pc-side-title' });
   const body = h('div', { class: 'pc-tree', role: 'tree' });
@@ -82,7 +83,7 @@ export function createTree(actions) {
             { label: '新增檔案', run: () => create(into, false) },
             { label: '新增資料夾', run: () => create(into, true) },
             null,
-            { label: '重新命名', run: () => rename(full, entry.name) },
+            { label: '重新命名（F2）', run: () => rename(full, entry.name) },
             { label: '刪除', danger: true, run: () => remove(full, entry.name, isDir) },
             null,
             { label: '複製路徑', run: () => copyText(full) },
@@ -164,6 +165,7 @@ export function createTree(actions) {
     }
     for (const p of [...dirs.keys()]) if (p === full || p.startsWith(full + '/')) dirs.delete(p);
     for (const p of expanded) if (!dirs.has(p)) load(p, true);
+    focusNext = to;
     emit('fs:moved', full, to); // open tabs follow the file
     emit('fs:changed', dir);
   }
@@ -184,6 +186,22 @@ export function createTree(actions) {
     actions.removed(full);
     emit('fs:changed', P.parent(full));
   }
+
+  // Keyboard, on the row that has the focus (the one clicked last): F2 renames,
+  // Delete deletes, the arrow keys walk up and down.
+  body.addEventListener('keydown', (ev) => {
+    const row = ev.target.closest?.('.pc-row');
+    if (!row || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    const full = row.dataset.path;
+    if (ev.key === 'F2') rename(full, P.base(full));
+    else if (ev.key === 'Delete') remove(full, P.base(full), row.classList.contains('dir'));
+    else if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+      const all = [...body.querySelectorAll('.pc-row')];
+      all[all.indexOf(row) + (ev.key === 'ArrowDown' ? 1 : -1)]?.focus();
+    } else return;
+    ev.preventDefault();
+    ev.stopPropagation();
+  });
 
   body.addEventListener('contextmenu', (ev) => {
     if (!root) return;
@@ -207,10 +225,17 @@ export function createTree(actions) {
       return;
     }
     const top = body.scrollTop;
+    // The row with the keyboard focus keeps it across a redraw.
+    const focused = focusNext || (body.contains(document.activeElement) ? document.activeElement.dataset.path : null);
     const out = [];
     rows(root, 0, out);
     body.replaceChildren(...out);
     body.scrollTop = top;
+    const again = focused && out.find((row) => row.dataset?.path === focused);
+    if (again) {
+      again.focus({ preventScroll: true });
+      focusNext = null;
+    }
   }
 
   // Reload what is on screen: one folder (when it changed), or all the open ones.

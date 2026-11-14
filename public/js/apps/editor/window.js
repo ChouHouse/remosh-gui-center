@@ -148,8 +148,10 @@ export function createProcoder(hub, { folder = null } = {}) {
     return app;
   }
 
+  // The keyboard goes to the editor, unless someone is working in the file
+  // tree (arrow keys, F2): they stay there.
   function focusEditor() {
-    if (app?.editor && active?.model) app.editor.focus();
+    if (app?.editor && active?.model && !app.tree.el.contains(document.activeElement)) app.editor.focus();
   }
 
   // Monaco and the window's single editor, made the first time a file needs it.
@@ -332,7 +334,7 @@ export function createProcoder(hub, { folder = null } = {}) {
       }
       app.pane.style.display = 'none';
       app.pane.replaceChildren();
-      if (wm.focused === app.win) app.editor.focus();
+      if (wm.focused === app.win) focusEditor();
     } else {
       if (doc.kind === 'welcome') {
         doc.page = buildWelcome(recentList(), { newFile: () => openFile(), openFile: askOpen, openFolder: askOpenFolder, openRecent: openPath, forget });

@@ -92,3 +92,4 @@
 .pc-tree-empty { padding: 14px 12px; display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
 .pc-tree-empty p { margin: 0; color: var(--muted); font-size: 12.5px; }
 .pc-tree-open { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-text, #fff); font: inherit; font-size: 12.5px; cursor: pointer; }
+.pc-row:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
