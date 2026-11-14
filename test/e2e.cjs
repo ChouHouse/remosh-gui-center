@@ -443,6 +443,11 @@ const { execSync: execSyncTop } = require('node:child_process');
 
   // ---- open a file in a Monaco window
   await openItem('math.ts');
+  // the first start asks which look Procoder should have
+  await page.waitForFunction(() => document.querySelector('.modal h2')?.textContent === 'Procoder 要用亮色還是暗色？');
+  check((await page.locator('.modal .btns button').allTextContents()).join() === '亮色,暗色', 'the first time Procoder starts it asks: light or dark');
+  await page.locator('.modal button', { hasText: '亮色' }).click();
+  check(await waitApp('editor', (d) => d.theme === 'light') && (await page.locator('.win[data-app="Procoder"]').getAttribute('data-pc-theme')) === 'light', 'the answer is kept in ~/.remosh-gui/app/editor and applied');
   await page.waitForSelector('.win .monaco-editor .view-lines', { timeout: 60000 });
   const value = () => page.evaluate(() => window.monaco.editor.getModels().find((m) => m.uri.path.endsWith('math.ts')).getValue()); // model keeps its URI after save-as
   const original = await value();
@@ -1787,8 +1792,23 @@ const { execSync: execSyncTop } = require('node:child_process');
   check(await waitSetting((st) => st.style.mode === 'dark'), 'dark mode is saved');
   await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
   check((await sw.evaluate((el) => getComputedStyle(el).backgroundColor)) === 'rgb(35, 39, 46)', 'dark mode darkens the windows');
-  await page.waitForFunction(() => getComputedStyle(document.querySelector('.monaco-editor .monaco-editor-background')).backgroundColor === 'rgb(30, 30, 30)', null, { timeout: 5000 }).catch(() => {});
-  check((await bgOf('.monaco-editor .monaco-editor-background')) === 'rgb(30, 30, 30)', 'the code editor switches to its dark theme');
+  check((await bgOf('.monaco-editor .monaco-editor-background')) !== 'rgb(30, 30, 30)' && (await indep.locator('.pc-tabbar').evaluate((el) => getComputedStyle(el).backgroundColor)) === 'rgb(243, 244, 246)',
+    'Procoder keeps the look chosen for it when the desktop goes dark');
+  {
+    const look = async (label) => {
+      if (!(await indep.evaluate((el) => el.classList.contains('focused')))) await page.locator('.dock-item', { hasText: 'README.md' }).click();
+      await indep.locator('.menu-btn', { hasText: '介面' }).click();
+      await indep.locator('.menu button', { hasText: label }).click();
+    };
+    await look('暗色');
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.monaco-editor .monaco-editor-background')).backgroundColor === 'rgb(30, 30, 30)');
+    check((await indep.getAttribute('data-pc-theme')) === 'dark' && (await indep.locator('.pc-tabbar').evaluate((el) => getComputedStyle(el).backgroundColor)) === 'rgb(28, 32, 38)' && await waitApp('editor', (d) => d.theme === 'dark'),
+      'the 介面 menu switches Procoder to dark: the editor and the window around it');
+    await look('亮色');
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.monaco-editor .monaco-editor-background')).backgroundColor !== 'rgb(30, 30, 30)');
+    check((await indep.getAttribute('data-pc-theme')) === 'light', 'and back to light');
+    await focusSettings();
+  }
   check((await cssVar('--accent')) === '#7db8f5', 'in dark mode the system colour turns to its pale version');
   await sw.locator('#set-mode button[data-value="light"]').click();
   await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');

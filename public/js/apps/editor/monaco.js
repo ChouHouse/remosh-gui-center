@@ -1,10 +1,13 @@
 // Loads Monaco (the VS Code editor component) on demand and configures it.
 import { on } from '../../core/events.js';
 import { effectiveMode, onDeviceModeChange } from '../../shell/style.js';
+import { data, themePref } from './prefs.js';
 export let monacoPromise = null;
 // The code editor is its own app with its own colours: it does not take the
-// system colour, it only switches between its light and dark theme.
-export const themeName = () => (effectiveMode() === 'dark' ? 'vs-dark' : 'vs');
+// system colour. Light or dark is the user's choice for Procoder (prefs.js);
+// until they have chosen, it goes by the desktop.
+export const procoderMode = () => themePref() || (effectiveMode() === 'dark' ? 'dark' : 'light');
+export const themeName = () => (procoderMode() === 'dark' ? 'vs-dark' : 'vs');
 
 export function loadMonaco() {
   if (monacoPromise) return monacoPromise;
@@ -31,6 +34,7 @@ export function loadMonaco() {
       const sync = () => monaco.editor.setTheme(themeName());
       onDeviceModeChange(sync);
       on('settings:changed', sync);
+      data.onChange(sync);
       sync();
       resolve(monaco);
     }, reject);

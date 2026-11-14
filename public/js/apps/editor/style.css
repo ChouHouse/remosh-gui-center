@@ -107,3 +107,53 @@
 .pc-lang-list button.on span:first-child { font-weight: 600; color: var(--accent); }
 .pc-lang-id { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
 .pc-lang-none { padding: 8px; color: var(--muted); font-size: 12.5px; }
+
+/* Procoder has its own light / dark look (asked at first start, 介面 menu
+   afterwards): its window takes these colours whatever the desktop uses. */
+[data-pc-theme="light"] {
+  --bg: #dfe6ee;
+  --bg2: #b9c8d8;
+  --surface: #ffffff;
+  --surface-2: #f3f4f6;
+  --surface-3: #e7e9ed;
+  --border: #cfd4db;
+  --text: #1c2026;
+  --muted: #68717d;
+  --accent: #0a64d6;
+  --accent-text: #ffffff;
+  --select: #d6e6fb;
+  --danger: #c0392b;
+  --warn-bg: #fff4d6;
+  --warn-border: #e2b93b;
+  --shadow: 0 18px 50px rgba(20, 30, 50, .28), 0 2px 8px rgba(20, 30, 50, .18);
+  --bar: rgba(255, 255, 255, .72);
+  --folder: #4a9bea;
+  --folder-dark: #2f7fd1;
+  --file: #ffffff;
+  --file-edge: #b8c0cb;
+  color-scheme: light;
+}
+[data-pc-theme="dark"] {
+  --bg: #1b2330;
+  --bg2: #0f141c;
+  --surface: #23272e;
+  --surface-2: #1c2026;
+  --surface-3: #2c313a;
+  --border: #3a404b;
+  --text: #e6e9ee;
+  --muted: #98a1ad;
+  --accent: #4c9bff;
+  --accent-text: #0b1220;
+  --select: #1f3b5e;
+  --danger: #ff6b5e;
+  --warn-bg: #3a3118;
+  --warn-border: #8a6d1a;
+  --shadow: 0 18px 50px rgba(0, 0, 0, .6), 0 2px 8px rgba(0, 0, 0, .4);
+  --bar: rgba(30, 34, 42, .78);
+  --folder: #5aa7f2;
+  --folder-dark: #3b86d6;
+  --file: #3a404b;
+  --file-edge: #5a6270;
+  color-scheme: dark;
+}
+[data-pc-theme] { color: var(--text); }

@@ -6,7 +6,9 @@ import { wm } from '../../shell/wm.js';
 import { registerApp, useAppStyle } from '../../shell/apps.js';
 import { procoderSvg } from './icon.js';
 import { loadMonaco } from './monaco.js';
-import { APP_NAME, data, toggleSide } from './prefs.js';
+import { APP_NAME, data, toggleSide, themePref, setTheme } from './prefs.js';
+import { dialog } from '../../core/ui.js';
+import { effectiveMode, onDeviceModeChange } from '../../shell/style.js';
 import { createProcoder } from './window.js';
 
 useAppStyle(import.meta.url);
@@ -37,16 +39,40 @@ const hub = {
   },
 };
 
+// The first time Procoder is started it asks which look it should have. The
+// answer is kept with Procoder's data (~/.remosh-gui/app/editor/); the 介面
+// menu changes it later. Closing the question without answering asks again
+// next time.
+let asking = false;
+async function askThemeOnce() {
+  await data.ready();
+  if (themePref() || asking) return;
+  asking = true;
+  const dark = effectiveMode() === 'dark';
+  const choice = await dialog({
+    title: 'Procoder 要用亮色還是暗色？',
+    message: '之後可以從 Procoder 的「介面」選單更改。',
+    buttons: [{ label: '亮色', value: 'light', default: !dark }, { label: '暗色', value: 'dark', default: dark }],
+  });
+  asking = false;
+  if (choice) setTheme(choice);
+}
+
 function openWindow(options) {
+  askThemeOnce();
   const inst = createProcoder(hub, options);
   windows.push(inst);
   return inst;
 }
 const lastUsed = () => windows[windows.length - 1] || null;
 
-data.onChange(() => {
+const followPrefs = () => {
   for (const inst of windows) inst.onPrefs();
-});
+};
+data.onChange(followPrefs);
+// Until a look has been chosen Procoder goes by the desktop's light / dark.
+onDeviceModeChange(followPrefs);
+on('settings:changed', followPrefs);
 
 // Ctrl/Cmd+S saves the active tab instead of the browser's "save page"; Alt+W
 // closes it and Ctrl/Cmd+B shows or hides the file tree, also when the focus

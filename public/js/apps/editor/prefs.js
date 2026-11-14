@@ -19,7 +19,7 @@ export const SIDE_MAX = 480;
 export const clampSide = (n) => Math.max(SIDE_MIN, Math.min(SIDE_MAX, Math.round(Number(n)) || SIDE_DEFAULT));
 export const clampFont = (n) => Math.max(FONT_MIN, Math.min(FONT_MAX, Math.round(Number(n)) || FONT_DEFAULT));
 export const data = appStore('editor', {
-  defaults: { fontSize: FONT_DEFAULT, minimap: true, wordWrap: 'off', recent: [], langs: {}, folder: null, sideWidth: SIDE_DEFAULT, sideShown: true },
+  defaults: { fontSize: FONT_DEFAULT, minimap: true, wordWrap: 'off', recent: [], langs: {}, theme: null, folder: null, sideWidth: SIDE_DEFAULT, sideShown: true },
   migrate() {
     const out = {};
     for (const key of ['fontSize', 'minimap', 'wordWrap']) {
@@ -61,3 +61,7 @@ export function setChosenLang(path, lang) {
   if (lang) next[path] = lang;
   data.set('langs', Object.fromEntries(Object.entries(next).slice(-LANGS_MAX)));
 }
+
+// Procoder's own look: 'light' or 'dark'; null until the user has been asked.
+export const themePref = () => (['light', 'dark'].includes(data.get('theme')) ? data.get('theme') : null);
+export const setTheme = (theme) => data.set('theme', theme);

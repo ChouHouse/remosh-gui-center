@@ -16,13 +16,13 @@ import { attachMenuBar } from '../../shell/menubar.js';
 import { showContextMenu } from '../../shell/context-menu.js';
 import { registerDropTarget } from '../../shell/drag.js';
 import { pickPath } from '../../shell/picker.js';
-import { loadMonaco, themeName, NAME_LANG, EXT_LANG } from './monaco.js';
+import { loadMonaco, themeName, procoderMode, NAME_LANG, EXT_LANG } from './monaco.js';
 import { buildWelcome } from './welcome.js';
 import { createTree } from './tree.js';
 import { pickLanguage, langName } from './lang-picker.js';
 import {
   APP_NAME, UNTITLED, WELCOME, LARGE_FILE_BYTES, FONT_DEFAULT, FONT_MIN, FONT_MAX, SIDE_DEFAULT, clampSide,
-  data, prefs, setFontSize, setMinimap, toggleWrap, recentList, remember, forget, sideShown, toggleSide, isFolderRef, chosenLang, setChosenLang,
+  data, prefs, setFontSize, setMinimap, toggleWrap, recentList, remember, forget, sideShown, toggleSide, isFolderRef, chosenLang, setChosenLang, setTheme,
 } from './prefs.js';
 
 // ---- documents
@@ -55,6 +55,7 @@ export function createProcoder(hub, { folder = null } = {}) {
 
   function applySide() {
     if (!app) return;
+    app.win.el.dataset.pcTheme = procoderMode();
     app.main.classList.toggle('no-side', !sideShown());
     app.tree.el.style.width = clampSide(data.get('sideWidth')) + 'px';
   }
@@ -220,6 +221,9 @@ export function createProcoder(hub, { folder = null } = {}) {
         items: [
           { label: '歡迎頁面', run: openWelcome },
           { label: '切換語言…', enabled: () => !!active?.model, run: chooseLanguage },
+          null,
+          { label: '亮色', checked: () => procoderMode() === 'light', run: () => setTheme('light') },
+          { label: '暗色', checked: () => procoderMode() === 'dark', run: () => setTheme('dark') },
           { label: '顯示檔案樹', key: mod + 'B', checked: sideShown, run: toggleSide },
           null,
           { label: '放大文字', key: mod + '+', enabled: () => prefs.fontSize < FONT_MAX, run: () => setFontSize(prefs.fontSize + 1) },

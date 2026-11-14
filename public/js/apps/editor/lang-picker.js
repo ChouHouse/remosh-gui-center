@@ -56,6 +56,7 @@ export function pickLanguage(monaco, anchor, currentId, autoId) {
     });
     input.addEventListener('input', render);
 
+    box.dataset.pcTheme = anchor.closest('[data-pc-theme]')?.dataset.pcTheme || ''; // dressed like its window
     document.body.append(box);
     const r = anchor.getBoundingClientRect();
     box.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
