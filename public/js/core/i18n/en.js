@@ -210,7 +210,6 @@ export default {
   '建立': 'Create',
   '貼上': 'Paste',
   '剪下': 'Cut',
-  '完成': 'Done',
   '設定': 'Settings',
   '全選': 'Select all',
   '{0} 核': '{0} cores',

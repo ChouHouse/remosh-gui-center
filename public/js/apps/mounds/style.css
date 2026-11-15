@@ -1,5 +1,5 @@
 /* ---------- Mounds: music player ---------- */
-.md-body { --md-bg: ; --md-fg: ; position: relative; background: var(--md-bg, var(--surface)); color: var(--md-fg, var(--text)); }
+.md-body { position: relative; background: var(--md-bg, var(--surface)); color: var(--md-fg, var(--text)); }
 .md-player { flex: none; position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 18px 14px; }
 .md-head { width: 100%; padding: 0 34px; box-sizing: border-box; text-align: center; min-width: 0; }
 .md-title { font-size: 16px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -34,17 +34,14 @@
 .md-song-del { flex: none; width: 24px; height: 24px; margin-right: 4px; border: 0; border-radius: 5px; background: transparent; color: inherit; opacity: 0; font-size: 15px; line-height: 1; }
 .md-song:hover .md-song-del, .md-song-del:focus { opacity: .8; }
 .md-empty { padding: 22px 14px; text-align: center; font-size: 12.5px; opacity: .65; }
-.md-settings { display: none; position: absolute; inset: 0; z-index: 5; padding: 16px 18px; flex-direction: column; gap: 14px; background: var(--md-bg, var(--surface)); }
-.md-settings-open .md-settings { display: flex; }
-.md-settings h2 { margin: 0; font-size: 15px; }
+.md-settings-win { padding: 18px 20px; }
 .md-set-row { display: flex; align-items: center; gap: 14px; font-size: 13px; }
 .md-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
 .md-swatch { width: 24px; height: 24px; padding: 0; border-radius: 50%; border: 2px solid color-mix(in srgb, currentColor 30%, transparent); }
 .md-swatch.on { outline: 2px solid currentColor; outline-offset: 2px; }
-.md-swatch-none { background: linear-gradient(135deg, var(--surface) 0 48%, #c0392b 48% 52%, var(--surface) 52%); }
+.md-swatch-none { background: linear-gradient(135deg, var(--surface) 0 46%, #c0392b 46% 54%, var(--surface) 54%); }
+.md-set-row > span { flex: none; white-space: nowrap; }
 .md-swatches input[type="color"] { width: 30px; height: 26px; padding: 0; border: 0; background: transparent; }
-.md-set-btns { margin-top: auto; display: flex; justify-content: flex-end; }
-.md-set-close { padding: 6px 16px; border: 1px solid color-mix(in srgb, currentColor 30%, transparent); border-radius: 7px; background: transparent; color: inherit; }
 .md-mode { position: relative; width: 30px; height: 30px; padding: 7px; opacity: .55; }
 .md-mode[aria-pressed="true"] { opacity: 1; background: color-mix(in srgb, currentColor 16%, transparent); }
 .md-repeat i { display: none; position: absolute; right: 2px; bottom: 1px; font: 700 9px/1 system-ui, sans-serif; }

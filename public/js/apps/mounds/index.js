@@ -83,7 +83,6 @@ function createPlayer() {
   const bMenu = h('button', { type: 'button', class: 'md-corner md-menu', title: tt('選單'), 'aria-label': tt('選單'), html: ICON.menu, onclick: menu });
   const bList = h('button', { type: 'button', class: 'md-corner md-list-btn', title: tt('歌單'), 'aria-label': tt('歌單'), html: ICON.list, onclick: () => showList(!listOpen) });
   const list = h('div', { class: 'md-list', role: 'listbox', 'aria-label': tt('歌單') });
-  const settings = h('div', { class: 'md-settings' });
   const card = h('div', { class: 'md-player' },
     bMenu,
     h('div', { class: 'md-head' }, title, artist),
@@ -93,13 +92,18 @@ function createPlayer() {
       h('div', { class: 'md-vol' }, h('span', { class: 'md-vol-ico', html: ICON.quiet }), volume, h('span', { class: 'md-vol-ico', html: ICON.loud })),
       bList));
   win.body.classList.add('md-body');
-  win.body.append(card, list, settings);
+  win.body.append(card, list);
 
   // ---- looks
   function applyLook() {
     const bg = /^#[0-9a-f]{6}$/i.test(data.get('bg') || '') ? data.get('bg') : null;
-    win.body.style.setProperty('--md-bg', bg || '');
-    win.body.style.setProperty('--md-fg', bg ? textOn(bg) : '');
+    if (bg) {
+      win.body.style.setProperty('--md-bg', bg);
+      win.body.style.setProperty('--md-fg', textOn(bg));
+    } else {
+      win.body.style.removeProperty('--md-bg');
+      win.body.style.removeProperty('--md-fg');
+    }
     win.body.classList.toggle('md-tinted', !!bg);
     audio.volume = Math.max(0, Math.min(1, Number(data.get('volume')) || 0));
     volume.value = String(Math.round(audio.volume * 100));
@@ -330,7 +334,7 @@ function createPlayer() {
       null,
       ...RATES.map((r) => ({ label: (r === rate ? '✓ ' : '') + tt('速度 {0}×', r), run: () => data.set('rate', r) })),
       null,
-      { label: tt('設定'), run: () => showSettings(true) },
+      { label: tt('設定'), run: showSettings },
     ]);
   }
 
@@ -339,20 +343,27 @@ function createPlayer() {
     if (path && player) add([path], { start: true });
   }
 
-  function showSettings(open) {
-    win.body.classList.toggle('md-settings-open', open);
-    if (!open) return settings.replaceChildren();
+  // Settings have a small window of their own.
+  let setWin = null;
+  function paintSettings() {
+    if (!setWin) return;
     const current = (data.get('bg') || '').toLowerCase();
-    const custom = h('input', { type: 'color', id: 'md-bg-custom', value: /^#[0-9a-f]{6}$/i.test(current) ? current : '#6c4bd8', 'aria-label': tt('自訂顏色') });
-    custom.addEventListener('input', () => data.set('bg', custom.value));
-    settings.replaceChildren(
-      h('h2', null, tt('設定')),
+    const custom = h('input', { type: 'color', id: 'md-bg-custom', value: /^#[0-9a-f]{6}$/i.test(current) ? current : '#6c4bd8', title: tt('自訂顏色'), 'aria-label': tt('自訂顏色') });
+    custom.addEventListener('change', () => data.set('bg', custom.value));
+    setWin.body.replaceChildren(h('div', { class: 'md-settings-win' },
       h('div', { class: 'md-set-row' }, h('span', null, tt('背景顏色')),
         h('div', { class: 'md-swatches' },
           h('button', { type: 'button', class: 'md-swatch md-swatch-none' + (current ? '' : ' on'), title: tt('預設'), 'aria-label': tt('預設'), onclick: () => data.set('bg', null) }),
           COLOURS.map((c) => h('button', { type: 'button', class: 'md-swatch' + (c === current ? ' on' : ''), style: `background:${c}`, 'data-colour': c, title: c, 'aria-label': c, onclick: () => data.set('bg', c) })),
-          custom)),
-      h('div', { class: 'md-set-btns' }, h('button', { type: 'button', class: 'md-set-close', onclick: () => showSettings(false) }, tt('完成'))));
+          custom))));
+  }
+  function showSettings() {
+    if (setWin) return setWin.focus();
+    setWin = createWindow({ title: tt('設定'), appName: APP_NAME, iconHtml: moundsSvg(), width: 420, height: 150 });
+    setWin.destroy = () => {
+      setWin = null;
+    };
+    paintSettings();
   }
 
   // ---- wiring
@@ -397,7 +408,7 @@ function createPlayer() {
   const follow = () => {
     applyLook();
     paint();
-    if (win.body.classList.contains('md-settings-open')) showSettings(true);
+    paintSettings();
   };
   // Songs dragged in from the file cabinet or the desktop, one or many.
   const offDrop = registerDropTarget(win.el, {
@@ -407,6 +418,7 @@ function createPlayer() {
   });
   win.destroy = () => {
     token++;
+    setWin?.close(true);
     offDrop();
     audio.pause();
     audio.removeAttribute('src');
