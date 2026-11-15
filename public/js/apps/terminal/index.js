@@ -169,5 +169,6 @@ registerApp({
   icon: terminalSvg,
   startMenu: true,
   extensions: ['', 'sh', 'bash', 'out', 'run', 'bin', 'elf', 'py', 'pl', 'rb'],
-  launch: openTerminal,
+  folders: true, // 「用 終端機 開啟」 on a folder starts a shell there
+  launch: (args) => openTerminal(args?.folder ? { cwd: args.path } : args),
 });

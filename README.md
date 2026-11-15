@@ -1,4 +1,6 @@
-# Remosh GUI Center
+# Remogui
+
+Version 1.0, code name Sandbox (`public/js/core/version.js`). The repository is still called Remosh GUI Center.
 
 A desktop in the browser for SSH hosts. A small Node server logs in to an SSH
 server and shows its files as a desktop: a file cabinet, a code editor
@@ -60,7 +62,7 @@ public/
     core/               dom, store, errors, ui, format, path, icons, events, rpc, text-codec, settings, i18n (+ i18n/en.js, ja.js)
     shell/              wm (windows), menubar, context-menu, drag, file-drop, shortcuts,
                         desktop-icons, login, gate, start-menu, clock, style, fullscreen,
-                        desktop, apps (registry), file-open (associations)
+                        desktop, apps (registry), file-open (「用 … 開啟」)
     apps/               one folder per app: index.js, icon.js, style.css, i18n.js (its texts in English and Japanese)
       files/            檔案櫃
       editor/           Procoder: windows with tabs and a file tree (index.js, window.js, tree.js, welcome.js, prefs.js, monaco.js)
@@ -192,10 +194,10 @@ npm run assets && WEB_PASSWORD=secret npm start   # http://localhost:8080
   新增資料夾 / 在這裡開啟終端機; right-click the sidebar to add or remove folders.
   Copy and cut put `remosh/file:<path><<id>>` on the clipboard; the id names the
   server and account, and pasting files with another id is refused.
-- **File associations**: every app declares the extensions it accepts
-  (`extensions: 'all'` or a list). The first time an extension is opened the
-  user is asked which app to use and the answer is remembered; 設定 → 檔案關聯
-  lists them and lets them be changed or removed (not added by hand).
+- **Open with**: an app declares what it opens when it registers: `extensions` for files and
+  `folders: true` for folders. Right-clicking a file or folder then offers 「用 XXX 開啟」 for every
+  app that fits (`openWithItems` in `shell/file-open.js`), and 設定 › 系統 lists them. Nothing is
+  remembered: a double-click opens the only app that fits, or asks when there are several.
 - **Graphoto**: the image viewer (png, jpg, gif, webp, avif, bmp, ico, svg).
   Wheel or +/- to zoom, drag to move, R to rotate, 0 to fit, 1 for actual size;
   ← / → (or the mouse side buttons) step through the pictures in the same folder.

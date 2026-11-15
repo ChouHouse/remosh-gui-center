@@ -12,8 +12,11 @@ import { rpc } from '../../core/rpc.js';
 import { settingsSvg } from './icon.js';
 import { on } from '../../core/events.js';
 import { getSettings, saveSettings, updateSettings } from '../../core/settings.js';
+import { productLine } from '../../core/version.js';
+import { localSystem } from './local-system.js';
 import { createWindow } from '../../shell/wm.js';
-import { registerApp, getApp, appsForExt, useAppStyle } from '../../shell/apps.js';
+import { registerApp, listApps, useAppStyle } from '../../shell/apps.js';
+import { fmtSize } from '../../core/format.js';
 import { setTaskbar } from '../../shell/taskbar.js';
 import { COLORS, systemColor, MODES, setColor, setMode, setControls, uploadWallpaper, useWallpaper, clearWallpaper, wallpaperUrl } from '../../shell/style.js';
 import { tt, tm, LANGS } from '../../core/i18n.js';
@@ -50,9 +53,40 @@ const CATEGORIES = [
           s.system.lang = lang.value;
         }).catch((err) => toast(tt('無法儲存：{0}', errText(err)), true));
       });
+      // What this is running on: the web system, this computer, and the host.
+      const host = { os: h('span', null, '…'), cpu: h('span', null, '…'), mem: h('span', null, '…'), disk: h('span', null, '…') };
+      rpc('sysInfo').then((info) => {
+        host.os.textContent = [info.os, info.arch].filter(Boolean).join(' · ') || '—';
+        host.cpu.textContent = info.cpu ? `${info.cpu}${info.cores ? ' · ' + tt('{0} 核', info.cores) : ''}` : info.cores ? tt('{0} 核', info.cores) : '—';
+        host.mem.textContent = info.memBytes ? fmtSize(info.memBytes) : '—';
+        host.disk.textContent = info.diskBytes ? tt('{0}，剩 {1}', fmtSize(info.diskBytes), fmtSize(info.diskFreeBytes)) : '—';
+      }, () => {
+        for (const el of Object.values(host)) el.textContent = '—';
+      });
+      const fact = (id, title, value) => h('div', { class: 'sys-fact', id }, h('span', null, title), h('b', null, value));
+      const about = h('div', { class: 'sys-about' },
+        fact('sys-web', tt('網頁系統'), productLine()),
+        fact('sys-local', tt('本地系統'), localSystem()),
+        fact('sys-host', tt('主機系統'), host.os),
+        fact('sys-cpu', 'CPU', host.cpu),
+        fact('sys-mem', tt('記憶體'), host.mem),
+        fact('sys-disk', tt('儲存空間'), host.disk));
+      // The right-click 「用 … 開啟」 entries, as the apps registered them.
+      const opens = listApps().filter((app) => app.extensions || app.folders).map((app) =>
+        h('div', { class: 'sys-open', 'data-app': app.id },
+          h('span', { class: 'sys-open-ico', html: app.icon() }),
+          h('b', null, tt('用 {0} 開啟', tt(app.name))),
+          h('span', null, [
+            app.folders && tt('資料夾'),
+            app.extensions === 'all' ? tt('所有檔案') : Array.isArray(app.extensions) && app.extensions.map((x) => (x ? '.' + x : tt('（無副檔名）'))).join(' '),
+          ].filter(Boolean).join('、'))));
       return h('div', null,
         h('h2', null, tt('系統')),
-        row(tt('語言'), tt('介面使用的語言。已經開著的視窗要重新開啟才會換過去'), lang));
+        about,
+        row(tt('語言'), tt('介面使用的語言。已經開著的視窗要重新開啟才會換過去'), lang),
+        h('h3', null, tt('右鍵選單')),
+        h('p', { class: 'set-note' }, tt('在檔案或資料夾上按右鍵時，會出現這些應用程式註冊的項目。')),
+        h('div', { class: 'sys-opens' }, opens));
     },
   },
   {
@@ -77,45 +111,6 @@ const CATEGORIES = [
         h('h2', null, tt('動畫')),
         row(tt('啟用動畫'), tt('視窗放大、還原，以及介面元件的過渡效果'), enabled),
         row(tt('速度'), tt('過渡效果播放的快慢'), speed));
-    },
-  },
-  {
-    id: 'associations',
-    label: tm('檔案關聯'),
-    render(draft, changed) {
-      const table = draft.files.associations;
-      const list = h('div', { class: 'assoc-list' });
-      const appSelect = (ext, current) => {
-        const options = appsForExt(ext);
-        const stale = current && !options.some((a) => a.id === current); // app gone or no longer accepts it
-        return h('select', { 'aria-label': tt('開啟程式') },
-          stale && h('option', { value: current, selected: true }, tt('{0}（不適用）', getApp(current)?.name || current)),
-          options.map((a) => h('option', { value: a.id, selected: a.id === current }, tt(a.name))));
-      };
-      const draw = () => {
-        const exts = Object.keys(table).sort();
-        list.replaceChildren(...(exts.length
-          ? exts.map((ext) => {
-            const select = appSelect(ext, table[ext]);
-            select.addEventListener('change', () => {
-              table[ext] = select.value;
-              changed();
-            });
-            return h('div', { class: 'assoc-row', 'data-ext': ext },
-              h('code', null, ext ? '.' + ext : tt('（無副檔名）')), select,
-              h('button', { type: 'button', class: 'assoc-del', title: tt('移除這個關聯'), onclick: () => {
-                delete table[ext];
-                draw();
-                changed();
-              } }, tt('移除')));
-          })
-          : [h('p', { class: 'assoc-empty' }, tt('還沒有任何關聯。'))]));
-      };
-      draw();
-      return h('div', null,
-        h('h2', null, tt('檔案關聯')),
-        h('p', { class: 'set-desc' }, tt('每種檔案要用哪個程式開啟。')),
-        list);
     },
   },
   {

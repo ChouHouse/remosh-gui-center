@@ -62,3 +62,4 @@ button.primary:disabled { opacity: .6; cursor: progress; }
   #saved-servers h2 { color: var(--muted); text-shadow: none; }
   .saved-server { box-shadow: none; }
 }
+.card .note.version { margin-top: -6px; opacity: .75; }

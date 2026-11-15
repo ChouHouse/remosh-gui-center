@@ -118,11 +118,18 @@ registerApp({
   icon: procoderSvg,
   startMenu: true,
   extensions: 'all',
+  folders: true, // 「用 Procoder 開啟」 on a folder shows it in the file tree
   // Starting Procoder while it is open brings its window forward; another
   // window comes from its own 檔案 › 開新視窗. A file from outside opens as a
   // tab in the Procoder that was used last. The first window shows the
   // welcome page and the folder from last time.
   launch: (args) => {
+    if (args?.folder) {
+      const inst = lastUsed() || openWindow();
+      inst.openFolder(args.path);
+      if (!inst.docs.length) inst.openWelcome();
+      return;
+    }
     if (args?.path) return (lastUsed() || openWindow()).openFile(args.path, args.size);
     const inst = lastUsed();
     if (inst) inst.win.focus();

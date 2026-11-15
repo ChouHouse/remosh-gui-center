@@ -2,11 +2,12 @@
 import { $, h } from '../core/dom.js';
 import { animationMs } from '../core/settings.js';
 import { tt } from '../core/i18n.js';
+import { PRODUCT } from '../core/version.js';
 
 export const winLayer = $('#windows');
 export const dockItems = $('#dock-items');
 export const setActiveTitle = (t) => {
-  document.title = t ? `${t} — Remosh GUI` : 'Remosh GUI';
+  document.title = t ? `${t} — ${PRODUCT.name}` : PRODUCT.name;
 };
 // workspaces: ids in display order; ws: the one on screen. Every window
 // belongs to one workspace; the others' windows and taskbar entries are hidden.

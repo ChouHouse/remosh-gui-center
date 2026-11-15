@@ -1,6 +1,6 @@
 {
-  "name": "Remosh GUI",
-  "short_name": "Remosh",
+  "name": "Remogui",
+  "short_name": "Remogui",
   "lang": "zh-Hant",
   "description": "SSH 主機的網頁桌面：檔案、編輯器、終端機",
   "start_url": "/",

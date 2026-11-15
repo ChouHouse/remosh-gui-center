@@ -13,6 +13,7 @@
 //   extensions?:        files it can open: 'all', or a list of lower-case
 //                       extensions without the dot ('' = no extension).
 //                       launch({ path, size }) then opens that remote file.
+//   folders?: bool      it can open a folder: launch({ path, folder: true })
 //   unsavedCount?()     number of documents with unsaved changes
 // })
 const apps = new Map();
@@ -45,5 +46,6 @@ export function acceptsExt(app, ext) {
 }
 
 export const appsForExt = (ext) => listApps().filter((app) => acceptsExt(app, ext));
+export const appsForFolders = () => listApps().filter((app) => app.folders);
 
 export const unsavedCount = () => listApps().reduce((n, a) => n + (a.unsavedCount?.() || 0), 0);

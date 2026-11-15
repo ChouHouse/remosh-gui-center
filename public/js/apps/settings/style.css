@@ -88,3 +88,17 @@ input.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2
 .acc-user { padding: 3px 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); }
 .colour-row .chip { width: 20px; height: 20px; flex: none; border-radius: 50%; border: 1px solid var(--border); }
 .colour-row select { padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; }
+
+/* 系統: what this runs on, and the right-click entries the apps registered */
+.sys-about { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; padding: 12px 14px; margin-bottom: 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); font-size: 12.5px; }
+.sys-fact { display: contents; }
+.sys-fact > span { color: var(--muted); white-space: nowrap; }
+.sys-fact > b { font-weight: 600; min-width: 0; overflow-wrap: anywhere; user-select: text; }
+.sys-fact > b span { font-weight: inherit; }
+.set-note { margin: 0 0 8px; color: var(--muted); font-size: 12px; }
+.sys-opens { display: grid; gap: 6px; }
+.sys-open { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); font-size: 12.5px; }
+.sys-open-ico { flex: none; width: 22px; height: 22px; }
+.sys-open-ico svg { width: 100%; height: 100%; display: block; }
+.sys-open b { flex: none; font-weight: 600; }
+.sys-open > span:last-child { flex: 1; min-width: 0; color: var(--muted); text-align: right; overflow-wrap: anywhere; }

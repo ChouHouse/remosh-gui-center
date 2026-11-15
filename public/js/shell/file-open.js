@@ -1,23 +1,30 @@
-// Opening files: which app handles which extension.
+// Opening files and folders with an app.
 //
-// Associations (extension -> app id) live in the user's settings. The first
-// time an extension is opened the user is asked, and the answer is remembered.
+// An app says what it opens when it registers (shell/apps.js): `extensions`
+// for files, `folders: true` for folders. The right-click menus then offer
+// 「用 XXX 開啟」 for each app that fits (openWithItems). A double-click opens
+// the only app that fits, or asks when there are several.
 import { h } from '../core/dom.js';
 import { P } from '../core/path.js';
 import { errText } from '../core/errors.js';
 import { toast } from '../core/ui.js';
-import { getSettings, updateSettings, whenSettingsReady } from '../core/settings.js';
 import { rpc } from '../core/rpc.js';
-import { getApp, acceptsExt, appsForExt, launchApp } from './apps.js';
+import { getApp, appsForExt, appsForFolders, launchApp } from './apps.js';
 import { shortcutKind, displayName, readShortcut } from './shortcuts.js';
 import { tt } from '../core/i18n.js';
 
-export const extLabel = (ext) => (ext ? tt('.{0} 檔', ext) : tt('沒有副檔名的檔案'));
+// Right-click entries for a file or folder: one 「用 XXX 開啟」 per app that
+// registered for it. `except` leaves an app out (the one showing the menu).
+export function openWithItems(path, { isDir = false, size = 0, except = null } = {}) {
+  const apps = (isDir ? appsForFolders() : appsForExt(P.ext(P.base(path)))).filter((app) => app.id !== except);
+  return apps.map((app) => ({
+    label: tt('用 {0} 開啟', tt(app.name)),
+    run: () => app.launch(isDir ? { path, folder: true } : { path, size }),
+  }));
+}
 
-// Asks which app to use. Resolves to { app, remember } or null when cancelled.
-// The dialog has a 「以後都用這個程式開啟」 checkbox; `rememberDefault` is its
-// initial state (ticked when the extension is unknown, so one click registers it).
-export function chooseApp(name, { rememberDefault = false } = {}) {
+// Asks which app to use. Resolves to the app, or null when cancelled.
+export function chooseApp(name) {
   const ext = P.ext(name);
   return new Promise((resolve) => {
     const done = (value) => {
@@ -31,39 +38,19 @@ export function chooseApp(name, { rememberDefault = false } = {}) {
       ev.stopPropagation();
       done(null);
     };
-    const remember = h('input', { type: 'checkbox', id: 'choose-remember', checked: rememberDefault });
     const choices = appsForExt(ext).map((app) =>
-      h('button', { type: 'button', class: 'app-choice', 'data-app': app.id, onclick: () => done({ app, remember: remember.checked }) },
+      h('button', { type: 'button', class: 'app-choice', 'data-app': app.id, onclick: () => done(app) },
         h('span', { class: 'ico', html: app.icon() }), tt(app.name)));
     const modal = h('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true' },
       h('div', { class: 'box' },
         h('h2', null, tt('要用什麼開啟「{0}」？', name)),
-        h('p', null, rememberDefault ? tt('還沒有設定{0}的開啟方式。', extLabel(ext)) : tt('選擇這次要用的程式。')),
+        h('p', null, tt('也可以在檔案上按右鍵，直接選「用 … 開啟」。')),
         h('div', { class: 'app-choices' }, choices),
-        h('label', { class: 'choose-remember' }, remember, tt('以後{0}都用這個程式開啟', extLabel(ext))),
         h('div', { class: 'btns' }, h('button', { type: 'button', onclick: () => done(null) }, tt('取消')))));
     document.body.append(modal);
     document.addEventListener('keydown', onKey, true);
     choices[0]?.focus();
   });
-}
-
-async function remember(ext, app) {
-  try {
-    await updateSettings((s) => {
-      s.files.associations[ext] = app.id;
-    });
-  } catch (err) {
-    toast(tt('無法記住開啟方式：{0}', errText(err)), true);
-  }
-}
-
-// "開啟程式…": always ask; remember only if the user ticks the box.
-export async function openWith(path, size, { rememberDefault = false } = {}) {
-  const choice = await chooseApp(P.base(path), { rememberDefault });
-  if (!choice) return;
-  if (choice.remember) await remember(P.ext(P.base(path)), choice.app);
-  return choice.app.launch({ path, size });
 }
 
 // A .remosh_gui-app starts its app; a .remosh_gui-lnk opens what it points at.
@@ -88,12 +75,11 @@ export async function openShortcut(path) {
   }
 }
 
-// Double-click / 開啟: use the remembered app, or ask when the extension is unknown.
+// Double-click / 開啟: the only app that fits opens it; with several, ask.
 export async function openFile(path, size) {
-  if (shortcutKind(P.base(path))) return openShortcut(path);
-  await whenSettingsReady();
-  const ext = P.ext(P.base(path));
-  const app = getApp(getSettings().files.associations[ext]);
-  if (app && acceptsExt(app, ext)) return app.launch({ path, size });
-  return openWith(path, size, { rememberDefault: true });
+  const name = P.base(path);
+  if (shortcutKind(name)) return openShortcut(path);
+  const apps = appsForExt(P.ext(name));
+  const app = apps.length === 1 ? apps[0] : await chooseApp(name);
+  return app?.launch({ path, size });
 }

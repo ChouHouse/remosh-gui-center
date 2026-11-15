@@ -23,9 +23,6 @@ export const ANIMATION_SPEEDS = { fast: 120, normal: 200, slow: 350 }; // millis
 const DEFAULTS = {
   system: { lang: 'auto' }, // 'auto' (follow the browser) or a language id from core/i18n.js
   animation: { enabled: true, speed: 'normal' },
-  files: {
-    associations: {}, // extension ('' = no extension) -> app id
-  },
   taskbar: {
     autoHide: false, // slide away until the pointer reaches the bottom edge
     size: 'medium', // 'small' | 'medium' | 'large'
@@ -53,24 +50,18 @@ export const WALLPAPER_DIR = 'wallpaper';
 export const MAX_WALLPAPERS = 5;
 const FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
 
-export const EXT_PATTERN = /^[a-z0-9_+-]{0,16}$/;
 
 let raw = {}; // the file as last read, so keys this version does not know survive a save
 let current = structuredClone(DEFAULTS);
 
 function normalise(obj) {
   const a = obj?.animation;
-  const associations = {};
-  for (const [ext, app] of Object.entries(obj?.files?.associations || {})) {
-    if (EXT_PATTERN.test(ext) && typeof app === 'string' && app) associations[ext] = app;
-  }
   return {
     system: { lang: ['zh-TW', 'en', 'ja'].includes(obj?.system?.lang) ? obj.system.lang : DEFAULTS.system.lang },
     animation: {
       enabled: typeof a?.enabled === 'boolean' ? a.enabled : DEFAULTS.animation.enabled,
       speed: Object.hasOwn(ANIMATION_SPEEDS, a?.speed) ? a.speed : DEFAULTS.animation.speed,
     },
-    files: { associations },
     start: {
       pinned: Array.isArray(obj?.start?.pinned)
         ? [...new Set(obj.start.pinned.filter((id) => typeof id === 'string' && /^[a-z0-9-]{1,32}$/.test(id)))]
@@ -157,13 +148,14 @@ function writeFile(clean) {
   const run = async () => {
     await ready; // never write before the file on the host has been read
     const file = { ...raw, version: 1, ...clean };
+    delete file.files; // earlier versions kept file associations and the file cabinet's sidebar here
     if (file.style) {
       delete file.style.tint; // both replaced by style.color
       delete file.style.tints;
     }
     await rpc('mkdir', { path: settingsDir() });
     await rpc('write', { path: settingsPath(), data: toBase64(new TextEncoder().encode(JSON.stringify(file, null, 2) + '\n')) });
-    raw = file;
+    raw = raw.files ? { ...file, files: raw.files } : file; // still readable this session, for the file cabinet's one-time move
     emit('fs:changed', settingsDir());
   };
   const result = saveQueue.then(run);
@@ -179,7 +171,7 @@ export async function saveSettings(next) {
   apply();
 }
 
-// Change one thing and save, e.g. updateSettings((s) => { s.files.associations.txt = 'notepad'; }).
+// Change one thing and save, e.g. updateSettings((s) => { s.system.lang = 'en'; }).
 // With { optimistic: true } the change shows at once and is saved in the
 // background; if the save fails it is undone and the returned promise rejects.
 export async function updateSettings(mutate, { optimistic = false } = {}) {

@@ -4,8 +4,6 @@ import { addStrings } from '../../core/i18n.js';
 addStrings({
   en: {
     '工作管理員': 'Task Manager',
-    '記憶體': 'Memory',
-    '儲存空間': 'Storage',
     '網路': 'Network',
     '圖表': 'Charts',
     '使用者': 'User',
@@ -14,7 +12,6 @@ addStrings({
     '計算中…': 'Calculating…',
     '上限 {0} 核': 'Limit {0} cores',
     '{0} / {1} 核': '{0} / {1} cores',
-    '{0} 核': '{0} cores',
     '這個容器沒有設定 CPU 上限': 'This container has no CPU limit',
     '讀不到記憶體資訊': 'Memory information is unavailable',
     '這個容器沒有設定記憶體上限': 'This container has no memory limit',
@@ -63,8 +60,6 @@ addStrings({
   },
   ja: {
     '工作管理員': 'タスクマネージャー',
-    '記憶體': 'メモリ',
-    '儲存空間': 'ストレージ',
     '網路': 'ネットワーク',
     '圖表': 'グラフ',
     '使用者': 'ユーザー',
@@ -73,7 +68,6 @@ addStrings({
     '計算中…': '計算中…',
     '上限 {0} 核': '上限 {0} コア',
     '{0} / {1} 核': '{0} / {1} コア',
-    '{0} 核': '{0} コア',
     '這個容器沒有設定 CPU 上限': 'このコンテナには CPU の上限がありません',
     '讀不到記憶體資訊': 'メモリ情報を取得できません',
     '這個容器沒有設定記憶體上限': 'このコンテナにはメモリの上限がありません',

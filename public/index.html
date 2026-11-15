@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Remosh GUI</title>
+<title>Remogui</title>
 <!-- Installable as an app: Safari "Add to Dock" / "Add to Home Screen", Chrome/Edge "Install". -->
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Remosh GUI">
+<meta name="apple-mobile-web-app-title" content="Remogui">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1b2330">
 <link rel="stylesheet" href="/css/base.css">
@@ -69,7 +69,7 @@
 
 <div id="login" class="overlay" hidden>
   <form id="login-form" class="card" autocomplete="on">
-    <h1>Remosh GUI</h1>
+    <h1>Remogui</h1>
     <p class="sub" id="login-sub" data-i18n>連線到 SSH 主機，瀏覽並編輯上面的檔案</p>
     <div class="row">
       <label class="grow"><span data-i18n>主機位置</span>
@@ -94,6 +94,7 @@
     <div id="login-error" class="error" role="alert" hidden></div>
     <button type="submit" id="login-btn" class="primary" data-i18n>登入</button>
     <p class="note" data-i18n>密碼與私鑰不會被儲存。</p>
+    <p class="note version">Remogui v1.0 · Sandbox</p>
     <aside id="saved-servers" aria-label="登入過的主機" data-i18n-aria-label="登入過的主機"></aside>
   </form>
   <div id="kept-sessions" aria-label="已登入的使用者" data-i18n-aria-label="已登入的使用者"></div>
@@ -101,7 +102,7 @@
 
 <div id="gate" class="overlay" hidden>
   <form id="gate-form" class="card" autocomplete="off">
-    <h1>Remosh GUI</h1>
+    <h1>Remogui</h1>
     <p class="sub" data-i18n>這個站台需要存取密碼</p>
     <label><span data-i18n>存取密碼</span>
       <input id="gate-pass" type="password" autocomplete="off" required>

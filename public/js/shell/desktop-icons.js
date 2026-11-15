@@ -17,7 +17,7 @@ import { showContextMenu } from './context-menu.js';
 import { makeDraggable, registerDropTarget } from './drag.js';
 import { attachMarquee } from './marquee.js';
 import { acceptsDrop, dropAction, dropInto } from './file-drop.js';
-import { openFile } from './file-open.js';
+import { openFile, openWithItems } from './file-open.js';
 import { desktopDir, shortcutKind, displayName, readShortcut, writeText } from './shortcuts.js';
 import { isPinned, pinApp } from './start-menu.js';
 import { tt, tm } from '../core/i18n.js';
@@ -301,6 +301,7 @@ layer.addEventListener('contextmenu', (ev) => {
   const appId = it.shortcut?.kind === 'app' ? it.shortcut.id : null;
   showContextMenu(ev, [
     { label: tt('開啟'), run: () => open(it) },
+    ...(it.shortcut || shortcutKind(it.entry.name) ? [] : openWithItems(it.path, { isDir: it.entry.type === 'dir', size: it.entry.size })),
     appId && getApp(appId) ? { label: tt('釘選到開始'), enabled: !isPinned(appId), run: () => pinApp(appId) } : false,
     null,
     { label: tt('刪除'), danger: true, run: () => remove(it) },

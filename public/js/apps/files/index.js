@@ -20,7 +20,7 @@ import { attachMarquee } from '../../shell/marquee.js';
 import { acceptsDrop, dropAction, dropInto } from '../../shell/file-drop.js';
 import { shortcutKind, readShortcut } from '../../shell/shortcuts.js';
 import { isPinned, pinApp } from '../../shell/start-menu.js';
-import { openFile, openWith } from '../../shell/file-open.js';
+import { openFile, openWithItems } from '../../shell/file-open.js';
 import { showContextMenu } from '../../shell/context-menu.js';
 import { putFiles, takeFiles, clearFiles, cutPaths } from './clipboard.js';
 import { tt, tm } from '../../core/i18n.js';
@@ -663,7 +663,8 @@ function createFinder(home, startPath = home) {
     const paths = sidebarPaths();
     showContextMenu(ev, [
       { label: tt('開啟'), run: () => open(e) },
-      isFile(e) && !shortcutKind(e.name) && { label: tt('開啟程式…'), run: () => openWith(full, e.size) },
+      // 「用 XXX 開啟」, one for each app that registered for this kind of item.
+      ...(shortcutKind(e.name) ? [] : openWithItems(full, { isDir: isDir(e), size: e.size, except: isDir(e) ? 'files' : null })),
       shortcutKind(e.name) === 'app' && { label: tt('釘選到開始'), run: async () => {
         try {
           const sc = await readShortcut(full);
@@ -674,7 +675,6 @@ function createFinder(home, startPath = home) {
           toast(tt('無法讀取捷徑：{0}', errText(err)), true);
         }
       } },
-      isDir(e) && { label: tt('在終端機開啟'), run: () => launchApp('terminal', { cwd: full }) },
       isDir(e) && { label: tt('加到側邊欄'), enabled: !paths.includes(full), run: () => setSidebar([...paths, full]) },
       null,
       { label: tt('複製'), run: () => copyOrCut('copy', e) },
