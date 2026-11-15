@@ -778,6 +778,80 @@ const { execSync: execSyncTop } = require('node:child_process');
     await pcTab('math.ts').click();
   }
 
+  // ---- Mounds: the music player
+  {
+    // two short WAV files (a sine tone) for it to play
+    const wav = (seconds, hz) => {
+      const rate = 8000; const n = Math.floor(rate * seconds); const b = Buffer.alloc(44 + n * 2);
+      b.write('RIFF', 0); b.writeUInt32LE(36 + n * 2, 4); b.write('WAVEfmt ', 8); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22);
+      b.writeUInt32LE(rate, 24); b.writeUInt32LE(rate * 2, 28); b.writeUInt16LE(2, 32); b.writeUInt16LE(16, 34); b.write('data', 36); b.writeUInt32LE(n * 2, 40);
+      for (let i = 0; i < n; i++) b.writeInt16LE(Math.round(Math.sin((i / rate) * hz * 2 * Math.PI) * 3000), 44 + i * 2);
+      return b;
+    };
+    fs.rmSync(home + '/music', { recursive: true, force: true });
+    fs.mkdirSync(home + '/music');
+    fs.writeFileSync(home + '/music/first song.wav', wav(65, 440));
+    fs.writeFileSync(home + '/music/second.wav', wav(2, 660));
+    fs.writeFileSync(home + '/music/notes.txt', 'x');
+    for (const f of ['', '/first song.wav', '/second.wav', '/notes.txt']) give(home + '/music' + f);
+    const launch = (path) => page.evaluate((p) => import('/js/shell/apps.js').then((m) => { m.launchApp('mounds', p ? { path: p } : undefined); }), path);
+    await launch();
+    const md = page.locator('.win[data-app="Mounds"]');
+    await md.locator('.md-player').waitFor();
+    check((await md.locator('.md-title').textContent()) === '還沒有歌曲' && await md.locator('.md-list').isHidden() && await md.locator('.md-play').isDisabled(), 'Mounds opens with an empty playlist, closed');
+    check((await md.locator('.md-controls .md-btn').count()) === 3 && (await md.locator('.md-menu').count()) === 1 && (await md.locator('.md-list-btn').count()) === 1
+      && (await md.locator('.md-progress .md-time').count()) === 2 && (await md.locator('.md-vol .md-vol-ico').count()) === 2, 'the player: name, previous / play / next, time and volume bars, menu and playlist buttons');
+    {
+      const p = await md.locator('.md-progress').boundingBox();
+      const v = await md.locator('.md-vol').boundingBox();
+      check(Math.abs(p.width / (p.width + v.width) - 0.7) < 0.03, 'the time bar takes 70% of the row, the volume 30%', (p.width / (p.width + v.width)).toFixed(2));
+    }
+    const before = (await md.boundingBox()).height;
+    await launch(home + '/music/first song.wav');
+    await page.waitForFunction(() => document.querySelector('.md-time:last-child')?.textContent === '1:05');
+    check((await md.locator('.md-title').textContent()) === 'first song' && (await md.locator('.titlebar .ttext').textContent()) === 'first song — Mounds', 'a song shows its name (without the extension) and its length');
+    check(await md.locator('.md-list').isVisible() && (await md.boundingBox()).height > before + 150 && (await md.locator('.md-song').count()) === 1 && await md.locator('.md-song.on').count() === 1,
+      'adding a song opens the playlist underneath the player');
+    await page.evaluate((paths) => import('/js/shell/apps.js').then((m) => { for (const p of paths) m.launchApp('mounds', { path: p }); }), [home + '/music/second.wav']);
+    await page.waitForFunction(() => document.querySelector('.md-title').textContent === 'second' && document.querySelector('.md-time:last-child')?.textContent === '0:02');
+    check((await md.locator('.md-song .md-song-name').allTextContents()).join() === 'first song,second' && (await md.locator('.md-song.on .md-song-name').textContent()) === 'second', 'more songs join the playlist; the one just opened plays');
+    await md.locator('.md-controls .md-btn').first().click();
+    await page.waitForFunction(() => document.querySelector('.md-title').textContent === 'first song' && document.querySelector('.md-time:last-child')?.textContent === '1:05');
+    check(true, '"previous" goes to the song before');
+    if ((await md.locator('.md-play').getAttribute('data-state')) !== 'playing') await md.locator('.md-play').click();
+    await page.waitForFunction(() => document.querySelector('.md-play').dataset.state === 'playing' && document.querySelector('.md-progress .md-time').textContent !== '0:00', null, { timeout: 15000 });
+    check(true, 'it plays: the time moves');
+    await md.locator('.md-play').click();
+    await page.waitForFunction(() => document.querySelector('.md-play').dataset.state === 'paused');
+    check((await md.locator('.md-play').getAttribute('title')) === '播放', 'the middle button pauses and starts');
+    await md.locator('.md-menu').click();
+    check((await menuLabels()).join('|') === '開啟檔案…|速度 0.5×|速度 0.75×|✓ 速度 1×|速度 1.25×|速度 1.5×|速度 2×|設定', 'the menu: open a file, the playing speeds, settings', (await menuLabels()).join('|'));
+    await pick('速度 1.5×');
+    check(await waitApp('mounds', (d) => d.rate === 1.5), 'the speed is applied and kept in ~/.remosh-gui/app/mounds');
+    await md.locator('.md-menu').click();
+    check((await menuLabels()).includes('✓ 速度 1.5×'), 'the menu marks the speed in use');
+    await pick('設定');
+    await md.locator('.md-swatch[data-colour="#1f6feb"]').click();
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.md-body')).backgroundColor === 'rgb(31, 111, 235)');
+    check(await waitApp('mounds', (d) => d.bg === '#1f6feb') && (await md.locator('.md-title').evaluate((el) => getComputedStyle(el).color)) === 'rgb(255, 255, 255)', 'settings: the background colour changes, with text that stays readable');
+    await md.locator('.md-swatch-none').click();
+    await md.locator('.md-set-close').click();
+    check(await md.locator('.md-settings').isHidden() && await waitApp('mounds', (d) => d.bg === null), 'the colour can go back to the default');
+    await launch(home + '/music/notes.txt');
+    await page.waitForFunction(() => [...document.querySelectorAll('.toast')].some((t) => t.textContent.includes('不是 Mounds 能播放的音樂檔')));
+    check((await md.locator('.md-song').count()) === 2, 'a file that is not music is refused');
+    await md.locator('.md-list-btn').click();
+    check(await md.locator('.md-list').isHidden() && Math.abs((await md.boundingBox()).height - before) < 3, 'the playlist button folds the playlist away again');
+    const tags = await page.evaluate(() => import('/js/apps/mounds/tags.js').then((m) => {
+      const frame = (id, text) => { const body = [3, ...new TextEncoder().encode(text)]; return [...id].map((c) => c.charCodeAt(0)).concat([0, 0, 0, body.length, 0, 0], body); };
+      const frames = [...frame('TIT2', '夜曲'), ...frame('TPE1', 'Someone')];
+      return m.readTags(new Uint8Array([0x49, 0x44, 0x33, 4, 0, 0, 0, 0, 0, frames.length, ...frames, 0xff, 0xfb]));
+    }));
+    check(tags.title === '夜曲' && tags.artist === 'Someone', 'the title and the artist are read from an MP3\'s tag', JSON.stringify(tags));
+    await md.locator('.traffic .close').click();
+    fs.rmSync(home + '/music', { recursive: true, force: true });
+  }
+
   // ---- Filex: upload files from this computer, several at once
   {
     const crypto = require('crypto');
@@ -1080,17 +1154,17 @@ const { execSync: execSyncTop } = require('node:child_process');
     await page.click('#sm-files');
   };
   await page.click('#start-btn');
-  const allApps = '檔案櫃,Procoder,記事本,Graphoto,Filex,終端機,工作管理員,設定';
+  const allApps = '檔案櫃,Procoder,記事本,Graphoto,Mounds,Filex,終端機,工作管理員,設定';
   check((await page.locator('#sm-apps button').allTextContents()).join() === allApps, 'every app is pinned to start by default');
   await page.click('#sm-all-btn');
   check(await page.isVisible('#sm-all') && await page.isHidden('#sm-home') && (await page.locator('#sm-all-list button').allTextContents()).join() === allApps, '"all apps" lists every app, the code editor included');
   await page.locator('#sma-tasks').click({ button: 'right' });
   check((await menuLabels()).join('|') === '開啟|從開始取消釘選', 'right-click on an app offers to unpin it');
   await pick('從開始取消釘選');
-  check(await waitSetting((st) => st.start?.pinned && !st.start.pinned.includes('tasks') && st.start.pinned.length === 7), 'unpinning is saved');
+  check(await waitSetting((st) => st.start?.pinned && !st.start.pinned.includes('tasks') && st.start.pinned.length === 8), 'unpinning is saved');
   check(await page.isVisible('#start-menu'), 'the start menu stays open while pinning');
   await page.click('#sm-back');
-  check((await page.locator('#sm-apps button').allTextContents()).join() === '檔案櫃,Procoder,記事本,Graphoto,Filex,終端機,設定', 'the unpinned app leaves the pinned list');
+  check((await page.locator('#sm-apps button').allTextContents()).join() === '檔案櫃,Procoder,記事本,Graphoto,Mounds,Filex,終端機,設定', 'the unpinned app leaves the pinned list');
   await page.click('#sm-all-btn');
   await page.locator('#sma-tasks').click({ button: 'right' });
   check((await menuLabels()).join('|') === '開啟|釘選到開始', 'an unpinned app offers to pin');
