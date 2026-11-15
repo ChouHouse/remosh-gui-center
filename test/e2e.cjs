@@ -1273,17 +1273,25 @@ const { execSync: execSyncTop } = require('node:child_process');
   await item('todo.txt').dblclick();
   await page.waitForSelector('.modal .app-choice');
   check((await page.locator('.modal .app-choice').allTextContents()).join() === 'Procoder,記事本', 'unknown extension asks, offering only apps that accept .txt');
-  check((await page.locator('#choose-remember').count()) === 0, 'nothing is remembered any more: the dialog has no "always" box');
+  check((await page.locator('#choose-remember').count()) === 0, 'the choice is kept quietly: the dialog has no "always" box');
   await page.locator('.modal .app-choice[data-app="editor"]').click();
   const once = page.locator('.win', { has: page.locator('.titlebar .title', { hasText: 'todo.txt — Procoder' }) });
   await once.waitFor();
   await once.locator('.traffic .close').click();
   await sleep(300);
   await toFinder();
+  check(await waitSetting((d) => d.system?.openWith?.txt === 'editor'), 'the app chosen for .txt is kept in the settings file, with no page for it');
+  await sleep(200);
   await item('todo.txt').dblclick();
-  await page.waitForSelector('.modal .app-choice');
-  check((await page.locator('.modal .app-choice').count()) === 2, 'the next double-click asks again');
-  await page.locator('.modal .app-choice[data-app="notepad"]').click();
+  await once.waitFor();
+  check((await page.locator('.modal .app-choice').count()) === 0, 'the next double-click opens with the same app, without asking');
+  await once.locator('.traffic .close').click();
+  await sleep(300);
+  await toFinder();
+  await item('todo.txt').click({ button: 'right' });
+  await pick('用 記事本 開啟');
+  check(await waitSetting((d) => d.system?.openWith?.txt === 'notepad'), 'opening with another app from the right-click menu becomes the new habit');
+  await sleep(200);
   const np = page.locator('.win', { has: page.locator('.np-text') });
   await np.waitFor();
   await page.waitForFunction(() => document.querySelector('.np-text').value === 'buy milk\n');
@@ -1763,10 +1771,18 @@ const { execSync: execSyncTop } = require('node:child_process');
   await page.keyboard.press('Escape');
   // Enter opens everything that is selected
   await item('m1.txt').click();
+  await item('m1.txt').click({ button: 'right' }); // make the notepad the habit for .txt again
+  await pick('用 記事本 開啟');
+  await page.locator('.win[data-app="記事本"] .np-text').waitFor();
+  await page.locator('.win[data-app="記事本"] .traffic .close').click();
+  await page.waitForFunction(() => document.querySelectorAll('.win[data-app="記事本"]').length === 0);
+  check(await waitSetting((d) => d.system?.openWith?.txt === 'notepad'), 'the habit follows the last app used');
+  await sleep(200);
+  await toFinder();
+  await item('m1.txt').click();
   await item('m2.txt').click({ modifiers: ['Control'] });
   await page.keyboard.press('Enter');
-  for (let n = 1; n <= 2; n++) { // each file asks which app (nothing is remembered)
-    await page.locator('.modal .app-choice[data-app="notepad"]').click();
+  for (let n = 1; n <= 2; n++) { // .txt goes to the app that opened it last time
     await page.waitForFunction((want) => document.querySelectorAll('.win[data-app="記事本"]').length === want, n, { timeout: 15000 });
   }
   const openedTitles = (await page.locator('.win[data-app="記事本"] .titlebar .ttext').allTextContents()).sort().join();

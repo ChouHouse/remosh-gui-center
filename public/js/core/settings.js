@@ -24,6 +24,7 @@ const DEFAULTS = {
   system: {
     lang: 'auto', // 'auto' (follow the browser) or a language id from core/i18n.js
     hiddenOpenWith: [], // ids of the apps whose 「用 … 開啟」 is left out of the right-click menus
+    openWith: {}, // extension → id of the app that last opened it; kept quietly, there is no page for it
   },
   animation: { enabled: true, speed: 'normal' },
   taskbar: {
@@ -65,6 +66,8 @@ function normalise(obj) {
       hiddenOpenWith: Array.isArray(obj?.system?.hiddenOpenWith)
         ? [...new Set(obj.system.hiddenOpenWith.filter((id) => typeof id === 'string' && /^[a-z0-9-]{1,32}$/.test(id)))]
         : [],
+      openWith: Object.fromEntries(Object.entries(obj?.system?.openWith && typeof obj.system.openWith === 'object' ? obj.system.openWith : {})
+        .filter(([ext, id]) => /^[a-z0-9_+-]{1,24}$/.test(ext) && typeof id === 'string' && /^[a-z0-9-]{1,32}$/.test(id)).slice(0, 300)),
     },
     animation: {
       enabled: typeof a?.enabled === 'boolean' ? a.enabled : DEFAULTS.animation.enabled,

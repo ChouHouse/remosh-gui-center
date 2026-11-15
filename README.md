@@ -197,8 +197,11 @@ npm run assets && WEB_PASSWORD=secret npm start   # http://localhost:8080
   server and account, and pasting files with another id is refused.
 - **Open with**: an app declares what it opens when it registers: `extensions` for files and
   `folders: true` for folders. Right-clicking a file or folder then offers 「用 XXX 開啟」 for every
-  app that fits (`openWithItems` in `shell/file-open.js`), and 設定 › 系統 lists them. Nothing is
-  remembered: a double-click opens the only app that fits, or asks when there are several.
+  app that fits (`openWithItems` in `shell/file-open.js`), and 設定 › 系統 switches each one on or off.
+  A double-click opens the only app that fits; with several it asks the first time, then uses the
+  app that last opened that kind of file. That record is kept quietly (`system.openWith` in the
+  settings file) and has no settings page; opening with another app from the right-click menu
+  changes it.
 - **Graphoto**: the image viewer (png, jpg, gif, webp, avif, bmp, ico, svg).
   Wheel or +/- to zoom, drag to move, R to rotate, 0 to fit, 1 for actual size;
   ← / → (or the mouse side buttons) step through the pictures in the same folder.

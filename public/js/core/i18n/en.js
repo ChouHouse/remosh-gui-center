@@ -82,7 +82,7 @@ export default {
   '無法放到這裡：{0}': 'Could not put it here: {0}',
   '用 {0} 開啟': 'Open with {0}',
   '要用什麼開啟「{0}」？': 'Open “{0}” with what?',
-  '也可以在檔案上按右鍵，直接選「用 … 開啟」。': 'You can also right-click the file and pick “Open with …” directly.',
+  '之後這類檔案會直接用它開啟；想換的話，在檔案上按右鍵選「用 … 開啟」。': 'Files of this kind will open with it from now on. To switch, right-click a file and pick “Open with …”.',
   '無法開啟「{0}」：{1}': 'Could not open “{0}”: {1}',
   '「{0}」不是有效的捷徑': '“{0}” is not a valid shortcut',
   '找不到這個應用程式': 'This app could not be found',
