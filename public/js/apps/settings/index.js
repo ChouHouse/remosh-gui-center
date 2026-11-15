@@ -71,21 +71,26 @@ const CATEGORIES = [
         fact('sys-cpu', 'CPU', host.cpu),
         fact('sys-mem', tt('記憶體'), host.mem),
         fact('sys-disk', tt('儲存空間'), host.disk));
-      // The right-click 「用 … 開啟」 entries, as the apps registered them.
-      const opens = listApps().filter((app) => app.extensions || app.folders).map((app) =>
-        h('div', { class: 'sys-open', 'data-app': app.id },
+      // Which apps' 「用 … 開啟」 show in the right-click menus.
+      const hidden = draft.system.hiddenOpenWith;
+      const opens = listApps().filter((app) => app.extensions || app.folders).map((app) => {
+        const shown = h('input', { type: 'checkbox', class: 'switch', role: 'switch', 'data-app': app.id, 'aria-label': tt('用 {0} 開啟', tt(app.name)), checked: !hidden.includes(app.id) });
+        shown.addEventListener('change', () => {
+          updateSettings((st) => {
+            st.system.hiddenOpenWith = shown.checked ? st.system.hiddenOpenWith.filter((id) => id !== app.id) : [...st.system.hiddenOpenWith, app.id];
+          }).catch((err) => toast(tt('無法儲存：{0}', errText(err)), true));
+        });
+        return h('label', { class: 'sys-open', 'data-app': app.id },
           h('span', { class: 'sys-open-ico', html: app.icon() }),
           h('b', null, tt('用 {0} 開啟', tt(app.name))),
-          h('span', null, [
-            app.folders && tt('資料夾'),
-            app.extensions === 'all' ? tt('所有檔案') : Array.isArray(app.extensions) && app.extensions.map((x) => (x ? '.' + x : tt('（無副檔名）'))).join(' '),
-          ].filter(Boolean).join('、'))));
+          shown);
+      });
       return h('div', null,
         h('h2', null, tt('系統')),
         about,
         row(tt('語言'), tt('介面使用的語言。已經開著的視窗要重新開啟才會換過去'), lang),
         h('h3', null, tt('右鍵選單')),
-        h('p', { class: 'set-note' }, tt('在檔案或資料夾上按右鍵時，會出現這些應用程式註冊的項目。')),
+        h('p', { class: 'set-note' }, tt('選擇哪些應用程式要出現在檔案和資料夾的右鍵選單裡。')),
         h('div', { class: 'sys-opens' }, opens));
     },
   },

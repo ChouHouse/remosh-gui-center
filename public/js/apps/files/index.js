@@ -661,10 +661,9 @@ function createFinder(home, startPath = home) {
     }
     const full = P.join(st.path, e.name);
     const paths = sidebarPaths();
+    const withApps = shortcutKind(e.name) ? [] : openWithItems(full, { isDir: isDir(e), size: e.size, except: isDir(e) ? 'files' : null });
     showContextMenu(ev, [
       { label: tt('開啟'), run: () => open(e) },
-      // 「用 XXX 開啟」, one for each app that registered for this kind of item.
-      ...(shortcutKind(e.name) ? [] : openWithItems(full, { isDir: isDir(e), size: e.size, except: isDir(e) ? 'files' : null })),
       shortcutKind(e.name) === 'app' && { label: tt('釘選到開始'), run: async () => {
         try {
           const sc = await readShortcut(full);
@@ -677,6 +676,7 @@ function createFinder(home, startPath = home) {
       } },
       isDir(e) && { label: tt('加到側邊欄'), enabled: !paths.includes(full), run: () => setSidebar([...paths, full]) },
       null,
+      ...(withApps.length ? [...withApps, null] : []), // 「用 XXX 開啟」, in a group of its own
       { label: tt('複製'), run: () => copyOrCut('copy', e) },
       { label: tt('剪下'), run: () => copyOrCut('cut', e) },
       { label: tt('貼上'), run: paste },

@@ -21,7 +21,10 @@ const LEGACY_FILE = 'setting.json';
 export const ANIMATION_SPEEDS = { fast: 120, normal: 200, slow: 350 }; // milliseconds
 
 const DEFAULTS = {
-  system: { lang: 'auto' }, // 'auto' (follow the browser) or a language id from core/i18n.js
+  system: {
+    lang: 'auto', // 'auto' (follow the browser) or a language id from core/i18n.js
+    hiddenOpenWith: [], // ids of the apps whose 「用 … 開啟」 is left out of the right-click menus
+  },
   animation: { enabled: true, speed: 'normal' },
   taskbar: {
     autoHide: false, // slide away until the pointer reaches the bottom edge
@@ -57,7 +60,12 @@ let current = structuredClone(DEFAULTS);
 function normalise(obj) {
   const a = obj?.animation;
   return {
-    system: { lang: ['zh-TW', 'en', 'ja'].includes(obj?.system?.lang) ? obj.system.lang : DEFAULTS.system.lang },
+    system: {
+      lang: ['zh-TW', 'en', 'ja'].includes(obj?.system?.lang) ? obj.system.lang : DEFAULTS.system.lang,
+      hiddenOpenWith: Array.isArray(obj?.system?.hiddenOpenWith)
+        ? [...new Set(obj.system.hiddenOpenWith.filter((id) => typeof id === 'string' && /^[a-z0-9-]{1,32}$/.test(id)))]
+        : [],
+    },
     animation: {
       enabled: typeof a?.enabled === 'boolean' ? a.enabled : DEFAULTS.animation.enabled,
       speed: Object.hasOwn(ANIMATION_SPEEDS, a?.speed) ? a.speed : DEFAULTS.animation.speed,

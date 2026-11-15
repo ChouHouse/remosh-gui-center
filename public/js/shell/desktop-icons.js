@@ -299,11 +299,12 @@ layer.addEventListener('contextmenu', (ev) => {
     ]);
   }
   const appId = it.shortcut?.kind === 'app' ? it.shortcut.id : null;
+  const withApps = it.shortcut || shortcutKind(it.entry.name) ? [] : openWithItems(it.path, { isDir: it.entry.type === 'dir', size: it.entry.size });
   showContextMenu(ev, [
     { label: tt('開啟'), run: () => open(it) },
-    ...(it.shortcut || shortcutKind(it.entry.name) ? [] : openWithItems(it.path, { isDir: it.entry.type === 'dir', size: it.entry.size })),
     appId && getApp(appId) ? { label: tt('釘選到開始'), enabled: !isPinned(appId), run: () => pinApp(appId) } : false,
     null,
+    ...(withApps.length ? [...withApps, null] : []), // 「用 XXX 開啟」, in a group of its own
     { label: tt('刪除'), danger: true, run: () => remove(it) },
   ].filter((x) => x !== false));
 });

@@ -799,7 +799,7 @@ const { execSync: execSyncTop } = require('node:child_process');
     const md = page.locator('.win[data-app="Mounds"]');
     await md.locator('.md-player').waitFor();
     check((await md.locator('.md-title').textContent()) === '還沒有歌曲' && await md.locator('.md-list').isHidden() && await md.locator('.md-play').isDisabled(), 'Mounds opens with an empty playlist, closed');
-    check((await md.locator('.md-controls .md-btn').count()) === 3 && (await md.locator('.md-menu').count()) === 1 && (await md.locator('.md-list-btn').count()) === 1
+    check((await md.locator('.md-controls .md-btn').allTextContents()).length === 5 && (await md.locator('.md-controls .md-btn').evaluateAll((els) => els.map((e) => e.className.split(' ').pop()).join())) === 'md-shuffle,md-prev,md-play,md-next,md-repeat' && (await md.locator('.md-menu').count()) === 1 && (await md.locator('.md-list-btn').count()) === 1
       && (await md.locator('.md-progress .md-time').count()) === 2 && (await md.locator('.md-vol .md-vol-ico').count()) === 2, 'the player: name, previous / play / next, time and volume bars, menu and playlist buttons');
     {
       const p = await md.locator('.md-progress').boundingBox();
@@ -815,7 +815,7 @@ const { execSync: execSyncTop } = require('node:child_process');
     await page.evaluate((paths) => import('/js/shell/apps.js').then((m) => { for (const p of paths) m.launchApp('mounds', { path: p }); }), [home + '/music/second.wav']);
     await page.waitForFunction(() => document.querySelector('.md-title').textContent === 'second' && document.querySelector('.md-time:last-child')?.textContent === '0:02');
     check((await md.locator('.md-song .md-song-name').allTextContents()).join() === 'first song,second' && (await md.locator('.md-song.on .md-song-name').textContent()) === 'second', 'more songs join the playlist; the one just opened plays');
-    await md.locator('.md-controls .md-btn').first().click();
+    await md.locator('.md-prev').click();
     await page.waitForFunction(() => document.querySelector('.md-title').textContent === 'first song' && document.querySelector('.md-time:last-child')?.textContent === '1:05');
     check(true, '"previous" goes to the song before');
     if ((await md.locator('.md-play').getAttribute('data-state')) !== 'playing') await md.locator('.md-play').click();
@@ -837,6 +837,44 @@ const { execSync: execSyncTop } = require('node:child_process');
     await md.locator('.md-swatch-none').click();
     await md.locator('.md-set-close').click();
     check(await md.locator('.md-settings').isHidden() && await waitApp('mounds', (d) => d.bg === null), 'the colour can go back to the default');
+    // shuffle and repeat
+    await md.locator('.md-repeat').click();
+    check(await waitApp('mounds', (d) => d.repeat === 'all') && (await md.locator('.md-repeat').getAttribute('title')) === '循環：整個歌單' && (await md.locator('.md-repeat').getAttribute('aria-pressed')) === 'true', 'repeat: the whole playlist');
+    await md.locator('.md-repeat').click();
+    check(await waitApp('mounds', (d) => d.repeat === 'one') && await md.locator('.md-repeat i').isVisible(), 'repeat: one song, marked with a 1');
+    await md.locator('.md-repeat').click();
+    check(await waitApp('mounds', (d) => d.repeat === 'off') && (await md.locator('.md-repeat').getAttribute('aria-pressed')) === 'false', 'and off again');
+    await md.locator('.md-shuffle').click();
+    check(await waitApp('mounds', (d) => d.shuffle === true) && (await md.locator('.md-shuffle').getAttribute('title')) === '隨機播放：開', 'shuffle can be switched on');
+    await md.locator('.md-next').click();
+    await page.waitForFunction(() => document.querySelector('.md-title').textContent === 'second');
+    await md.locator('.md-prev').click();
+    await page.waitForFunction(() => document.querySelector('.md-title').textContent === 'first song');
+    check(true, 'shuffling plays another song, and "previous" goes back to the one before');
+    await md.locator('.md-shuffle').click();
+    // the song at the end of a list that repeats is followed by the first one
+    await md.locator('.md-repeat').click();
+    await md.locator('.md-song', { hasText: 'second' }).locator('.md-song-main').click();
+    await page.waitForFunction(() => document.querySelector('.md-title').textContent === 'second' && document.querySelector('.md-time:last-child')?.textContent === '0:02');
+    if ((await md.locator('.md-play').getAttribute('data-state')) !== 'playing') await md.locator('.md-play').click();
+    await page.waitForFunction(() => document.querySelector('.md-title').textContent === 'first song', null, { timeout: 20000 });
+    check(true, 'with repeat on, the end of the playlist goes round to the first song');
+    await md.locator('.md-play').click();
+    await md.locator('.md-repeat').click();
+    await md.locator('.md-repeat').click();
+    // drag a song to another place in the playlist
+    {
+      const a = await md.locator('.md-song', { hasText: 'first song' }).locator('.md-song-main').boundingBox();
+      const b = await md.locator('.md-song', { hasText: 'second' }).locator('.md-song-main').boundingBox();
+      await page.mouse.move(a.x + 80, a.y + a.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(a.x + 80, b.y + b.height - 3, { steps: 6 });
+      await page.mouse.up();
+      await sleep(80);
+      check((await md.locator('.md-song .md-song-name').allTextContents()).join() === 'second,first song' && (await md.locator('.md-song.on .md-song-name').textContent()) === 'first song'
+        && (await md.locator('.md-song-no').allTextContents()).join() === '1,2' && (await md.locator('.md-title').textContent()) === 'first song',
+        'songs can be dragged up and down the playlist; the one playing stays the one playing', (await md.locator('.md-song .md-song-name').allTextContents()).join());
+    }
     await launch(home + '/music/notes.txt');
     await page.waitForFunction(() => [...document.querySelectorAll('.toast')].some((t) => t.textContent.includes('不是 Mounds 能播放的音樂檔')));
     check((await md.locator('.md-song').count()) === 2, 'a file that is not music is refused');
@@ -1218,6 +1256,11 @@ const { execSync: execSyncTop } = require('node:child_process');
   await item('todo.txt').waitFor();
   await item('todo.txt').click({ button: 'right' });
   check((await menuLabels()).join('|') === '開啟|用 Procoder 開啟|用 記事本 開啟|複製|剪下|貼上|重新命名|刪除|內容', 'file right-click menu: one "open with" entry for each app that takes the file', (await menuLabels()).join('|'));
+  check(await page.evaluate(() => {
+    const kids = [...document.querySelector('.ctx-menu').children];
+    const withs = kids.filter((k) => k.textContent.startsWith('用 '));
+    return kids[kids.indexOf(withs[0]) - 1].classList.contains('menu-sep') && kids[kids.indexOf(withs[withs.length - 1]) + 1].classList.contains('menu-sep');
+  }), 'the "open with" entries form a group of their own, between separators');
   await pick('內容');
   const props = await page.locator('.modal dl.props').textContent();
   check(props.includes('todo.txt') && props.includes('rw-r--r--（644）') && props.includes('9 位元組') && props.includes(home + '/docs'), 'properties show name, location, size and permissions', props);
@@ -1317,7 +1360,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   await page.keyboard.press('Enter');
   check(await page.locator('.toast.err', { hasText: '已經有' }).first().waitFor({ timeout: 5000 }).then(() => true, () => false), 'a duplicate name is refused', (await page.locator('.toast').allTextContents()).join(' / '));
   await item('e2e 新資料夾').click({ button: 'right' });
-  check((await menuLabels()).slice(0, 3).join('|') === '開啟|用 Procoder 開啟|用 終端機 開啟', 'folders offer the apps that registered for folders: Procoder and the terminal', (await menuLabels()).join('|'));
+  check((await menuLabels()).slice(0, 4).join('|') === '開啟|加到側邊欄|用 Procoder 開啟|用 終端機 開啟', 'folders offer the apps that registered for folders: Procoder and the terminal', (await menuLabels()).join('|'));
   await pick('用 終端機 開啟');
   const tw0 = page.locator('.win', { has: page.locator('.term-host') });
   await tw0.waitFor();
@@ -2161,9 +2204,18 @@ const { execSync: execSyncTop } = require('node:child_process');
     check(/Linux · Chrome \d+/.test(await fact('sys-local')), 'this computer: its system and browser', await fact('sys-local'));
     check((await fact('sys-host')).length > 3 && / · \d+ 核$/.test(await fact('sys-cpu')) && /GB|MB/.test(await fact('sys-mem')) && /，剩 /.test(await fact('sys-disk')),
       'the host: system, CPU with its cores, memory and storage size', [await fact('sys-host'), await fact('sys-cpu'), await fact('sys-mem'), await fact('sys-disk')].join(' | '));
-    const opens = await sw.locator('.sys-open').evaluateAll((els) => els.map((e) => e.querySelector('b').textContent + '=' + e.lastElementChild.textContent));
-    check(opens[0] === '用 Procoder 開啟=資料夾、所有檔案' && opens.some((o) => o.startsWith('用 Graphoto 開啟=.png')) && opens.some((o) => o.startsWith('用 終端機 開啟=資料夾、（無副檔名） .sh')),
-      'it lists the right-click "open with" entries the apps registered', opens.join(' / '));
+    const withFor = (name) => page.evaluate((n) => import('/js/shell/file-open.js').then((m) => m.openWithItems(n).map((i) => i.label).join()), name);
+    check((await sw.locator('.sys-open b').allTextContents()).join() === '用 Procoder 開啟,用 記事本 開啟,用 Graphoto 開啟,用 Mounds 開啟,用 終端機 開啟' && (await sw.locator('.sys-open input.switch:checked').count()) === 5,
+      'it lists the apps that offer "open with", each with a switch, all on', (await sw.locator('.sys-open b').allTextContents()).join());
+    check((await withFor('/tmp/a.txt')) === '用 Procoder 開啟,用 記事本 開啟', 'with every switch on, a text file offers both editors');
+    await sw.locator('.sys-open input[data-app="notepad"]').uncheck();
+    const savedOff = await waitSetting((st) => (st.system?.hiddenOpenWith || []).join() === 'notepad');
+    await sleep(200);
+    check(savedOff && (await withFor('/tmp/a.txt')) === '用 Procoder 開啟', 'switching an app off takes it out of the right-click menu, and that is saved');
+    await sw.locator('.sys-open input[data-app="notepad"]').check();
+    const savedOn = await waitSetting((st) => (st.system?.hiddenOpenWith || []).length === 0);
+    await sleep(200);
+    check(savedOn && (await withFor('/tmp/a.txt')) === '用 Procoder 開啟,用 記事本 開啟', 'and back on');
     check((await sw.locator('.set-nav button', { hasText: '檔案關聯' }).count()) === 0, 'the file associations category is gone');
   }
 

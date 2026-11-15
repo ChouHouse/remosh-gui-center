@@ -205,7 +205,6 @@ export default {
   '無法另存到「{0}」：{1}': 'Could not save as “{0}”: {1}',
   '資料夾不存在': 'The folder does not exist',
   '讀取中…': 'Loading…',
-  '資料夾': 'Folder',
   '名稱': 'Name',
   '大小': 'Size',
   '建立': 'Create',

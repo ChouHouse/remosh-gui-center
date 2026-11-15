@@ -27,7 +27,8 @@ const COLOURS = ['#1f2430', '#6c4bd8', '#1f6feb', '#1f8a4c', '#c9620e', '#b3261e
 const BASE_HEIGHT = 208;
 const LIST_HEIGHT = 230;
 // Saved in ~/.remosh-gui/app/mounds/.
-const data = appStore('mounds', { defaults: { bg: null, volume: 0.8, rate: 1 } });
+const data = appStore('mounds', { defaults: { bg: null, volume: 0.8, rate: 1, shuffle: false, repeat: 'off' } });
+const REPEATS = ['off', 'all', 'one'];
 
 const ICON = {
   prev: '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M3 3h1.800v10H3zM13.500 3.300v9.400L6 8z"/></svg>',
@@ -37,6 +38,8 @@ const ICON = {
   quiet: stroke('<path d="M2.500 6.200h2.300L8 3.500v9L4.800 9.800H2.500z"/><path d="m10.500 6.500 3 3M13.500 6.500l-3 3"/>'),
   loud: stroke('<path d="M2.500 6.200h2.300L8 3.500v9L4.800 9.800H2.500z"/><path d="M10.300 6a3 3 0 0 1 0 4M12 4.300a5.500 5.500 0 0 1 0 7.400"/>'),
   menu: stroke('<path d="M3 4.500h10M3 8h10M3 11.500h10"/>'),
+  shuffle: stroke('<path d="M2 4.500h2.500c3.500 0 3.500 7 7 7H14M2 11.500h2.500c1.200 0 2-.800 2.700-1.800M11.500 4.500H14M8.800 6.300c.700-1 1.500-1.800 2.700-1.800M12.200 2.700 14 4.500l-1.800 1.800M12.200 9.700 14 11.500l-1.800 1.800"/>'),
+  repeat: stroke('<path d="M3 7.500V7a2.500 2.500 0 0 1 2.500-2.500H13M11.200 2.700 13 4.500l-1.800 1.800M13 8.500V9a2.500 2.500 0 0 1-2.500 2.500H3M4.800 13.300 3 11.500l1.800-1.800"/>'),
   list: stroke('<path d="M2.500 4h7M2.500 8h7M2.500 12h4.500M12 12.500V5l2.500-.8"/><circle cx="10.800" cy="12.300" r="1.300"/>'),
 };
 const clock = (sec) => (Number.isFinite(sec) ? `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}` : '0:00');
@@ -61,12 +64,18 @@ function createPlayer() {
   let loading = '';
   let seeking = false;
   let listOpen = false;
+  const heard = new Set(); // songs already played in this round of shuffle
+  const trail = []; // songs in the order they were played, for "previous" while shuffling
+  let justDragged = false;
+  const repeatMode = () => (REPEATS.includes(data.get('repeat')) ? data.get('repeat') : 'off');
 
   const title = h('div', { class: 'md-title' });
   const artist = h('div', { class: 'md-artist' });
-  const bPrev = h('button', { type: 'button', class: 'md-btn', title: tt('上一首'), 'aria-label': tt('上一首'), html: ICON.prev, onclick: () => step(-1) });
+  const bPrev = h('button', { type: 'button', class: 'md-btn md-prev', title: tt('上一首'), 'aria-label': tt('上一首'), html: ICON.prev, onclick: () => step(-1) });
   const bPlay = h('button', { type: 'button', class: 'md-btn md-play', onclick: toggle });
-  const bNext = h('button', { type: 'button', class: 'md-btn', title: tt('下一首'), 'aria-label': tt('下一首'), html: ICON.next, onclick: () => step(1) });
+  const bShuffle = h('button', { type: 'button', class: 'md-btn md-mode md-shuffle', html: ICON.shuffle, onclick: () => data.set('shuffle', !data.get('shuffle')) });
+  const bRepeat = h('button', { type: 'button', class: 'md-btn md-mode md-repeat', html: ICON.repeat + '<i>1</i>', onclick: () => data.set('repeat', REPEATS[(REPEATS.indexOf(repeatMode()) + 1) % REPEATS.length]) });
+  const bNext = h('button', { type: 'button', class: 'md-btn md-next', title: tt('下一首'), 'aria-label': tt('下一首'), html: ICON.next, onclick: () => step(1) });
   const now = h('span', { class: 'md-time' }, '0:00');
   const total = h('span', { class: 'md-time' }, '0:00');
   const seek = h('input', { type: 'range', class: 'md-seek', min: '0', max: '1000', value: '0', 'aria-label': tt('播放進度') });
@@ -78,7 +87,7 @@ function createPlayer() {
   const card = h('div', { class: 'md-player' },
     bMenu,
     h('div', { class: 'md-head' }, title, artist),
-    h('div', { class: 'md-controls' }, bPrev, bPlay, bNext),
+    h('div', { class: 'md-controls' }, bShuffle, bPrev, bPlay, bNext, bRepeat),
     h('div', { class: 'md-bars' },
       h('div', { class: 'md-progress' }, now, seek, total),
       h('div', { class: 'md-vol' }, h('span', { class: 'md-vol-ico', html: ICON.quiet }), volume, h('span', { class: 'md-vol-ico', html: ICON.loud })),
@@ -108,6 +117,14 @@ function createPlayer() {
     bPlay.setAttribute('aria-label', bPlay.title);
     bPlay.dataset.state = playing ? 'playing' : 'paused';
     bPrev.disabled = bNext.disabled = songs.length < 2;
+    const shuffle = !!data.get('shuffle');
+    bShuffle.setAttribute('aria-pressed', String(shuffle));
+    bShuffle.title = shuffle ? tt('隨機播放：開') : tt('隨機播放：關');
+    bShuffle.setAttribute('aria-label', bShuffle.title);
+    bRepeat.dataset.mode = repeatMode();
+    bRepeat.setAttribute('aria-pressed', String(repeatMode() !== 'off'));
+    bRepeat.title = { off: tt('循環：關'), all: tt('循環：整個歌單'), one: tt('循環：單曲') }[repeatMode()];
+    bRepeat.setAttribute('aria-label', bRepeat.title);
     bPlay.disabled = !songs.length;
     seek.disabled = !song || !Number.isFinite(audio.duration);
     if (!seeking) {
@@ -119,13 +136,55 @@ function createPlayer() {
 
   function paintList() {
     list.replaceChildren(...(songs.length
-      ? songs.map((song, i) => h('div', { class: 'md-song' + (i === at ? ' on' : ''), role: 'option', 'aria-selected': String(i === at), 'data-path': song.path },
-        h('button', { type: 'button', class: 'md-song-main', title: song.path, onclick: () => play(i) },
-          h('span', { class: 'md-song-no' }, String(i + 1)),
-          h('span', { class: 'md-song-name' }, song.title || stem(song.name)),
-          h('span', { class: 'md-song-artist' }, song.artist || '')),
-        h('button', { type: 'button', class: 'md-song-del', title: tt('從歌單移除'), 'aria-label': tt('從歌單移除'), onclick: () => removeSong(i) }, '×')))
+      ? songs.map((song, i) => {
+        const row = h('div', { class: 'md-song' + (i === at ? ' on' : ''), role: 'option', 'aria-selected': String(i === at), 'data-path': song.path },
+          h('button', { type: 'button', class: 'md-song-main', title: song.path, onclick: () => !justDragged && play(songs.indexOf(song)) },
+            h('span', { class: 'md-song-no' }, String(i + 1)),
+            h('span', { class: 'md-song-name' }, song.title || stem(song.name)),
+            h('span', { class: 'md-song-artist' }, song.artist || '')),
+          h('button', { type: 'button', class: 'md-song-del', title: tt('從歌單移除'), 'aria-label': tt('從歌單移除'), onclick: () => removeSong(songs.indexOf(song)) }, '×'));
+        row.firstChild.addEventListener('pointerdown', (ev) => dragSong(ev, song, row));
+        return row;
+      })
       : [h('div', { class: 'md-empty' }, tt('歌單是空的。把歌曲拖進來，或從選單開啟檔案'))]));
+  }
+
+  // Drag a song up or down to change the order.
+  function dragSong(down, song, row) {
+    if (down.button !== 0) return;
+    const current = songs[at];
+    let moved = false;
+    const move = (ev) => {
+      if (!moved && Math.abs(ev.clientY - down.clientY) < 5) return;
+      moved = true;
+      row.classList.add('moving');
+      const others = [...list.querySelectorAll('.md-song')].filter((r) => r !== row);
+      const to = others.filter((r) => {
+        const b = r.getBoundingClientRect();
+        return b.top + b.height / 2 < ev.clientY;
+      }).length;
+      const from = songs.indexOf(song);
+      if (to === from) return;
+      songs.splice(from, 1);
+      songs.splice(to, 0, song);
+      if (to >= others.length) list.append(row);
+      else others[to].before(row);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      if (!moved) return;
+      justDragged = true; // the click that ends the drag must not start the song
+      setTimeout(() => {
+        justDragged = false;
+      });
+      at = songs.indexOf(current);
+      paintList();
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
   }
 
   // The playlist opens underneath the player; the window grows to hold it.
@@ -137,9 +196,11 @@ function createPlayer() {
   }
 
   // ---- playing
-  async function play(i) {
+  async function play(i, { back = false } = {}) {
     const song = songs[i];
     if (!song) return;
+    heard.add(song);
+    if (!back && trail[trail.length - 1] !== song) trail.push(song);
     const mine = ++token;
     at = i;
     audio.pause();
@@ -180,17 +241,41 @@ function createPlayer() {
     else audio.pause();
   }
 
+  // The song after this one. `auto` = the song ended by itself: then the end
+  // of the list (or of a shuffle round) stops, unless the list repeats.
+  function nextIndex(auto) {
+    const stop = auto && repeatMode() === 'off' ? -1 : null;
+    if (data.get('shuffle') && songs.length > 1) {
+      let pool = songs.filter((s) => !heard.has(s));
+      if (!pool.length) {
+        if (stop !== null) return stop;
+        heard.clear();
+        pool = songs.filter((s) => s !== songs[at]);
+      }
+      return songs.indexOf(pool[Math.floor(Math.random() * pool.length)]);
+    }
+    if (at < songs.length - 1) return at + 1;
+    return stop ?? 0;
+  }
+
   function step(by) {
     if (!songs.length) return;
+    if (by > 0) return play(nextIndex(false));
     // "Previous" a few seconds into a song starts it over, like players do.
-    if (by < 0 && audio.currentTime > 3) {
+    if (audio.currentTime > 3) {
       audio.currentTime = 0;
       return;
     }
-    play((at + by + songs.length) % songs.length);
+    if (data.get('shuffle')) {
+      // back along the songs that were actually played
+      while (trail.length && (trail[trail.length - 1] === songs[at] || !songs.includes(trail[trail.length - 1]))) trail.pop();
+      if (trail.length) return play(songs.indexOf(trail[trail.length - 1]), { back: true });
+    }
+    play((at - 1 + songs.length) % songs.length);
   }
 
   function removeSong(i) {
+    heard.delete(songs[i]);
     songs.splice(i, 1);
     if (i === at) {
       token++;
@@ -272,7 +357,18 @@ function createPlayer() {
 
   // ---- wiring
   for (const type of ['play', 'pause', 'timeupdate', 'durationchange', 'loadedmetadata']) audio.addEventListener(type, paint);
-  audio.addEventListener('ended', () => (at < songs.length - 1 ? play(at + 1) : paint())); // the next song, until the list ends
+  audio.addEventListener('ended', () => {
+    if (repeatMode() === 'one') {
+      audio.currentTime = 0;
+      return audio.play().catch(() => {});
+    }
+    const next = nextIndex(true);
+    if (next >= 0) play(next);
+    else {
+      heard.clear();
+      paint();
+    }
+  });
   audio.addEventListener('error', () => {
     if (!audio.src || !songs[at]) return;
     toast(tt('無法播放「{0}」：瀏覽器不支援這個檔案', songs[at].name), true);
@@ -300,6 +396,7 @@ function createPlayer() {
   // Saved choices changed (colour, speed, volume): follow them.
   const follow = () => {
     applyLook();
+    paint();
     if (win.body.classList.contains('md-settings-open')) showSettings(true);
   };
   // Songs dragged in from the file cabinet or the desktop, one or many.

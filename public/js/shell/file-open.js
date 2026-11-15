@@ -9,14 +9,17 @@ import { P } from '../core/path.js';
 import { errText } from '../core/errors.js';
 import { toast } from '../core/ui.js';
 import { rpc } from '../core/rpc.js';
+import { getSettings } from '../core/settings.js';
 import { getApp, appsForExt, appsForFolders, launchApp } from './apps.js';
 import { shortcutKind, displayName, readShortcut } from './shortcuts.js';
 import { tt } from '../core/i18n.js';
 
 // Right-click entries for a file or folder: one 「用 XXX 開啟」 per app that
-// registered for it. `except` leaves an app out (the one showing the menu).
+// registered for it and that 設定 › 系統 has not switched off. `except` leaves
+// an app out (the one showing the menu).
 export function openWithItems(path, { isDir = false, size = 0, except = null } = {}) {
-  const apps = (isDir ? appsForFolders() : appsForExt(P.ext(P.base(path)))).filter((app) => app.id !== except);
+  const hidden = getSettings().system.hiddenOpenWith;
+  const apps = (isDir ? appsForFolders() : appsForExt(P.ext(P.base(path)))).filter((app) => app.id !== except && !hidden.includes(app.id));
   return apps.map((app) => ({
     label: tt('用 {0} 開啟', tt(app.name)),
     run: () => app.launch(isDir ? { path, folder: true } : { path, size }),
