@@ -159,3 +159,4 @@
   color-scheme: dark;
 }
 [data-pc-theme] { color: var(--text); }
+.pc-row.cut { opacity: .5; }

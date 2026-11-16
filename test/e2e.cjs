@@ -730,7 +730,7 @@ const { execSync: execSyncTop } = require('node:child_process');
   for (const rel of ['src/made.ts', 'src/made2.ts']) fs.rmSync(home + '/project/' + rel, { force: true });
   fs.rmSync(home + '/project/newdir', { recursive: true, force: true });
   await treeRow('src').click({ button: 'right' });
-  check((await page.locator('.ctx-menu button').allTextContents()).join('|') === '收合|新增檔案|新增資料夾|重新命名（F2）|刪除|複製路徑|重新整理', 'a folder in the tree has a right-click menu');
+  check((await page.locator('.ctx-menu button').allTextContents()).join('|') === '收合|新增檔案|新增資料夾|複製|剪下|貼上|重新命名（F2）|刪除|複製路徑|重新整理', 'a folder in the tree has a right-click menu');
   await page.locator('.ctx-menu button', { hasText: '新增檔案' }).click();
   await page.fill('.modal input', 'made.ts');
   await page.keyboard.press('Enter');
@@ -761,6 +761,29 @@ const { execSync: execSyncTop } = require('node:child_process');
   await page.locator('.modal button', { hasText: '刪除' }).click();
   await treeRow('made2.ts').waitFor({ state: 'detached' });
   check(!inProject('src/made2.ts') && (await pcTabs()) === 'math.ts,README.md', 'delete: the file is gone from the host, the tree and the tabs', await pcTabs());
+  // copy / cut / paste in the tree
+  fs.rmSync(home + '/project/src/math 複本.ts', { force: true });
+  const treeExact = async (name, label) => {
+    await treeRow(name).click({ button: 'right' });
+    await page.locator('.ctx-menu button', { hasText: new RegExp('^' + label + '$') }).click();
+  };
+  await treeExact('src/math.ts', '複製');
+  await treeExact('newdir', '貼上');
+  await treeRow('newdir/math.ts').waitFor();
+  check(inProject('newdir/math.ts') && inProject('src/math.ts') && fs.readFileSync(home + '/project/newdir/math.ts', 'utf8') === fs.readFileSync(home + '/project/src/math.ts', 'utf8'),
+    'tree: copy a file, paste it into a folder (which opens to show it)');
+  await treeRow('newdir/math.ts').focus();
+  await page.keyboard.press('Control+x');
+  await page.waitForFunction(() => document.querySelector('.pc-row.cut')?.dataset.path.endsWith('/newdir/math.ts'));
+  check(true, 'Ctrl+X on a row cuts it, and the row is dimmed');
+  await treeRow('src/math.ts').focus();
+  await page.keyboard.press('Control+v');
+  await treeRow('src/math 複本.ts').waitFor();
+  check(inProject('src/math 複本.ts') && !inProject('newdir/math.ts') && (await edWin.locator('.pc-row[data-path$="/newdir/math.ts"]').count()) === 0,
+    'Ctrl+V next to a file moves the cut file there, under a name that is free');
+  await treeExact('src/math 複本.ts', '刪除');
+  await page.locator('.modal button', { hasText: '刪除' }).click();
+  await treeRow('src/math 複本.ts').waitFor({ state: 'detached' });
   await treeCtx('newdir', '刪除');
   await page.locator('.modal button', { hasText: '刪除' }).click();
   await treeRow('newdir').waitFor({ state: 'detached' });

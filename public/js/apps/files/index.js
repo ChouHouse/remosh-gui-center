@@ -22,7 +22,7 @@ import { shortcutKind, readShortcut } from '../../shell/shortcuts.js';
 import { isPinned, pinApp } from '../../shell/start-menu.js';
 import { openFile, openWithItems } from '../../shell/file-open.js';
 import { showContextMenu } from '../../shell/context-menu.js';
-import { putFiles, takeFiles, clearFiles, cutPaths } from './clipboard.js';
+import { putFiles, takeFiles, clearFiles, cutPaths } from '../../shell/file-clipboard.js';
 import { tt, tm } from '../../core/i18n.js';
 
 useAppStyle(import.meta.url);

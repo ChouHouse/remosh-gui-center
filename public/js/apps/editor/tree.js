@@ -1,12 +1,13 @@
 // Procoder's file tree: the opened folder, shown down the left side. Folders
 // load when they are first expanded.
 import { h } from '../../core/dom.js';
-import { P, isInvisible } from '../../core/path.js';
+import { P, freeName, isInvisible } from '../../core/path.js';
 import { rpc } from '../../core/rpc.js';
 import { errText } from '../../core/errors.js';
 import { fileSvg, folderSvg, ICON, stroke } from '../../core/icons.js';
 import { copyText } from '../../core/clipboard.js';
 import { showContextMenu } from '../../shell/context-menu.js';
+import { putFiles, takeFiles, clearFiles, cutPaths } from '../../shell/file-clipboard.js';
 import { toast, dialog } from '../../core/ui.js';
 import { writeFile } from '../../core/file-io.js';
 import { emit } from '../../core/events.js';
@@ -66,13 +67,14 @@ export function createTree(actions) {
     if (!dir || (dir.loading && !dir.entries)) return out.push(h('div', { class: 'pc-row-note', style: pad }, tt('載入中…')));
     if (dir.error) return out.push(h('div', { class: 'pc-row-note err', style: pad, title: dir.error }, dir.error));
     if (!dir.entries.length) return out.push(h('div', { class: 'pc-row-note', style: pad }, tt('（空的）')));
+    const cut = cutPaths();
     for (const entry of dir.entries) {
       const full = P.join(path, entry.name);
       const isDir = isFolder(entry);
       const open = isDir && expanded.has(full);
       const row = h('button', {
         type: 'button', role: 'treeitem', style: pad, title: full, 'data-path': full,
-        class: 'pc-row' + (isDir ? ' dir' : '') + (open ? ' open' : '') + (full === current ? ' current' : ''),
+        class: 'pc-row' + (isDir ? ' dir' : '') + (open ? ' open' : '') + (full === current ? ' current' : '') + (cut.includes(full) ? ' cut' : ''),
         'aria-expanded': isDir ? String(open) : null,
         onclick: () => (isDir ? toggle(full) : actions.openFile(full, entry.size)),
         oncontextmenu: (ev) => {
@@ -83,6 +85,10 @@ export function createTree(actions) {
             null,
             { label: tt('新增檔案'), run: () => create(into, false) },
             { label: tt('新增資料夾'), run: () => create(into, true) },
+            null,
+            { label: tt('複製'), run: () => copyOrCut('copy', full) },
+            { label: tt('剪下'), run: () => copyOrCut('cut', full) },
+            { label: tt('貼上'), run: () => paste(into) },
             null,
             { label: tt('重新命名（F2）'), run: () => rename(full, entry.name) },
             { label: tt('刪除'), danger: true, run: () => remove(full, entry.name, isDir) },
@@ -187,12 +193,71 @@ export function createTree(actions) {
     emit('fs:changed', P.parent(full));
   }
 
+  // ---- copy / cut / paste, on the same clipboard as the file cabinet
+  async function copyOrCut(mode, full) {
+    await putFiles(mode, [full]);
+    render(); // a cut row is dimmed
+    toast(mode === 'cut' ? tt('已剪下{0}，到目的資料夾按貼上', `「${P.base(full)}」`) : tt('已複製{0}', `「${P.base(full)}」`));
+  }
+
+  async function paste(dir) {
+    if (!root) return;
+    const clip = await takeFiles();
+    if (!clip) return toast(tt('剪貼簿裡沒有檔案'), true);
+    if (clip.foreign) return toast(tt('不可跨域貼上：這些檔案是從另一台主機或另一個帳號複製的'), true);
+    let taken;
+    try {
+      taken = new Set((await rpc('list', { path: dir })).entries.map((e) => e.name));
+    } catch (err) {
+      return toast(tt('無法貼上到「{0}」：{1}', label(dir), errText(err)), true);
+    }
+    const cutting = clip.mode === 'cut';
+    let last = null;
+    for (const from of clip.paths) {
+      if (cutting && P.parent(from) === dir) continue; // already here
+      if (dir === from || dir.startsWith(from + '/')) {
+        toast(tt('不能把「{0}」貼到它自己裡面', P.base(from)), true);
+        continue;
+      }
+      const to = P.join(dir, freeName(P.base(from), taken));
+      try {
+        await rpc(cutting ? 'move' : 'copy', { from, to });
+      } catch (err) {
+        toast(tt('無法貼上「{0}」：{1}', P.base(from), errText(err)), true);
+        continue;
+      }
+      taken.add(P.base(to));
+      last = to;
+      if (cutting) {
+        for (const p of [...expanded]) if (p === from || p.startsWith(from + '/')) expanded.delete(p);
+        emit('fs:moved', from, to); // open tabs follow the file
+        emit('fs:changed', P.parent(from));
+      }
+    }
+    if (cutting) await clearFiles();
+    if (!last) return render();
+    focusNext = last;
+    await expand(dir);
+    emit('fs:changed', dir);
+  }
+
   // Keyboard, on the row that has the focus (the one clicked last): F2 renames,
-  // Delete deletes, the arrow keys walk up and down.
+  // Delete deletes, the arrow keys walk up and down, Ctrl+C / X / V copy, cut
+  // and paste (into the folder, or next to the file).
   body.addEventListener('keydown', (ev) => {
     const row = ev.target.closest?.('.pc-row');
-    if (!row || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    if (!row || ev.altKey) return;
     const full = row.dataset.path;
+    if (ev.ctrlKey || ev.metaKey) {
+      const k = ev.key.toLowerCase();
+      if (k === 'c') copyOrCut('copy', full);
+      else if (k === 'x') copyOrCut('cut', full);
+      else if (k === 'v') paste(row.classList.contains('dir') ? full : P.parent(full));
+      else return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      return;
+    }
     if (ev.key === 'F2') rename(full, P.base(full));
     else if (ev.key === 'Delete') remove(full, P.base(full), row.classList.contains('dir'));
     else if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
@@ -208,6 +273,8 @@ export function createTree(actions) {
     showContextMenu(ev, [
       { label: tt('新增檔案'), run: () => create(root, false) },
       { label: tt('新增資料夾'), run: () => create(root, true) },
+      null,
+      { label: tt('貼上'), run: () => paste(root) },
       null,
       { label: tt('重新整理'), run: () => refresh() },
     ]);

@@ -1,4 +1,5 @@
-// File clipboard. Copy / cut put one line per file on the system clipboard:
+// File clipboard, shared by everything that copies and pastes files (the file
+// cabinet, Procoder's tree). Copy / cut put one line per file on the system clipboard:
 //
 //   remosh/file:<path><<<domain id>>>      e.g. remosh/file:/home/me/a.txt<<3f9c2a71b0de>>
 //
@@ -6,7 +7,7 @@
 // hands it out at login). Pasting lines with a different id is refused: a path
 // from one machine means nothing on another.
 // Whether it was a cut is remembered here, in this page only.
-import { conn } from '../../core/rpc.js';
+import { conn } from '../core/rpc.js';
 
 const LINE = /^remosh\/file:(.+)<<([0-9a-f]{6,64})>>$/;
 const format = (path) => `remosh/file:${path}<<${conn.info.domain}>>`;
