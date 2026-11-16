@@ -880,7 +880,7 @@ const { execSync: execSyncTop } = require('node:child_process');
         'songs can be dragged up and down the playlist; the one playing stays the one playing', (await md.locator('.md-song .md-song-name').allTextContents()).join());
     }
     await launch(home + '/music/notes.txt');
-    await page.waitForFunction(() => [...document.querySelectorAll('.toast')].some((t) => t.textContent.includes('不是 Mounds 能播放的音樂檔')));
+    await page.waitForFunction(() => [...document.querySelectorAll('.toast')].some((t) => t.textContent.includes('不是 Mounds 能播放的檔案')));
     check((await md.locator('.md-song').count()) === 2, 'a file that is not music is refused');
     await md.locator('.md-list-btn').click();
     check(await md.locator('.md-list').isHidden() && Math.abs((await md.boundingBox()).height - before) < 3, 'the playlist button folds the playlist away again');
@@ -890,6 +890,47 @@ const { execSync: execSyncTop } = require('node:child_process');
       return m.readTags(new Uint8Array([0x49, 0x44, 0x33, 4, 0, 0, 0, 0, 0, frames.length, ...frames, 0xff, 0xfb]));
     }));
     check(tags.title === '夜曲' && tags.artist === 'Someone', 'the title and the artist are read from an MP3\'s tag', JSON.stringify(tags));
+    // a video: recorded here from a canvas, then played from the host
+    const clip = await page.evaluate(async () => {
+      const canvas = Object.assign(document.createElement('canvas'), { width: 320, height: 180 });
+      const g = canvas.getContext('2d');
+      const rec = new MediaRecorder(canvas.captureStream(15), { mimeType: 'video/webm' });
+      const parts = [];
+      rec.ondataavailable = (ev) => parts.push(ev.data);
+      const done = new Promise((resolve) => { rec.onstop = resolve; });
+      rec.start();
+      for (let i = 0; i < 20; i++) {
+        g.fillStyle = `hsl(${i * 18} 80% 50%)`;
+        g.fillRect(0, 0, 320, 180);
+        await new Promise((r) => setTimeout(r, 70));
+      }
+      rec.stop();
+      await done;
+      const bytes = new Uint8Array(await new Blob(parts).arrayBuffer());
+      let bin = '';
+      for (const b of bytes) bin += String.fromCharCode(b);
+      return btoa(bin);
+    });
+    fs.writeFileSync(home + '/music/clip.webm', Buffer.from(clip, 'base64'));
+    give(home + '/music/clip.webm');
+    check((await md.locator('.md-screen').isHidden()), 'music plays without a screen');
+    await launch(home + '/music/clip.webm');
+    await page.waitForFunction(() => document.querySelector('.md-video')?.videoWidth === 320, null, { timeout: 15000 });
+    await sleep(150);
+    const screenBox = await md.locator('.md-screen').boundingBox();
+    check(await md.locator('.md-screen').isVisible() && Math.abs(screenBox.height - 264) < 3 && Math.abs((await md.boundingBox()).height - before - 264 - 230) < 3
+      && (await md.locator('.md-title').textContent()) === 'clip', 'a video gets a screen above the controls, and the window grows for it', JSON.stringify(screenBox));
+    check((await md.locator('.md-song').count()) === 3 && (await md.locator('.md-song.on .md-song-name').textContent()) === 'clip', 'videos sit in the same playlist as the music');
+    await md.locator('.md-screen').dblclick();
+    await sleep(350);
+    check(await md.evaluate((el) => el.classList.contains('maximized')) && (await md.locator('.md-screen').boundingBox()).height > 300, 'double-click on the picture fills the desktop');
+    await md.locator('.md-screen').dblclick();
+    await sleep(350);
+    check(!(await md.evaluate((el) => el.classList.contains('maximized'))), 'and again goes back');
+    await md.locator('.md-song', { hasText: 'second' }).locator('.md-song-main').click();
+    await page.waitForFunction(() => document.querySelector('.md-title').textContent === 'second' && !document.querySelector('.md-body').classList.contains('md-has-video'));
+    await sleep(150);
+    check(await md.locator('.md-screen').isHidden() && Math.abs((await md.boundingBox()).height - before - 230) < 3, 'back on a song, the screen folds away');
     await md.locator('.traffic .close').click();
     fs.rmSync(home + '/music', { recursive: true, force: true });
   }
@@ -1525,6 +1566,7 @@ const { execSync: execSyncTop } = require('node:child_process');
     return false;
   };
   const beginDrag = async (locator, x, y, mod) => {
+    await locator.waitFor();
     const b = await locator.boundingBox();
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
     await page.mouse.down();

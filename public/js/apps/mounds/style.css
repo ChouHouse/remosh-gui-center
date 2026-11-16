@@ -1,4 +1,4 @@
-/* ---------- Mounds: music player ---------- */
+/* ---------- Mounds: music and video player ---------- */
 .md-body { position: relative; background: var(--md-bg, var(--surface)); color: var(--md-fg, var(--text)); }
 .md-player { flex: none; position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 18px 14px; }
 .md-head { width: 100%; padding: 0 34px; box-sizing: border-box; text-align: center; min-width: 0; }
@@ -48,3 +48,8 @@
 .md-repeat[data-mode="one"] i { display: block; }
 .md-song-main { cursor: grab; }
 .md-song.moving { opacity: .6; outline: 1px dashed currentColor; }
+.md-screen { display: none; flex: none; height: 264px; background: #000; }
+.win.maximized .md-screen { flex: 1 1 0; height: auto; min-height: 0; }
+.md-has-video .md-screen { display: block; }
+.md-video { width: 100%; height: 100%; display: block; object-fit: contain; }
+.win.maximized .md-has-video .md-list { flex: none; height: 230px; box-sizing: border-box; }

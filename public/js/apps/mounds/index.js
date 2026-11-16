@@ -1,5 +1,6 @@
-// Mounds: a music player for the audio files on the host. Songs are dropped
-// in (or opened) to build the playlist, which opens underneath the player.
+// Mounds: a player for the music and the videos on the host. Files are dropped
+// in (or opened) to build the playlist, which opens underneath the player. A
+// video gets a screen above the controls; music leaves the player small.
 import './i18n.js'; // this app's texts in the other languages
 import { h } from '../../core/dom.js';
 import { appStore } from '../../core/app-store.js';
@@ -21,11 +22,14 @@ import { readTags } from './tags.js';
 useAppStyle(import.meta.url);
 
 const APP_NAME = 'Mounds';
-const TYPES = { mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg', wav: 'audio/wav', flac: 'audio/flac', webm: 'audio/webm', weba: 'audio/webm' };
+// .webm may hold only sound: the screen shows once the file turns out to have a picture.
+const VIDEO_TYPES = { mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', ogv: 'video/ogg', mkv: 'video/x-matroska' };
+const TYPES = { mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg', wav: 'audio/wav', flac: 'audio/flac', weba: 'audio/webm', ...VIDEO_TYPES };
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const COLOURS = ['#1f2430', '#6c4bd8', '#1f6feb', '#1f8a4c', '#c9620e', '#b3261e', '#f3f4f6'];
 const BASE_HEIGHT = 208;
 const LIST_HEIGHT = 230;
+const SCREEN_HEIGHT = 264; // 16:9 at the window's width
 // Saved in ~/.remosh-gui/app/mounds/.
 const data = appStore('mounds', { defaults: { bg: null, volume: 0.8, rate: 1, shuffle: false, repeat: 'off' } });
 const REPEATS = ['off', 'all', 'one'];
@@ -44,7 +48,7 @@ const ICON = {
 };
 const clock = (sec) => (Number.isFinite(sec) ? `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}` : '0:00');
 const stem = (name) => (name.lastIndexOf('.') > 0 ? name.slice(0, name.lastIndexOf('.')) : name);
-const isAudio = (path) => Object.hasOwn(TYPES, P.ext(P.base(path)));
+const canPlay = (path) => Object.hasOwn(TYPES, P.ext(P.base(path)));
 // Light text on a dark background and the other way round.
 function textOn(colour) {
   const n = parseInt(colour.slice(1), 16);
@@ -56,7 +60,9 @@ let player = null; // the one Mounds window
 
 function createPlayer() {
   const win = createWindow({ title: APP_NAME, appName: APP_NAME, iconHtml: moundsSvg(), width: 470, height: BASE_HEIGHT });
-  const audio = new Audio();
+  const audio = h('video', { class: 'md-video', playsinline: '', preload: 'auto' }); // plays music as well; shown only for a video
+  const screen = h('div', { class: 'md-screen' }, audio);
+  let hasVideo = false;
   const songs = []; // { path, name, title, artist }
   let at = -1; // the song in the player
   let token = 0; // counts loads, so a slow one that was overtaken is dropped
@@ -92,7 +98,7 @@ function createPlayer() {
       h('div', { class: 'md-vol' }, h('span', { class: 'md-vol-ico', html: ICON.quiet }), volume, h('span', { class: 'md-vol-ico', html: ICON.loud })),
       bList));
   win.body.classList.add('md-body');
-  win.body.append(card, list);
+  win.body.append(screen, card, list);
 
   // ---- looks
   function applyLook() {
@@ -113,7 +119,7 @@ function createPlayer() {
   function paint() {
     const song = songs[at];
     title.textContent = song ? song.title || stem(song.name) : tt('還沒有歌曲');
-    artist.textContent = loading || (song ? song.artist || '' : tt('把歌曲拖進來，或從選單開啟檔案'));
+    artist.textContent = loading || (song ? song.artist || '' : tt('把音樂或影片拖進來，或從選單開啟檔案'));
     win.setTitle(song ? song.title || stem(song.name) : APP_NAME);
     const playing = !audio.paused && !audio.ended;
     bPlay.innerHTML = playing ? ICON.pause : ICON.play;
@@ -150,7 +156,7 @@ function createPlayer() {
         row.firstChild.addEventListener('pointerdown', (ev) => dragSong(ev, song, row));
         return row;
       })
-      : [h('div', { class: 'md-empty' }, tt('歌單是空的。把歌曲拖進來，或從選單開啟檔案'))]));
+      : [h('div', { class: 'md-empty' }, tt('歌單是空的。把音樂或影片拖進來，或從選單開啟檔案'))]));
   }
 
   // Drag a song up or down to change the order.
@@ -191,12 +197,22 @@ function createPlayer() {
     window.addEventListener('pointercancel', up);
   }
 
-  // The playlist opens underneath the player; the window grows to hold it.
+  // The window is as tall as what it shows: the player, the screen above it
+  // for a video, the playlist underneath.
+  function fit() {
+    if (!win.maximized) win.el.style.height = BASE_HEIGHT + (hasVideo ? SCREEN_HEIGHT : 0) + (listOpen ? LIST_HEIGHT : 0) + 'px';
+  }
   function showList(open) {
     listOpen = open;
     win.body.classList.toggle('md-list-open', open);
     bList.setAttribute('aria-pressed', String(open));
-    if (!win.maximized) win.el.style.height = (open ? BASE_HEIGHT + LIST_HEIGHT : BASE_HEIGHT) + 'px';
+    fit();
+  }
+  function showScreen(show) {
+    if (show === hasVideo) return;
+    hasVideo = show;
+    win.body.classList.toggle('md-has-video', show);
+    fit();
   }
 
   // ---- playing
@@ -227,6 +243,7 @@ function createPlayer() {
       return toast(tt('無法開啟「{0}」：{1}', song.name, errText(err)), true);
     }
     if (mine !== token || !player) return;
+    showScreen(Object.hasOwn(VIDEO_TYPES, P.ext(song.name))); // settled for good once the file says what it holds
     Object.assign(song, readTags(bytes));
     if (url) URL.revokeObjectURL(url);
     url = URL.createObjectURL(new Blob([bytes], { type: TYPES[P.ext(song.name)] || 'audio/mpeg' }));
@@ -286,6 +303,7 @@ function createPlayer() {
       audio.pause();
       audio.removeAttribute('src');
       audio.load();
+      showScreen(false);
       loading = '';
       at = -1;
       if (songs.length) play(Math.min(i, songs.length - 1));
@@ -294,12 +312,12 @@ function createPlayer() {
     paintList();
   }
 
-  // Adds audio files to the playlist; other files are left out, with a note.
+  // Adds music and videos to the playlist; other files are left out, with a note.
   async function add(paths, { start = false } = {}) {
     let skipped = 0;
     let first = -1;
     for (const path of paths) {
-      if (!isAudio(path)) {
+      if (!canPlay(path)) {
         skipped++;
         continue;
       }
@@ -318,7 +336,7 @@ function createPlayer() {
       songs.push({ path, name: P.base(path), title: '', artist: '' });
       if (first < 0) first = songs.length - 1;
     }
-    if (skipped) toast(skipped === paths.length ? tt('這些不是 Mounds 能播放的音樂檔') : tt('略過了 {0} 個不是音樂的項目', skipped));
+    if (skipped) toast(skipped === paths.length ? tt('這些不是 Mounds 能播放的檔案') : tt('略過了 {0} 個無法播放的項目', skipped));
     paint();
     paintList();
     if (first < 0) return;
@@ -339,7 +357,7 @@ function createPlayer() {
   }
 
   async function openFile() {
-    const path = await pickPath({ mode: 'file', title: tt('開啟音樂檔'), start: songs[at] ? P.parent(songs[at].path) : undefined });
+    const path = await pickPath({ mode: 'file', title: tt('開啟音樂或影片'), start: songs[at] ? P.parent(songs[at].path) : undefined });
     if (path && player) add([path], { start: true });
   }
 
@@ -380,6 +398,10 @@ function createPlayer() {
       paint();
     }
   });
+  audio.addEventListener('loadedmetadata', () => showScreen(audio.videoWidth > 0));
+  // On the picture: a click plays or pauses, a double-click fills the desktop and back.
+  screen.addEventListener('click', toggle);
+  screen.addEventListener('dblclick', () => win.toggleMax());
   audio.addEventListener('error', () => {
     if (!audio.src || !songs[at]) return;
     toast(tt('無法播放「{0}」：瀏覽器不支援這個檔案', songs[at].name), true);
