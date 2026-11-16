@@ -260,6 +260,19 @@ const { execSync: execSyncTop } = require('node:child_process');
   await setTb({ group: true });
   await page.waitForFunction(() => document.querySelectorAll('#dock-items .dock-item:not(.grouped)').length === 1);
   check((await page.textContent('#dock-items .dock-item:not(.grouped) .grp')) === '檔案櫃' && (await page.textContent('#dock-items .dock-item:not(.grouped) .cnt')) === '2', 'merged: one entry for the app, with the number of windows on its icon');
+  // the × on a picture closes that one window only
+  await page.evaluate(() => import('/js/shell/apps.js').then((m) => { m.launchApp('files'); }));
+  await page.waitForFunction(() => document.querySelector('#dock-items .dock-item:not(.grouped) .cnt')?.textContent === '3');
+  await page.mouse.move(600, 300);
+  await page.click('#dock-items .dock-item:not(.grouped)');
+  await page.waitForSelector('.win-preview');
+  check((await page.locator('.win-preview .win-preview-card .win-preview-close').count()) === 3, 'every picture in a preview has its own close button');
+  await page.locator('.win-preview .win-preview-card').last().locator('.win-preview-close').click();
+  await page.waitForFunction(() => document.querySelectorAll('.win-preview .win-preview-card').length === 2);
+  check((await page.locator('#windows > .win').count()) === 2 && (await page.textContent('#dock-items .dock-item:not(.grouped) .cnt')) === '2' && (await page.locator('.win-preview').count()) === 1,
+    'it closes just that window; the others and their pictures stay');
+  await page.mouse.move(600, 300);
+  await page.waitForSelector('.win-preview', { state: 'detached' });
   await page.mouse.move(600, 300);
   await page.click('#dock-items .dock-item:not(.grouped)');
   await page.waitForSelector('.win-preview');

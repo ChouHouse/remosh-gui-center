@@ -4,6 +4,7 @@
 import { h } from '../core/dom.js';
 import { wm, winLayer, dockItems } from './wm.js';
 import { groupOf, grouping } from './dock.js';
+import { tt } from '../core/i18n.js';
 
 const SHOW_AFTER_MS = 450;
 const MAX_W = 240;
@@ -115,7 +116,8 @@ function card(win) {
   const el = h('div', { class: 'win-preview-card' },
     h('div', { class: 'win-preview-title' },
       h('span', { class: 'ico', html: win.dockEl.querySelector('.ico').innerHTML }),
-      h('span', { class: 'lbl' }, win.title)),
+      h('span', { class: 'lbl' }, win.title),
+      h('button', { type: 'button', class: 'win-preview-close', title: tt('關閉'), 'aria-label': tt('關閉'), onclick: (ev) => closeFrom(ev, win, el) }, '×')),
     stage);
   el.addEventListener('pointerenter', () => peek(win));
   el.addEventListener('click', () => {
@@ -123,6 +125,26 @@ function card(win) {
     win.focus();
   });
   return { el, win, copy };
+}
+
+// The × on a picture closes just that window; the other pictures stay up.
+async function closeFrom(ev, win, cardEl) {
+  ev.stopPropagation();
+  peek(null);
+  const mine = popup;
+  if ((await win.close()) === false || popup !== mine) return; // kept open (unsaved work), or the pictures are gone
+  cardEl.remove();
+  if (!mine.querySelector('.win-preview-card')) return hide();
+  shownFor = wm.wins.find((w) => mine.anchor.includes(w) && !w.dockEl.classList.contains('grouped')) || shownFor; // the entry the pictures hang above
+  place(mine);
+}
+
+function place(el) {
+  const item = (shownFor?.dockEl.isConnected ? shownFor.dockEl : document.getElementById('dock')).getBoundingClientRect();
+  const dock = document.getElementById('dock').getBoundingClientRect();
+  const pw = el.offsetWidth;
+  const left = Math.max(6, Math.min(item.left + item.width / 2 - pw / 2, window.innerWidth - pw - 6));
+  Object.assign(el.style, { left: left + 'px', bottom: window.innerHeight - dock.top + 8 + 'px' });
 }
 
 function show(win) {
@@ -138,12 +160,9 @@ function show(win) {
   });
   document.body.append(popup);
   for (const c of cards) copyScroll(c.win, c.copy);
-  const item = win.dockEl.getBoundingClientRect();
-  const dock = document.getElementById('dock').getBoundingClientRect();
-  const pw = popup.offsetWidth;
-  const left = Math.max(6, Math.min(item.left + item.width / 2 - pw / 2, window.innerWidth - pw - 6));
-  Object.assign(popup.style, { left: left + 'px', bottom: window.innerHeight - dock.top + 8 + 'px' });
+  popup.anchor = cards.map((c) => c.win);
   shownFor = win;
+  place(popup);
 }
 
 const winOf = (target) => {
