@@ -7,6 +7,7 @@ import { remove, copy, move, chmod } from './manage.js';
 import { procInfo, kill } from './process.js';
 import { accountInfo, changePassword, createUser } from './account.js';
 import { termOpen, termInput, termResize, termClose } from './terminal.js';
+import { streamOpen, streamClose } from '../streams.js';
 
 export const ops = {
   realpath, list, stat, read, write, readChunk, writeChunk, mkdir,
@@ -14,4 +15,5 @@ export const ops = {
   stats, sysInfo, procInfo, kill,
   accountInfo, changePassword, createUser,
   termOpen, termInput, termResize, termClose,
+  streamOpen, streamClose,
 };

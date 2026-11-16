@@ -1,5 +1,5 @@
 // ssh-desk: Node entry, used by the Docker image (`node server/main.js`).
-// Serves public/, /ws, /api/gate and /api/apps.
+// Serves public/, /ws, /api/gate, /api/apps and /api/stream/<ticket>.
 //
 // Environment:
 //   PORT           port to listen on (default 8080)
@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { Session } from '../src/session.js';
 import { createGate, handleGateApi } from '../src/gate.js';
+import { serveStream } from '../src/streams.js';
 
 const PUBLIC = join(dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const PORT = Number(process.env.PORT) || 8080;
@@ -94,6 +95,12 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/apps') {
       res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
       return res.end(JSON.stringify(installedApps()));
+    }
+    // A file on the host, streamed for a player (see src/streams.js).
+    const stream = /^\/api\/stream\/([0-9a-f]{48})$/.exec(url.pathname);
+    if (stream) {
+      if (!(await gate.check(req.headers.cookie))) return res.writeHead(401).end();
+      return await serveStream(req, res, stream[1]);
     }
     serveStatic(req, res, url.pathname);
   } catch (err) {

@@ -51,6 +51,7 @@ src/
   ssh.js                run-a-command helper
   gate.js               optional access password (WEB_PASSWORD)
   util.js               shared helpers
+  streams.js            /api/stream/<ticket>: a host file over HTTP with byte ranges, for players
   ops/                  one handler per request name
     index.js            the registry (files, manage, stats, process, terminal, account)
     files.js  manage.js  stats.js  terminal.js
@@ -68,7 +69,7 @@ public/
       editor/           Procoder: windows with tabs and a file tree (index.js, window.js, tree.js, welcome.js, prefs.js, monaco.js)
       notepad/          記事本
       graphoto/         Graphoto (image viewer)
-      mounds/           Mounds (music and video player; tags.js reads MP3 titles and artists)
+      mounds/           Mounds (music and video player, streamed; tags.js reads MP3 titles and artists)
       filex/            Filex (upload files from this computer)
       terminal/         終端機
       taskman/          工作管理員 (index.js, stats.js, chart.js, process.js)

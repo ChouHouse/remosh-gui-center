@@ -9,8 +9,8 @@ import { toast } from '../../core/ui.js';
 import { P } from '../../core/path.js';
 import { stroke } from '../../core/icons.js';
 import { rpc } from '../../core/rpc.js';
-import { readFile } from '../../core/file-io.js';
-import { tt } from '../../core/i18n.js';
+import { fromBase64 } from '../../core/text-codec.js';
+import { tt, tm } from '../../core/i18n.js';
 import { createWindow } from '../../shell/wm.js';
 import { showContextMenu } from '../../shell/context-menu.js';
 import { registerDropTarget } from '../../shell/drag.js';
@@ -29,6 +29,7 @@ const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const COLOURS = ['#1f2430', '#6c4bd8', '#1f6feb', '#1f8a4c', '#c9620e', '#b3261e', '#f3f4f6'];
 const BASE_HEIGHT = 208;
 const LIST_HEIGHT = 230;
+const TAG_BYTES = 256 * 1024;
 const SCREEN_HEIGHT = 264; // 16:9 at the window's width
 // Saved in ~/.remosh-gui/app/mounds/.
 const data = appStore('mounds', { defaults: { bg: null, volume: 0.8, rate: 1, shuffle: false, repeat: 'off' } });
@@ -216,6 +217,9 @@ function createPlayer() {
   }
 
   // ---- playing
+  const closeStream = (address) => {
+    if (address) rpc('streamClose', { url: address }).catch(() => {});
+  };
   async function play(i, { back = false } = {}) {
     const song = songs[i];
     if (!song) return;
@@ -227,29 +231,30 @@ function createPlayer() {
     loading = tt('載入中…');
     paint();
     paintList();
-    let bytes;
+    // The file is streamed (src/streams.js on the server): it starts at once
+    // and can be jumped around in, whatever its size.
+    const ext = P.ext(song.name);
+    let stream;
     try {
-      ({ bytes } = await readFile(song.path, {
-        onProgress: (done, size) => {
-          if (mine !== token) return;
-          loading = tt('載入中… {0}%', Math.floor((done / size) * 100));
-          artist.textContent = loading;
-        },
-      }));
+      stream = await rpc('streamOpen', { path: song.path, type: TYPES[ext] || 'audio/mpeg' });
+      if (ext === 'mp3' && !song.tagged) {
+        // title and artist sit at the very start of an MP3
+        const head = await rpc('readChunk', { path: song.path, offset: 0, length: TAG_BYTES }).catch(() => null);
+        if (head) Object.assign(song, readTags(fromBase64(head.data)), { tagged: true });
+      }
     } catch (err) {
+      if (stream) closeStream(stream.url);
       if (mine !== token) return;
       loading = '';
       paint();
       return toast(tt('無法開啟「{0}」：{1}', song.name, errText(err)), true);
     }
-    if (mine !== token || !player) return;
-    showScreen(Object.hasOwn(VIDEO_TYPES, P.ext(song.name))); // settled for good once the file says what it holds
-    Object.assign(song, readTags(bytes));
-    if (url) URL.revokeObjectURL(url);
-    url = URL.createObjectURL(new Blob([bytes], { type: TYPES[P.ext(song.name)] || 'audio/mpeg' }));
+    if (mine !== token || !player) return closeStream(stream.url);
+    showScreen(Object.hasOwn(VIDEO_TYPES, ext)); // settled for good once the file says what it holds
+    closeStream(url);
+    url = stream.url;
     audio.src = url;
     audio.playbackRate = RATES.includes(data.get('rate')) ? data.get('rate') : 1;
-    loading = '';
     paint();
     paintList();
     if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: song.title || stem(song.name), artist: song.artist || '' });
@@ -303,6 +308,8 @@ function createPlayer() {
       audio.pause();
       audio.removeAttribute('src');
       audio.load();
+      closeStream(url);
+      url = null;
       showScreen(false);
       loading = '';
       at = -1;
@@ -399,6 +406,13 @@ function createPlayer() {
     }
   });
   audio.addEventListener('loadedmetadata', () => showScreen(audio.videoWidth > 0));
+  // "載入中…" under the title while the player waits for more of the file.
+  for (const [type, text] of [['waiting', tm('載入中…')], ['canplay', ''], ['playing', ''], ['error', '']]) {
+    audio.addEventListener(type, () => {
+      loading = text && tt(text);
+      paint();
+    });
+  }
   // On the picture: a click plays or pauses, a double-click fills the desktop and back.
   screen.addEventListener('click', toggle);
   screen.addEventListener('dblclick', () => win.toggleMax());
@@ -444,7 +458,8 @@ function createPlayer() {
     offDrop();
     audio.pause();
     audio.removeAttribute('src');
-    if (url) URL.revokeObjectURL(url);
+    audio.load();
+    closeStream(url);
     player = null;
   };
 

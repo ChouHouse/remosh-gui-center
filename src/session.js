@@ -5,6 +5,7 @@ import ssh2 from 'ssh2';
 import { ops } from './ops/index.js';
 import { CONNECT_TIMEOUT_MS } from './ssh.js';
 import { openSocket } from './net.js';
+import { dropStreams } from './streams.js';
 import { call, codeError, describeError, hostAllowed } from './util.js';
 
 const { Client, utils } = ssh2;
@@ -34,6 +35,7 @@ export class Session {
   }
 
   dispose() {
+    dropStreams(this);
     try {
       this.client?.end();
     } catch {

@@ -59,7 +59,8 @@ const { execSync: execSyncTop } = require('node:child_process');
   const errors = [];
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
   // The browser logs the 401 of a deliberately wrong access password; that one is expected.
-  page.on('console', (m) => m.type() === 'error' && !/status of 401/.test(m.text()) && errors.push('console: ' + m.text()));
+  // (the stream addresses the test asks for on purpose, to see them refused, do not count)
+  page.on('console', (m) => m.type() === 'error' && !/status of 401/.test(m.text()) && !(/status of 404/.test(m.text()) && /\/api\/stream\//.test(m.location().url)) && errors.push('console: ' + m.text()));
 
   await page.goto(base);
   // Access password (server started with WEB_PASSWORD): pass the same value in the environment.
@@ -921,6 +922,16 @@ const { execSync: execSyncTop } = require('node:child_process');
     check(await md.locator('.md-screen').isVisible() && Math.abs(screenBox.height - 264) < 3 && Math.abs((await md.boundingBox()).height - before - 264 - 230) < 3
       && (await md.locator('.md-title').textContent()) === 'clip', 'a video gets a screen above the controls, and the window grows for it', JSON.stringify(screenBox));
     check((await md.locator('.md-song').count()) === 3 && (await md.locator('.md-song.on .md-song-name').textContent()) === 'clip', 'videos sit in the same playlist as the music');
+    // the file is streamed from the host, not fetched whole
+    const streamUrl = await page.evaluate(() => document.querySelector('.md-video').currentSrc);
+    const part = await page.evaluate(async (u) => {
+      const r = await fetch(u, { headers: { Range: 'bytes=4-13' } });
+      return { status: r.status, range: r.headers.get('content-range'), type: r.headers.get('content-type'), bytes: (await r.arrayBuffer()).byteLength };
+    }, streamUrl);
+    const clipSize = fs.statSync(home + '/music/clip.webm').size;
+    check(/\/api\/stream\/[0-9a-f]{48}$/.test(streamUrl) && part.status === 206 && part.bytes === 10 && part.range === `bytes 4-13/${clipSize}` && part.type === 'video/webm',
+      'the player streams the file: any part of it can be asked for', JSON.stringify(part));
+    check((await page.evaluate((u) => fetch(u.slice(0, -4) + '0000').then((r) => r.status), streamUrl)) === 404, 'a made-up stream address gets nothing');
     await md.locator('.md-screen').dblclick();
     await sleep(350);
     check(await md.evaluate((el) => el.classList.contains('maximized')) && (await md.locator('.md-screen').boundingBox()).height > 300, 'double-click on the picture fills the desktop');
@@ -932,6 +943,8 @@ const { execSync: execSyncTop } = require('node:child_process');
     await sleep(150);
     check(await md.locator('.md-screen').isHidden() && Math.abs((await md.boundingBox()).height - before - 230) < 3, 'back on a song, the screen folds away');
     await md.locator('.traffic .close').click();
+    await sleep(300);
+    check((await page.evaluate((u) => fetch(u).then((r) => r.status), streamUrl)) === 404, 'a stream address stops working once the player has moved on');
     fs.rmSync(home + '/music', { recursive: true, force: true });
   }
 
