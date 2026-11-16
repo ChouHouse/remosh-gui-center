@@ -160,3 +160,6 @@
 }
 [data-pc-theme] { color: var(--text); }
 .pc-row.cut { opacity: .5; }
+.pc-row.sel { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.pc-row.drop-into { outline: 2px solid var(--accent); outline-offset: -2px; }
+.pc-tree.drop-over { outline-offset: -3px; }

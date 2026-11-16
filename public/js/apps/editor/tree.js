@@ -7,6 +7,8 @@ import { errText } from '../../core/errors.js';
 import { fileSvg, folderSvg, ICON, stroke } from '../../core/icons.js';
 import { copyText } from '../../core/clipboard.js';
 import { showContextMenu } from '../../shell/context-menu.js';
+import { makeDraggable, registerDropTarget } from '../../shell/drag.js';
+import { acceptsDrop, dropAction, dropInto } from '../../shell/file-drop.js';
 import { putFiles, takeFiles, clearFiles, cutPaths } from '../../shell/file-clipboard.js';
 import { toast, dialog } from '../../core/ui.js';
 import { writeFile } from '../../core/file-io.js';
@@ -26,17 +28,31 @@ export function createTree(actions) {
   let root = null;
   let current = null; // path of the file in the active tab
   const expanded = new Set();
+  let selected = null; // path of the row clicked last: "new file / folder" in the header go there
   let focusNext = null; // path of the row to give the focus to at the next redraw
   const dirs = new Map(); // path -> { entries } | { error } | { loading: true }
   const title = h('span', { class: 'pc-side-title' });
   const body = h('div', { class: 'pc-tree', role: 'tree' });
   const bRefresh = h('button', { type: 'button', title: tt('重新整理'), 'aria-label': tt('重新整理'), html: ICON.refresh, onclick: () => refresh() });
   const bClose = h('button', { type: 'button', title: tt('關閉資料夾'), 'aria-label': tt('關閉資料夾'), html: CLOSE, onclick: () => actions.closeFolder() });
-  const bNewFile = h('button', { type: 'button', title: tt('新增檔案'), 'aria-label': tt('新增檔案'), html: NEW_FILE, onclick: () => create(root, false) });
-  const bNewDir = h('button', { type: 'button', title: tt('新增資料夾'), 'aria-label': tt('新增資料夾'), html: NEW_FOLDER, onclick: () => create(root, true) });
+  const bNewFile = h('button', { type: 'button', title: tt('新增檔案'), 'aria-label': tt('新增檔案'), html: NEW_FILE, onclick: () => create(targetDir(), false) });
+  const bNewDir = h('button', { type: 'button', title: tt('新增資料夾'), 'aria-label': tt('新增資料夾'), html: NEW_FOLDER, onclick: () => create(targetDir(), true) });
   const tools = h('span', { class: 'pc-side-tools' }, bNewFile, bNewDir, bRefresh, bClose);
   const label = (path) => (path === '/' ? '/' : P.base(path));
   const el = h('aside', { class: 'pc-side' }, h('div', { class: 'pc-side-head' }, title, tools), body);
+
+  // Where the header's "new" buttons put things: the selected folder, or the
+  // folder of the selected file; the opened folder when nothing is selected.
+  function targetDir() {
+    const row = selected && [...body.querySelectorAll('.pc-row')].find((r) => r.dataset.path === selected);
+    if (!row) return root;
+    return row.classList.contains('dir') ? selected : P.parent(selected);
+  }
+  function select(path) {
+    if (selected === path) return;
+    selected = path;
+    for (const r of body.querySelectorAll('.pc-row')) r.classList.toggle('sel', r.dataset.path === selected);
+  }
 
   async function load(path, quiet) {
     const mine = root;
@@ -74,7 +90,7 @@ export function createTree(actions) {
       const open = isDir && expanded.has(full);
       const row = h('button', {
         type: 'button', role: 'treeitem', style: pad, title: full, 'data-path': full,
-        class: 'pc-row' + (isDir ? ' dir' : '') + (open ? ' open' : '') + (full === current ? ' current' : '') + (cut.includes(full) ? ' cut' : ''),
+        class: 'pc-row' + (isDir ? ' dir' : '') + (open ? ' open' : '') + (full === current ? ' current' : '') + (cut.includes(full) ? ' cut' : '') + (full === selected ? ' sel' : ''),
         'aria-expanded': isDir ? String(open) : null,
         onclick: () => (isDir ? toggle(full) : actions.openFile(full, entry.size)),
         oncontextmenu: (ev) => {
@@ -135,6 +151,7 @@ export function createTree(actions) {
     } catch (err) {
       return toast(tt('無法建立「{0}」：{1}', name, errText(err)), true);
     }
+    selected = full; // what was just made is the selected row
     await expand(dir);
     emit('fs:changed', dir);
     if (!isDir) actions.openFile(full, 0);
@@ -172,6 +189,7 @@ export function createTree(actions) {
     for (const p of [...dirs.keys()]) if (p === full || p.startsWith(full + '/')) dirs.delete(p);
     for (const p of expanded) if (!dirs.has(p)) load(p, true);
     focusNext = to;
+    if (selected === full) selected = to;
     emit('fs:moved', full, to); // open tabs follow the file
     emit('fs:changed', dir);
   }
@@ -268,6 +286,56 @@ export function createTree(actions) {
     ev.stopPropagation();
   });
 
+  // The row clicked (or reached with the keyboard) is the selected one; a click
+  // on the empty part below the rows selects nothing.
+  body.addEventListener('focusin', (ev) => {
+    const row = ev.target.closest?.('.pc-row');
+    if (row) select(row.dataset.path);
+  });
+  body.addEventListener('click', (ev) => {
+    if (!ev.target.closest('.pc-row')) select(null);
+  });
+
+  // ---- drag rows to move them (Ctrl = copy, Alt = shortcut, like the file
+  // cabinet); files dragged in from elsewhere land the same way. Dropping on a
+  // folder goes into it, on a file next to it, on the empty part into the top.
+  makeDraggable(body, (ev) => {
+    const row = ev.target.closest('.pc-row');
+    if (!row) return null;
+    const path = row.dataset.path;
+    const isDir = row.classList.contains('dir');
+    return { type: 'file', name: P.base(path), icon: isDir ? folderSvg() : fileSvg(P.base(path)), data: { path, paths: [path], isDir, size: 0 } };
+  });
+  const dirAt = (target) => {
+    const row = target?.closest?.('.pc-row');
+    if (!row || !body.contains(row)) return root;
+    return row.classList.contains('dir') ? row.dataset.path : P.parent(row.dataset.path);
+  };
+  const markDrop = (dir) => {
+    for (const r of body.querySelectorAll('.pc-row.drop-into')) r.classList.remove('drop-into');
+    if (dir && dir !== root) [...body.querySelectorAll('.pc-row')].find((r) => r.dataset.path === dir)?.classList.add('drop-into');
+  };
+  const offDrop = registerDropTarget(body, {
+    accepts: (payload) => !!root && acceptsDrop(payload),
+    action: dropAction,
+    onOver: (_payload, at) => markDrop(dirAt(document.elementFromPoint(at.clientX, at.clientY))),
+    onLeave: () => markDrop(null),
+    async onDrop(payload, drop) {
+      const dir = dirAt(drop.target);
+      const paths = payload.type === 'file' ? payload.data.paths || [payload.data.path] : [];
+      const inside = paths.find((from) => dir === from || dir.startsWith(from + '/'));
+      if (inside) return toast(tt('不能把「{0}」放到它自己裡面', P.base(inside)), true);
+      const made = await dropInto(dir, payload, drop);
+      if (!made.length) return;
+      if (!drop.ctrlKey && !drop.altKey) {
+        // moved folders are no longer where they were open
+        for (const from of paths) for (const p of [...expanded]) if (p === from || p.startsWith(from + '/')) expanded.delete(p);
+      }
+      focusNext = P.join(dir, made[made.length - 1]);
+      await expand(dir);
+    },
+  });
+
   body.addEventListener('contextmenu', (ev) => {
     if (!root) return;
     showContextMenu(ev, [
@@ -314,6 +382,7 @@ export function createTree(actions) {
 
   function setRoot(path) {
     root = path || null;
+    selected = null;
     expanded.clear();
     dirs.clear();
     if (root) load(root);
@@ -337,5 +406,5 @@ export function createTree(actions) {
   }
 
   render();
-  return { el, setRoot, setCurrent, refresh, get root() { return root; } };
+  return { el, setRoot, setCurrent, refresh, destroy: offDrop, get root() { return root; } };
 }

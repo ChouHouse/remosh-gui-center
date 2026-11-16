@@ -737,11 +737,32 @@ const { execSync: execSyncTop } = require('node:child_process');
   await pcTab('made.ts').waitFor();
   await page.waitForFunction(() => document.querySelector('.pc-row.current .pc-row-name')?.textContent === 'made.ts');
   check(inProject('src/made.ts') && (await edWin.locator('.titlebar .ttext').textContent()) === 'made.ts — Procoder', 'new file: created inside that folder on the host and opened as a tab');
+  // the header's buttons work in the selected folder (or next to the selected file)
+  fs.rmSync(home + '/project/src/seldir', { recursive: true, force: true });
+  await page.waitForFunction(() => document.querySelector('.pc-row.sel')?.dataset.path.endsWith('/src/made.ts'));
+  await edWin.locator('.pc-side-tools button[title="新增資料夾"]').click();
+  check((await page.textContent('.modal .box')).includes('「src」'), 'with a file selected, "new folder" in the header works next to that file');
+  await page.fill('.modal input', 'seldir');
+  await page.keyboard.press('Enter');
+  await treeRow('src/seldir').waitFor();
+  check(fs.statSync(home + '/project/src/seldir').isDirectory(), 'the folder is created there, not at the top');
+  await treeRow('src/seldir').click();
+  await edWin.locator('.pc-side-tools button[title="新增資料夾"]').click();
+  check((await page.textContent('.modal .box')).includes('「seldir」'), 'with a folder selected, it works inside that folder');
+  await page.keyboard.press('Escape');
+  await treeCtx('src/seldir', '刪除');
+  await page.locator('.modal button', { hasText: '刪除' }).click();
+  await treeRow('src/seldir').waitFor({ state: 'detached' });
+  {
+    const tb = await edWin.locator('.pc-tree').boundingBox();
+    await page.mouse.click(tb.x + tb.width / 2, tb.y + tb.height - 8); // the empty part below the rows
+  }
+  check((await edWin.locator('.pc-row.sel').count()) === 0, 'a click below the rows selects nothing');
   await edWin.locator('.pc-side-tools button[title="新增資料夾"]').click();
   await page.fill('.modal input', 'newdir');
   await page.keyboard.press('Enter');
   await treeRow('newdir').waitFor();
-  check(fs.statSync(home + '/project/newdir').isDirectory() && (await treeNames())[0] === 'newdir', 'new folder (from the tree\'s header) is created in the opened folder');
+  check(fs.statSync(home + '/project/newdir').isDirectory() && (await treeNames())[0] === 'newdir', 'with nothing selected, new folder is created in the opened folder');
   await treeRow('math.ts').click();
   await pcTab('math.ts').and(page.locator('.active')).waitFor();
   await page.keyboard.press('ArrowUp');
@@ -781,9 +802,23 @@ const { execSync: execSyncTop } = require('node:child_process');
   await treeRow('src/math 複本.ts').waitFor();
   check(inProject('src/math 複本.ts') && !inProject('newdir/math.ts') && (await edWin.locator('.pc-row[data-path$="/newdir/math.ts"]').count()) === 0,
     'Ctrl+V next to a file moves the cut file there, under a name that is free');
-  await treeExact('src/math 複本.ts', '刪除');
+  // drag a row onto a folder
+  {
+    const from = await treeRow('src/math 複本.ts').boundingBox();
+    const to = await treeRow('newdir').boundingBox();
+    await page.mouse.move(from.x + 40, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(from.x + 50, from.y + from.height / 2 + 8, { steps: 3 });
+    await page.mouse.move(to.x + 40, to.y + to.height / 2, { steps: 6 });
+    check((await page.textContent('.drag-ghost')).includes('移動') && await treeRow('newdir').evaluate((el) => el.classList.contains('drop-into')), 'tree rows can be dragged; the folder under the pointer lights up');
+    await page.mouse.up();
+    await treeRow('newdir/math 複本.ts').waitFor();
+    check(inProject('newdir/math 複本.ts') && !inProject('src/math 複本.ts') && (await edWin.locator('.pc-row[data-path$="/src/math 複本.ts"]').count()) === 0,
+      'dropping it on a folder moves it in, without opening it');
+  }
+  await treeExact('newdir/math 複本.ts', '刪除');
   await page.locator('.modal button', { hasText: '刪除' }).click();
-  await treeRow('src/math 複本.ts').waitFor({ state: 'detached' });
+  await treeRow('newdir/math 複本.ts').waitFor({ state: 'detached' });
   await treeCtx('newdir', '刪除');
   await page.locator('.modal button', { hasText: '刪除' }).click();
   await treeRow('newdir').waitFor({ state: 'detached' });
@@ -1615,8 +1650,12 @@ const { execSync: execSyncTop } = require('node:child_process');
     return false;
   };
   const beginDrag = async (locator, x, y, mod) => {
-    await locator.waitFor();
-    const b = await locator.boundingBox();
+    let b = null; // the icons may be redrawn right now: ask again until the item is there
+    for (let i = 0; i < 40 && !b; i++) {
+      await locator.waitFor();
+      b = await locator.boundingBox();
+      if (!b) await sleep(50);
+    }
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
     await page.mouse.down();
     if (mod) await page.keyboard.down(mod);

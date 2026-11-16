@@ -141,6 +141,7 @@ export function createProcoder(hub, { folder = null } = {}) {
     };
     win.destroy = () => {
       offDrop();
+      tree.destroy();
       me.editor?.dispose();
       for (const doc of docs) doc.model?.dispose();
       docs.length = 0;
