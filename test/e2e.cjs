@@ -852,6 +852,19 @@ const { execSync: execSyncTop } = require('node:child_process');
 
   // ---- Procoder: titlebar tools, the terminal panel (Ctrl+`), the ⋯ tab menu
   {
+    // two lines of room below the last line, not extra lines
+    const room = () => page.evaluate(() => {
+      const e = window.monaco.editor.getEditors().find((x) => x.getModel() && x.getDomNode()?.closest('.win[data-app="Procoder"]'));
+      const lh = e.getOption(window.monaco.editor.EditorOption.lineHeight);
+      return { extra: e.getContentHeight() - e.getModel().getLineCount() * lh, lh, lines: e.getModel().getLineCount(), text: e.getModel().getValue() };
+    });
+    let r = await room();
+    check(r.extra === 2 * r.lh && !r.text.endsWith('\n\n\n'), 'the code area keeps two lines of room under the last line (space, not newlines)', JSON.stringify({ extra: r.extra, lh: r.lh }));
+    await page.evaluate(() => import('/js/apps/editor/prefs.js').then((m) => m.setFontSize(m.prefs.fontSize + 4)));
+    await sleep(300);
+    const big = await room();
+    await page.evaluate(() => import('/js/apps/editor/prefs.js').then((m) => m.setFontSize(m.prefs.fontSize - 4)));
+    check(big.lh > r.lh && big.extra === 2 * big.lh, 'still two lines with a larger text size', JSON.stringify({ extra: big.extra, lh: big.lh }));
     const tools = edWin.locator('.win-tools button');
     check((await tools.count()) === 2, 'Procoder puts two tools in its title bar: file tree and terminal');
     const geo = await edWin.evaluate((w) => {

@@ -212,6 +212,12 @@ export function createProcoder(hub, { folder = null } = {}) {
       // invisible characters still are.
       unicodeHighlight: { ambiguousCharacters: false },
     }));
+    // Two lines of room below the last line (space, not extra lines), kept at
+    // two lines when the text size changes.
+    const { EditorOption } = monaco.editor;
+    const roomBelow = () => editor.updateOptions({ padding: { bottom: 2 * editor.getOption(EditorOption.lineHeight) } });
+    roomBelow();
+    editor.onDidChangeConfiguration((e) => e.hasChanged(EditorOption.lineHeight) && roomBelow());
     const { KeyMod, KeyCode } = monaco;
     const act = (id, label, keybindings, run) => editor.addAction({ id: 'sshdesk.' + id, label, keybindings, run });
     act('save', tt('儲存到主機'), [KeyMod.CtrlCmd | KeyCode.KeyS], () => active && saveDoc(active));
