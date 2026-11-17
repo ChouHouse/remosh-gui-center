@@ -2123,7 +2123,12 @@ const { execSync: execSyncTop } = require('node:child_process');
   const filesWidth = (await fwin.locator('.files').boundingBox()).width;
   let nameW = (await colBox('name')).width;
   check(nameW === 260 && nameW < filesWidth * 0.6 && (await colBox('size')).width === 90, 'list columns have set widths; the name column no longer takes all the room', JSON.stringify({ nameW, filesWidth }));
-  check((await fwin.locator('.files').evaluate((el) => getComputedStyle(el).scrollbarWidth)) === 'thin', 'scroll bars are the thin themed kind');
+  check(await page.evaluate(() => {
+    const rules = [...document.styleSheets].flatMap((sh) => { try { return [...sh.cssRules]; } catch { return []; } });
+    const rule = (sel) => rules.find((r) => r.selectorText === sel);
+    return rule('::-webkit-scrollbar')?.style.width === '6px' && rule('::-webkit-scrollbar-button')?.style.display === 'none'
+      && getComputedStyle(document.querySelector('.files')).scrollbarWidth === 'auto'; // set, Chrome would ignore the rules above
+  }), 'scroll bars: 6 px, no arrow buttons (and Chrome is not sent to its own thin bars)');
   const grip = await fwin.locator('.col-resize[data-col="name"]').boundingBox();
   await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
   await page.mouse.down();
