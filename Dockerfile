@@ -34,6 +34,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY scripts ./scripts
 COPY public ./public
+COPY src ./src
 # 把 Monaco / xterm / pyright 的靜態檔複製到 public，
 # 複製完就移除只在建置時需要的套件（pyright 是 devDependency，由 prune 移除）
 RUN npm ci --include=dev --no-audit --no-fund && \
@@ -41,7 +42,6 @@ RUN npm ci --include=dev --no-audit --no-fund && \
     npm prune --omit=dev --no-audit --no-fund && \
     rm -rf node_modules/monaco-editor node_modules/@xterm && \
     npm cache clean --force
-COPY src ./src
 COPY server ./server
 
 # 建立工作區域（旗標放這裡，與 remosh 相同）
