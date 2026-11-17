@@ -74,6 +74,7 @@ public/
       mounds/           Mounds (music and video player, streamed; tags.js reads MP3 titles and artists)
       filex/            Filex (upload files from this computer)
       terminal/         終端機
+      tmux/             tmux 終端管理器 (requires tmux; server side src/ops/tmux.js)
       taskman/          工作管理員 (index.js, stats.js, chart.js, process.js)
       settings/         設定
   vs/  xterm/           Monaco and xterm.js, copied by `npm run assets` (not committed)
@@ -100,8 +101,14 @@ its `i18n.js` (`addStrings({ en, ja })`). The language is the system setting
    ```
 
    Optional fields: `order` (place in the start menu, lowest first), `autostart`, `extensions` (`'all'` or a list such as
-   `['txt', 'md']`; `launch({ path, size })` then opens a remote file) and
-   `unsavedCount()` (asked before logout).
+   `['txt', 'md']`; `launch({ path, size })` then opens a remote file),
+   `folders`, `unsavedCount()` (asked before logout) and `requires`: what the
+   host must have, e.g. `requires: [{ command: 'tmux', install: 'sudo apt install tmux' }]`
+   (or just `['tmux']`). After login the host is asked once for every required
+   command (`hasCommands`, which also tries a login shell, so nvm / pyenv /
+   ~/.local/bin installs count). An app missing one stays in the start menu,
+   dimmed with what it needs as its tooltip, and opening it explains what is
+   missing and how to get it instead of starting.
 2. That is all: the folder is found by itself (the server lists `js/apps/*/index.js`
    and the page loads each one), nothing else has to be edited. Everything belongs in the app's folder:
    its icon (`icon.js`) and its styles (`style.css`, loaded by the app with
@@ -216,6 +223,12 @@ On a narrow screen only the form is shown.
   app that last opened that kind of file. That record is kept quietly (`system.openWith` in the
   settings file) and has no settings page; opening with another app from the right-click menu
   changes it.
+- **tmux 終端管理器**: the tmux sessions on the host and their windows, listed
+  on the left; choosing one attaches to it in a terminal on the right (choosing
+  a window switches to it). New session / new window, rename, close window and
+  end session from the buttons and right-click menus. tmux keeps sessions
+  running on the host: closing the window or logging out only detaches, and
+  they are there again next time. Needs tmux on the host.
 - **Graphoto**: the image viewer (png, jpg, gif, webp, avif, bmp, ico, svg).
   Wheel or +/- to zoom, drag to move, R to rotate, 0 to fit, 1 for actual size;
   ← / → (or the mouse side buttons) step through the pictures in the same folder.

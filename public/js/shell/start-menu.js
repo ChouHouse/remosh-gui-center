@@ -6,7 +6,7 @@ import { on } from '../core/events.js';
 import { errText } from '../core/errors.js';
 import { toast } from '../core/ui.js';
 import { getSettings, updateSettings, animationMs } from '../core/settings.js';
-import { listApps, launchApp, getApp } from './apps.js';
+import { listApps, launchApp, getApp, missingFor } from './apps.js';
 import { showContextMenu } from './context-menu.js';
 import { makeDraggable } from './drag.js';
 import { host, otherSessions, onSessionsChange } from './sessions.js';
@@ -83,12 +83,15 @@ export const isPinned = (id) => pinnedIds().includes(id);
 export const pinApp = (id) => (isPinned(id) ? null : setPinned([...pinnedIds(), id]));
 export const unpinApp = (id) => setPinned(pinnedIds().filter((x) => x !== id));
 
+// An app whose requirements the host does not meet is dimmed; clicking it says why.
 const appButton = (app, prefix) =>
   h('button', {
     type: 'button',
     id: prefix + app.id,
     role: 'menuitem',
     'data-app-id': app.id,
+    class: missingFor(app).length ? 'needs' : null,
+    title: missingFor(app).length ? tt('需要主機上有：{0}', missingFor(app).map((r) => r.command).join('、')) : null,
     onclick: () => {
       closeStart();
       launchApp(app.id);
@@ -112,6 +115,7 @@ function renderApps() {
 // Call once, after every app module has registered itself.
 export function initStartMenu() {
   renderApps();
+  on('apps:requirements', renderApps);
   for (const list of [$('#sm-apps'), $('#sm-all-list')]) {
     // Right-click: open, pin or unpin.
     list.addEventListener('contextmenu', (ev) => {

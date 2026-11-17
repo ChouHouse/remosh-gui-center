@@ -8,6 +8,8 @@ import { procInfo, kill } from './process.js';
 import { accountInfo, changePassword, createUser } from './account.js';
 import { termOpen, termInput, termResize, termClose } from './terminal.js';
 import { streamOpen, streamClose } from '../streams.js';
+import { hasCommands } from './requires.js';
+import { tmuxList, tmuxDo } from './tmux.js';
 // Server side of Procoder's add-on modules (public/js/apps/editor/modules).
 import { pyCollect } from './procoder/python.js';
 import { jsCollect } from './procoder/node.js';
@@ -19,5 +21,6 @@ export const ops = {
   accountInfo, changePassword, createUser,
   termOpen, termInput, termResize, termClose,
   streamOpen, streamClose,
+  hasCommands, tmuxList, tmuxDo,
   pyCollect, jsCollect,
 };

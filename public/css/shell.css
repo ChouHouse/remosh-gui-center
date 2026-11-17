@@ -473,3 +473,8 @@ html[data-taskbar-ws="off"] #ws-btn { display: none; }
 .ws-stage-inner > .win { display: flex; min-width: 0; min-height: 0; }
 .ws-card.new .ws-stage { display: grid; place-items: center; font-size: 28px; color: var(--muted); background: var(--surface-2); }
 @media (prefers-reduced-motion: reduce) { #ws-panel { animation: none; } }
+
+/* An app whose requirements the host does not meet (apps.js `requires`). */
+#sm-apps button.needs, #sm-all-list button.needs { opacity: .5; }
+/* Dialog messages may hold line breaks. */
+.modal .box > p { white-space: pre-line; }
