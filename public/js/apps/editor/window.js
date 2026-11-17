@@ -103,6 +103,14 @@ export function createProcoder(hub, { folder = null } = {}) {
     };
     const menubar = h('div', { class: 'ed-menubar' });
     const tabsEl = h('div', { class: 'pc-tabs', role: 'tablist' });
+    // The tab strip hides its scrollbar, so let the mouse wheel scroll it sideways.
+    tabsEl.addEventListener('wheel', (e) => {
+      if (e.ctrlKey || tabsEl.scrollWidth <= tabsEl.clientWidth) return;
+      const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (!d) return;
+      e.preventDefault();
+      tabsEl.scrollLeft += e.deltaMode === 1 ? d * 16 : d;
+    }, { passive: false });
     const host = h('div', { class: 'editor-host' });
     const pane = h('div', { class: 'pc-pane' });
     const tree = createTree({ openFile, openFolder: askOpenFolder, closeFolder, removed });

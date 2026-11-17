@@ -925,6 +925,14 @@ const { execSync: execSyncTop } = require('node:child_process');
     await w2.locator('.monaco-editor .view-lines').click();
     await page.keyboard.type('x');
     await w2.locator('.pc-tab.dirty').waitFor();
+    // the tab strip hides its scrollbar; the mouse wheel scrolls it sideways
+    const strip = w2.locator('.pc-tabs');
+    await strip.evaluate((el) => { el.style.flex = '0 0 120px'; el.style.width = '120px'; el.scrollLeft = 0; });
+    await strip.hover();
+    await page.mouse.wheel(0, 200);
+    await page.waitForFunction(() => document.querySelectorAll('.win[data-app="Procoder"]')[1].querySelector('.pc-tabs').scrollLeft > 0);
+    check(true, 'the mouse wheel scrolls the Procoder tab strip');
+    await strip.evaluate((el) => { el.style.flex = ''; el.style.width = ''; });
     const more = w2.locator('.pc-tab-more');
     const mb = await more.boundingBox();
     const bar = await w2.locator('.pc-tabbar').boundingBox();
