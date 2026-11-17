@@ -73,7 +73,6 @@ button.primary:disabled { opacity: .6; cursor: progress; }
 .art-text { position: absolute; z-index: 1; left: 48px; right: 48px; top: 56px; display: grid; gap: 8px; color: #ffffff; text-shadow: 0 1px 8px rgba(0, 0, 0, .55); }
 .art-text b { font-size: 40px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
 .art-text span { font-size: 18px; font-weight: 500; }
-.art-text small { font-size: 13.5px; opacity: .8; }
 .split-panel {
   flex: 0 0 clamp(380px, 36vw, 500px); display: grid; place-items: center; overflow-y: auto;
   padding: 40px 32px; box-sizing: border-box; background: var(--surface); border-left: 1px solid var(--border);
