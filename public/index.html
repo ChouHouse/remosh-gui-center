@@ -67,7 +67,15 @@
   </nav>
 </div>
 
-<div id="login" class="overlay" hidden>
+<div id="login" class="overlay split" hidden>
+  <div class="split-art" aria-hidden="true">
+    <div class="art-text">
+      <b>Remogui</b>
+      <span data-i18n>透過 SSH，把遠端主機變成你的桌面</span>
+      <small data-i18n>主機上不用安裝任何東西</small>
+    </div>
+  </div>
+  <div class="split-panel">
   <form id="login-form" class="card" autocomplete="on">
     <h1>Remogui</h1>
     <p class="sub" id="login-sub" data-i18n>連線到 SSH 主機，瀏覽並編輯上面的檔案</p>
@@ -97,10 +105,19 @@
     <p class="note version">Remogui v1.0 · Sandbox</p>
     <aside id="saved-servers" aria-label="登入過的主機" data-i18n-aria-label="登入過的主機"></aside>
   </form>
+  </div>
   <div id="kept-sessions" aria-label="已登入的使用者" data-i18n-aria-label="已登入的使用者"></div>
 </div>
 
-<div id="gate" class="overlay" hidden>
+<div id="gate" class="overlay split" hidden>
+  <div class="split-art" aria-hidden="true">
+    <div class="art-text">
+      <b>Remogui</b>
+      <span data-i18n>透過 SSH，把遠端主機變成你的桌面</span>
+      <small data-i18n>主機上不用安裝任何東西</small>
+    </div>
+  </div>
+  <div class="split-panel">
   <form id="gate-form" class="card" autocomplete="off">
     <h1>Remogui</h1>
     <p class="sub" data-i18n>這個站台需要存取密碼</p>
@@ -110,6 +127,7 @@
     <div id="gate-error" class="error" role="alert" hidden></div>
     <button type="submit" id="gate-btn" class="primary" data-i18n>進入</button>
   </form>
+  </div>
 </div>
 
 <div id="toasts" aria-live="polite"></div>

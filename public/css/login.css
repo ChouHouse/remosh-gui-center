@@ -18,6 +18,7 @@
   padding: 8px 10px; border-radius: 7px; border: 1px solid var(--border);
   background: var(--surface-2); color: var(--text); font-size: 14px; user-select: text;
 }
+.card input:not([type="file"]) { width: 100%; min-width: 0; box-sizing: border-box; }
 .card input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .card .row { display: flex; gap: 10px; }
 .card .grow { flex: 1; min-width: 0; }
@@ -44,22 +45,46 @@ button.primary:disabled { opacity: .6; cursor: progress; }
 .warn button { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--warn-border); background: transparent; }
 #gate { z-index: 100001; }
 
-/* Servers logged in to before, beside the login card: one click fills in the
+/* Servers logged in to before, under the login form: one click fills in the
    host, port and account. */
 #login-form { position: relative; }
-#saved-servers { position: absolute; left: calc(100% + 14px); top: 0; width: 230px; max-height: 100%; overflow-y: auto; display: grid; gap: 6px; align-content: start; }
+#saved-servers { display: grid; gap: 6px; align-content: start; margin-top: 6px; max-height: 210px; overflow-y: auto; }
 #saved-servers:empty, #login-form.relogin #saved-servers { display: none; }
-#saved-servers h2 { margin: 0 2px 2px; font-size: 11px; font-weight: 600; color: #ffffff; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
-.saved-server { display: flex; align-items: stretch; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 4px 14px rgba(20, 30, 50, .18); overflow: hidden; }
+#saved-servers h2 { margin: 4px 2px 0; font-size: 11px; font-weight: 600; color: var(--muted); }
+.saved-server { display: flex; align-items: stretch; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
 .saved-server .fill { flex: 1; min-width: 0; display: grid; gap: 1px; padding: 7px 10px; border: 0; background: transparent; color: var(--text); text-align: left; }
 .saved-server .fill:hover, .saved-server .forget:hover { background: var(--surface-3); }
 .saved-server.on { border-color: var(--accent); }
 .saved-server strong { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .saved-server span { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .saved-server .forget { flex: none; width: 28px; border: 0; background: transparent; color: var(--muted); font-size: 15px; }
-@media (max-width: 920px) {
-  #saved-servers { position: static; width: auto; max-height: 150px; }
-  #saved-servers h2 { color: var(--muted); text-shadow: none; }
-  .saved-server { box-shadow: none; }
+
+/* The access-password and login screens: a picture on the left, the form in a
+   panel on the right. On a narrow screen only the panel is left. */
+.overlay.split {
+  display: flex; padding: 0; place-items: initial;
+  background: var(--surface); backdrop-filter: none;
+}
+.split-art {
+  position: relative; flex: 1 1 auto; min-width: 0; overflow: hidden;
+  background: #05080a url("/img/login.jpg") center / cover no-repeat;
+}
+.split-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(3, 6, 9, .9) 0%, rgba(3, 6, 9, .5) 30%, rgba(3, 6, 9, .1) 62%, rgba(3, 6, 9, .6) 100%); }
+.art-text { position: absolute; z-index: 1; left: 48px; right: 48px; top: 56px; display: grid; gap: 8px; color: #ffffff; text-shadow: 0 1px 8px rgba(0, 0, 0, .55); }
+.art-text b { font-size: 40px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.art-text span { font-size: 18px; font-weight: 500; }
+.art-text small { font-size: 13.5px; opacity: .8; }
+.split-panel {
+  flex: 0 0 clamp(380px, 36vw, 500px); display: grid; place-items: center; overflow-y: auto;
+  padding: 40px 32px; box-sizing: border-box; background: var(--surface); border-left: 1px solid var(--border);
+}
+.split .card { width: min(380px, 100%); padding: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; gap: 13px; }
+.split .card h1 { font-size: 26px; }
+.split #kept-sessions { z-index: 2; left: 24px; bottom: 24px; }
+@media (max-width: 760px) {
+  .split-art { display: none; }
+  .split-panel { flex: 1 1 auto; border-left: 0; padding: 28px 16px; place-items: start center; }
+  .split #kept-sessions { position: static; margin: 0 16px 16px; max-width: none; }
+  .overlay.split { flex-direction: column; overflow-y: auto; }
 }
 .card .note.version { margin-top: -6px; opacity: .75; }

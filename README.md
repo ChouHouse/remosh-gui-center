@@ -156,6 +156,13 @@ npm install
 npm run assets && WEB_PASSWORD=secret npm start   # http://localhost:8080
 ```
 
+## Login screen
+
+The access-password and SSH login screens are split: a picture on the left
+(`public/img/login.jpg`, photo from Pexels, free to use under the Pexels license)
+and the form on the right. Servers logged in to before are listed under the form.
+On a narrow screen only the form is shown.
+
 ## Desktop
 
 - **Installable**: a web app manifest and icons let Safari ("Add to Dock",
