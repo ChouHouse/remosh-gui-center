@@ -7,7 +7,7 @@ import { tm } from '../../core/i18n.js';
 export const APP_NAME = 'Procoder';
 export const UNTITLED = tm('未命名');
 export const WELCOME = tm('歡迎');
-export const LARGE_FILE_BYTES = 200 * 1024 * 1024; // above this the user is asked first
+export const LARGE_FILE_BYTES = 200 * 1024 * 1024; // above this the user is asked first, unless 效能 › 允許 200M 檔案 is on
 export const RECENT_MAX = 10;
 
 // ---- preferences and the recent list, saved in ~/.remosh-gui/app/editor/
@@ -20,7 +20,7 @@ export const SIDE_MAX = 480;
 export const clampSide = (n) => Math.max(SIDE_MIN, Math.min(SIDE_MAX, Math.round(Number(n)) || SIDE_DEFAULT));
 export const clampFont = (n) => Math.max(FONT_MIN, Math.min(FONT_MAX, Math.round(Number(n)) || FONT_DEFAULT));
 export const data = appStore('editor', {
-  defaults: { fontSize: FONT_DEFAULT, minimap: true, wordWrap: 'off', recent: [], langs: {}, theme: null, folder: null, sideWidth: SIDE_DEFAULT, sideShown: true, analysis: true, panelHeight: 220 },
+  defaults: { fontSize: FONT_DEFAULT, minimap: true, wordWrap: 'off', recent: [], langs: {}, theme: null, folder: null, sideWidth: SIDE_DEFAULT, sideShown: true, analysis: true, panelHeight: 220, allowLarge: false },
   migrate() {
     const out = {};
     for (const key of ['fontSize', 'minimap', 'wordWrap']) {
@@ -49,6 +49,9 @@ export const recentList = () => (Array.isArray(data.get('recent')) ? data.get('r
 export const remember = (path) => data.set('recent', [path, ...recentList().filter((p) => p !== path)].slice(0, RECENT_MAX));
 export const forget = (path) => data.set('recent', recentList().filter((p) => p !== path));
 export const sideShown = () => data.get('sideShown') !== false;
+// 效能 › 允許 200M 檔案: files over LARGE_FILE_BYTES open without asking first.
+export const allowLarge = () => data.get('allowLarge') === true;
+export const toggleAllowLarge = () => data.set('allowLarge', !allowLarge());
 export const toggleSide = () => data.set('sideShown', !sideShown());
 export const isFolderRef = (ref) => ref.length > 1 && ref.endsWith('/'); // folders are remembered with a trailing slash
 

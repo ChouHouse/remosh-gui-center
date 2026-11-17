@@ -23,7 +23,7 @@ import { createTerminalPanel, panelStartDir } from './terminal-panel.js';
 import { moduleStatus, onModuleStatus, rehomeModules, analysisOn, setAnalysis } from './modules.js';
 import { pickLanguage, langName } from './lang-picker.js';
 import {
-  APP_NAME, UNTITLED, WELCOME, LARGE_FILE_BYTES, FONT_DEFAULT, FONT_MIN, FONT_MAX, SIDE_DEFAULT, clampSide,
+  APP_NAME, UNTITLED, WELCOME, LARGE_FILE_BYTES, allowLarge, toggleAllowLarge, FONT_DEFAULT, FONT_MIN, FONT_MAX, SIDE_DEFAULT, clampSide,
   data, prefs, setFontSize, setMinimap, toggleWrap, recentList, remember, forget, sideShown, toggleSide, isFolderRef, chosenLang, setChosenLang, setTheme,
 } from './prefs.js';
 import { tt } from '../../core/i18n.js';
@@ -208,6 +208,9 @@ export function createProcoder(hub, { folder = null } = {}) {
       fixedOverflowWidgets: true,
       renderWhitespace: 'selection',
       smoothScrolling: true,
+      // Full-width punctuation (，。：) is not marked as "looks like ASCII";
+      // invisible characters still are.
+      unicodeHighlight: { ambiguousCharacters: false },
     }));
     const { KeyMod, KeyCode } = monaco;
     const act = (id, label, keybindings, run) => editor.addAction({ id: 'sshdesk.' + id, label, keybindings, run });
@@ -278,6 +281,8 @@ export function createProcoder(hub, { folder = null } = {}) {
           // The language analysers (./modules): completion, errors, go to
           // definition, with the files a program imports read from the host.
           { label: tt('語言解析器'), checked: analysisOn, run: () => setAnalysis(!analysisOn()) },
+          // Files over 200 MB open straight away instead of asking first.
+          { label: tt('允許 200M 檔案'), checked: allowLarge, run: toggleAllowLarge },
         ],
       },
     ];
@@ -509,7 +514,7 @@ export function createProcoder(hub, { folder = null } = {}) {
     };
     // A very large file is not opened straight away: the tab says so and waits
     // for the user to insist.
-    if (size > LARGE_FILE_BYTES) {
+    if (size > LARGE_FILE_BYTES && !allowLarge()) {
       const open = h('button', { type: 'button', class: 'ed-large-open', onclick: () => loadDoc(doc, 0) }, tt('仍要開啟'));
       setPage(h('div', { class: 'ed-large' }, h('p', null, tt('此檔案大小超過上限 ({0} MB)', Math.round(size / 1024 / 1024))), open));
       return;

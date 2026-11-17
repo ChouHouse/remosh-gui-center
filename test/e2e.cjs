@@ -930,6 +930,42 @@ const { execSync: execSyncTop } = require('node:child_process');
     await page.waitForFunction(() => document.querySelectorAll('.win[data-app="Procoder"]').length === 1);
   }
 
+  // ---- Procoder: 效能 › 允許 200M 檔案, and full-width punctuation is not boxed
+  {
+    const big = home + '/docs/big-fake.txt';
+    fs.writeFileSync(big, '中文，標點。測試：好！\nlet a = 1，b;\n'); // the second line is where Monaco would box ，
+    require('child_process').execSync(`chown ${owner.uid}:${owner.gid} ${JSON.stringify(big)}`);
+    const openBig = () => page.evaluate((p) => import('/js/shell/apps.js').then((m) => { m.launchApp('editor', { path: p, size: 300 * 1024 * 1024 }); }), big);
+    await openBig();
+    await edWin.locator('.ed-large .ed-large-open').waitFor();
+    check((await edWin.locator('.ed-large p').textContent()).includes('300 MB'), 'a file over 200 MB asks first');
+    await pcTab('big-fake.txt').click({ button: 'middle' });
+    await pcTab('big-fake.txt').waitFor({ state: 'detached' });
+    await edWin.locator('.menu-btn', { hasText: '效能' }).click();
+    const allow = edWin.locator('.menu button', { hasText: '允許 200M 檔案' });
+    check((await allow.getAttribute('aria-checked')) === 'false', '效能 has 允許 200M 檔案, off at first');
+    await allow.click();
+    check(await waitApp('editor', (d) => d.allowLarge === true), 'switching it on is saved with Procoder\'s settings');
+    await openBig();
+    await page.waitForFunction(() => /中文，標點。/.test(document.querySelector('.win[data-app="Procoder"] .monaco-editor .view-lines')?.textContent || ''), null, { timeout: 15000 });
+    check((await edWin.locator('.ed-large').count()) === 0, 'with it on, a file over 200 MB opens straight away');
+    await sleep(800);
+    const boxed = () => edWin.locator('.monaco-editor .unicode-highlight').count();
+    const noBox = (await boxed()) === 0;
+    // the same text with Monaco's default does get boxes: the check above means something
+    await page.evaluate(() => window.monaco.editor.getEditors().find((e) => e.getModel()?.uri.path.endsWith('/big-fake.txt')).updateOptions({ unicodeHighlight: { ambiguousCharacters: true, allowedLocales: {} } })); // as for a browser not set to Chinese
+    await page.waitForFunction(() => document.querySelectorAll('.win[data-app="Procoder"] .monaco-editor .unicode-highlight').length > 0, null, { timeout: 5000 }).catch(() => {});
+    const withDefault = await boxed();
+    await page.evaluate(() => window.monaco.editor.getEditors().find((e) => e.getModel()?.uri.path.endsWith('/big-fake.txt')).updateOptions({ unicodeHighlight: { ambiguousCharacters: false } }));
+    check(noBox && withDefault > 0, 'full-width punctuation (，。：！) is not boxed as "looks like ASCII" (Monaco\'s default would box it)', String(withDefault));
+    await pcTab('big-fake.txt').click({ button: 'middle' });
+    await pcTab('big-fake.txt').waitFor({ state: 'detached' });
+    await edWin.locator('.menu-btn', { hasText: '效能' }).click();
+    await edWin.locator('.menu button', { hasText: '允許 200M 檔案' }).click();
+    await waitApp('editor', (d) => d.allowLarge === false);
+    fs.rmSync(big, { force: true });
+  }
+
   // ---- Procoder: Python completion from pyright running in the browser, with
   // the files the program imports read from the host
   {
@@ -1059,7 +1095,7 @@ const { execSync: execSyncTop } = require('node:child_process');
     // 效能 › 語言解析器 switches the analysers off and on
     await pcTab('main.ts').click();
     await edWin.locator('.menu-btn', { hasText: '效能' }).click();
-    check((await edWin.locator('.menu button .lbl').allTextContents()).join() === '語言解析器' && (await edWin.locator('.menu button', { hasText: '語言解析器' }).getAttribute('aria-checked')) === 'true', 'Procoder has a 效能 menu with 語言解析器, on at first');
+    check((await edWin.locator('.menu button .lbl').allTextContents()).join() === '語言解析器,允許 200M 檔案' && (await edWin.locator('.menu button', { hasText: '語言解析器' }).getAttribute('aria-checked')) === 'true', 'Procoder has a 效能 menu with 語言解析器, on at first');
     await edWin.locator('.menu button', { hasText: '語言解析器' }).click();
     check(await waitApp('editor', (d) => d.analysis === false), 'switching it off is saved with Procoder\'s settings');
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.win[data-app="Procoder"] .pc-mod')).display === 'none');

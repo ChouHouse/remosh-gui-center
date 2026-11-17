@@ -274,7 +274,10 @@ or only the saved ones (unsaved changes are asked about).
 Files are read and written as UTF-8 (BOM kept) or Big5, with the original line
 endings; binary files are not opened. Large files travel in pieces
 (`core/file-io.js`, `readChunk` / `writeChunk`), so there is no fixed limit;
-above 200 MB the window asks before opening.
+above 200 MB the window asks before opening, unless 效能 › 允許 200M 檔案 is on.
+Full-width punctuation (，。：) is not boxed as a character that "looks like
+ASCII" (Monaco's `unicodeHighlight.ambiguousCharacters` is off); invisible
+characters still are.
 
 ## Language features
 
