@@ -23,6 +23,10 @@ const changed = () => {
 
 // title is the short name (shown in the taskbar); the title bar shows
 // "title — appName" so every window says which app it belongs to.
+//
+// The title bar: | window buttons (system) | title (system) | the app's own
+// tools | — with 設定 › 樣式 › 視窗按鈕 on the right, the buttons go to the far
+// right, after the tools. An app puts its tools there with win.setTools(...).
 export function createWindow({ title, appName, iconHtml, width, height }) {
   // appName stays as written (it identifies the app); what is shown is translated.
   const fullTitle = (t) => (appName && t !== appName && t !== tt(appName) ? `${t} — ${tt(appName)}` : t);
@@ -35,7 +39,9 @@ export function createWindow({ title, appName, iconHtml, width, height }) {
       h('button', { type: 'button', class: 'close', title: tt('關閉'), 'aria-label': tt('關閉'), onclick: () => win.close() }),
       h('button', { type: 'button', class: 'min', title: tt('縮到工作列'), 'aria-label': tt('縮到工作列'), onclick: () => win.minimize() }),
       h('button', { type: 'button', class: 'max', title: tt('放大'), 'aria-label': tt('放大'), onclick: () => win.toggleMax() })),
-    titleEl);
+    titleEl,
+    h('div', { class: 'win-tools' }));
+  win.setTools = (...nodes) => bar.querySelector('.win-tools').replaceChildren(...nodes.flat());
   win.body = h('div', { class: 'win-body' });
   win.el = h('section', { class: 'win', 'data-app': appName || null }, bar, win.body,
     ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'].map((d) => h('div', { class: 'rs ' + d, 'data-dir': d })));
@@ -152,10 +158,10 @@ export function createWindow({ title, appName, iconHtml, width, height }) {
     if (wm.focused !== win) win.focus();
   }, true);
   bar.addEventListener('dblclick', (ev) => {
-    if (!ev.target.closest('.traffic')) win.toggleMax();
+    if (!ev.target.closest('.traffic, .win-tools button')) win.toggleMax();
   });
   bar.addEventListener('pointerdown', (ev) => {
-    if (ev.button !== 0 || ev.target.closest('.traffic')) return;
+    if (ev.button !== 0 || ev.target.closest('.traffic, .win-tools button')) return;
     dragRect(ev, win, 'move');
   });
   for (const handle of win.el.querySelectorAll('.rs')) {

@@ -108,6 +108,17 @@
 .titlebar .ticon { width: 16px; height: 16px; flex: none; display: flex; }
 .titlebar .ticon svg { width: 100%; height: 100%; }
 .titlebar .ttext { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The app's own tools (win.setTools), right of the title. */
+.win-tools { flex: none; display: flex; align-items: center; gap: 2px; }
+.win-tools:empty { display: none; }
+.win-tools button {
+  width: 24px; height: 24px; padding: 4px; border: 0; border-radius: 5px; background: transparent; color: var(--muted);
+  display: grid; place-items: center;
+}
+.win-tools button svg { width: 16px; height: 16px; display: block; }
+.win-tools button:hover { background: var(--surface-3); color: var(--text); }
+.win-tools button[aria-pressed="true"] { color: var(--text); }
+.titlebar:has(.win-tools:not(:empty)) .title { padding-right: 0; }
 .win-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .rs { position: absolute; z-index: 5; }
 .rs.n, .rs.s { left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
@@ -162,8 +173,7 @@ body.dragging iframe, body.dragging .monaco-editor { pointer-events: none; }
 .ctx-menu button.danger:hover:not(:disabled), .ctx-menu button.danger:focus-visible { background: var(--danger); color: #fff; }
 
 /* Window buttons on the right (設定 → 樣式): close ends up in the far corner. */
-html[data-controls="right"] .titlebar { flex-direction: row-reverse; }
-html[data-controls="right"] .traffic { flex-direction: row-reverse; }
+html[data-controls="right"] .traffic { order: 3; flex-direction: row-reverse; }
 html[data-controls="right"] .titlebar .title { padding-right: 0; padding-left: 60px; }
 
 /* Start menu rises and fades in; the logout flyout slides out from it. */

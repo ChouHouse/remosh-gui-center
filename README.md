@@ -62,12 +62,12 @@ public/
   js/
     main.js             loads every app folder the server lists, then boots
     core/               dom, store, errors, ui, format, path, icons, events, rpc, text-codec, settings, i18n (+ i18n/en.js, ja.js)
-    shell/              wm (windows), menubar, context-menu, drag, file-drop, shortcuts,
+    shell/              wm (windows), menubar, context-menu, drag, file-drop, shortcuts, terminal-view (a shell in an element),
                         desktop-icons, login, gate, start-menu, clock, style, fullscreen,
                         desktop, apps (registry), file-open (「用 … 開啟」)
     apps/               one folder per app: index.js, icon.js, style.css, i18n.js (its texts in English and Japanese)
       files/            檔案櫃
-      editor/           Procoder: windows with tabs and a file tree (index.js, window.js, tree.js, welcome.js, prefs.js, monaco.js)
+      editor/           Procoder: windows with tabs, a file tree and a terminal panel (index.js, window.js, tree.js, terminal-panel.js, welcome.js, prefs.js, monaco.js, modules.js)
         modules/        Procoder add-ons: python/, node/ (language analysers)
       notepad/          記事本
       graphoto/         Graphoto (image viewer)
@@ -187,6 +187,10 @@ On a narrow screen only the form is shown.
   `app:<id>`, `name.remosh_gui-lnk` holds `lnk:<path>`.
 - **Windows**: drag to the left or right edge for half the screen, to the top to
   maximise; the strip at the far right of the taskbar shows the desktop.
+  The title bar is | window buttons | title | the app's own tools |: the system
+  owns the buttons and the title, an app puts its tools at the right with
+  `win.setTools(...)`. With the window buttons set to the right (設定 › 樣式)
+  they come after the tools.
 - **Taskbar**: one entry per open window; 設定 → 工作列 sets its size, icons only
   or with titles, left or centred (dock mode: start button included), and auto-hide (3 s after
   the pointer leaves). More entries than fit scroll
@@ -238,10 +242,21 @@ plus:
 | Ctrl+Shift+S | Save as (the window switches to the new file) |
 | Alt+Z | Toggle word wrap |
 | Ctrl+= / Ctrl+- / Ctrl+0 | Larger / smaller / default text size |
+| Ctrl+B | Show / hide the file tree |
+| Ctrl+` | Show / hide the terminal panel (also inside the terminal) |
+| Alt+W | Close the tab |
 
-Each editor window has two menus: 檔案 (undo, redo, save, save as, close) and
-介面 (text size, minimap on/off, word wrap). The 介面 settings apply to every
-editor window and are remembered in the browser.
+Each editor window has three menus: 檔案 (new window, open, undo, redo, save,
+save as, close), 介面 (welcome page, language, light/dark, file tree, terminal,
+text size, minimap, word wrap) and 效能 (語言解析器, see below). Its settings
+apply to every editor window and are saved in `~/.remosh-gui/app/editor/`.
+
+The two buttons at the right of the title bar show and hide the file tree and
+the terminal panel. The panel (`editor/terminal-panel.js`) sits under the
+editor; the list on its left holds several terminals (+ adds one, × closes it),
+each a shell on the host that starts in the folder open in the tree. Its height
+is dragged from its top edge. The ⋯ at the end of the tab bar closes all tabs
+or only the saved ones (unsaved changes are asked about).
 
 Files are read and written as UTF-8 (BOM kept) or Big5, with the original line
 endings; binary files are not opened. Large files travel in pieces

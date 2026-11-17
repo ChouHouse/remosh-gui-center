@@ -12,6 +12,7 @@ import { dialog } from '../../core/ui.js';
 import { effectiveMode, onDeviceModeChange } from '../../shell/style.js';
 import { createProcoder } from './window.js';
 import { initModules } from './modules.js';
+import { isPanelKey } from './terminal-panel.js';
 import { P } from '../../core/path.js';
 import { tt } from '../../core/i18n.js';
 
@@ -96,8 +97,8 @@ onDeviceModeChange(followPrefs);
 on('settings:changed', followPrefs);
 
 // Ctrl/Cmd+S saves the active tab instead of the browser's "save page"; Alt+W
-// closes it and Ctrl/Cmd+B shows or hides the file tree, also when the focus
-// is outside the editor (e.g. on the welcome page).
+// closes it, Ctrl/Cmd+B shows or hides the file tree and Ctrl+` the terminal
+// panel, also when the focus is outside the editor (e.g. on the welcome page).
 window.addEventListener('keydown', (ev) => {
   const inst = document.querySelector('.modal') ? null : windows.find((w) => w.win === wm.focused);
   const inEditor = !!ev.target.closest?.('.monaco-editor'); // Monaco's own keybindings handle it there
@@ -108,6 +109,10 @@ window.addEventListener('keydown', (ev) => {
   } else if (inst && cmd && !ev.shiftKey && ev.code === 'KeyB' && !inEditor && !ev.target.closest?.('input, textarea')) {
     ev.preventDefault();
     toggleSide();
+  } else if (inst && isPanelKey(ev) && !inEditor && !ev.target.closest?.('.xterm')) {
+    // Ctrl+` shows or hides the terminal panel (the editor and the terminal handle it themselves)
+    ev.preventDefault();
+    inst.togglePanel();
   } else if (inst && ev.altKey && !ev.ctrlKey && !ev.metaKey && ev.code === 'KeyW' && !inEditor) {
     ev.preventDefault();
     inst.closeActive();

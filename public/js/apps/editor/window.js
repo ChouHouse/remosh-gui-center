@@ -4,7 +4,7 @@ import { h } from '../../core/dom.js';
 import { errText } from '../../core/errors.js';
 import { toast, dialog } from '../../core/ui.js';
 import { P } from '../../core/path.js';
-import { fileSvg } from '../../core/icons.js';
+import { fileSvg, stroke } from '../../core/icons.js';
 import { copyText } from '../../core/clipboard.js';
 import { procoderSvg } from './icon.js';
 import { conn, rpc } from '../../core/rpc.js';
@@ -19,6 +19,7 @@ import { pickPath } from '../../shell/picker.js';
 import { loadMonaco, themeName, procoderMode, NAME_LANG, EXT_LANG } from './monaco.js';
 import { buildWelcome } from './welcome.js';
 import { createTree } from './tree.js';
+import { createTerminalPanel, panelStartDir } from './terminal-panel.js';
 import { moduleStatus, onModuleStatus, rehomeModules, analysisOn, setAnalysis } from './modules.js';
 import { pickLanguage, langName } from './lang-picker.js';
 import {
@@ -28,6 +29,8 @@ import {
 import { tt } from '../../core/i18n.js';
 
 // ---- documents
+const SIDE_ICON = stroke('<rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M6 3v10"/>');
+const PANEL_ICON = stroke('<rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 9.5h12"/>');
 const isDirty = (doc) => !!doc.model && doc.model.getAlternativeVersionId() !== doc.savedVersion;
 const docIcon = (doc) => (doc.kind === 'welcome' ? procoderSvg() : fileSvg(doc.name));
 
@@ -60,6 +63,18 @@ export function createProcoder(hub, { folder = null } = {}) {
     app.win.el.dataset.pcTheme = procoderMode();
     app.main.classList.toggle('no-side', !sideShown());
     app.tree.el.style.width = clampSide(data.get('sideWidth')) + 'px';
+    app.panel.applyHeight();
+    paintTools();
+  }
+  // The title bar's buttons show what is open.
+  function paintTools() {
+    if (!app) return;
+    app.tools.side.setAttribute('aria-pressed', String(sideShown()));
+    app.tools.panel.setAttribute('aria-pressed', String(app.panel.shown));
+  }
+  function togglePanel(show) {
+    ensureWindow();
+    app.panel.toggle(show);
   }
   // Preferences changed (in any window): follow them.
   function onPrefs() {
@@ -91,12 +106,25 @@ export function createProcoder(hub, { folder = null } = {}) {
     const host = h('div', { class: 'editor-host' });
     const pane = h('div', { class: 'pc-pane' });
     const tree = createTree({ openFile, openFolder: askOpenFolder, closeFolder, removed });
+    const panel = createTerminalPanel({
+      startDir: () => panelStartDir(tree.root, active?.path, conn.info.home),
+      changed: () => paintTools(),
+      focusBack: () => focusEditor(),
+    });
+    // The title bar's own tools (right of the title): file tree and terminal panel.
+    const tools = {
+      side: h('button', { type: 'button', class: 'pc-tool-side', title: tt('顯示／隱藏檔案樹（{0}）', 'Ctrl+B'), 'aria-label': tt('顯示／隱藏檔案樹'), html: SIDE_ICON, onclick: toggleSide }),
+      panel: h('button', { type: 'button', class: 'pc-tool-panel', title: tt('顯示／隱藏終端機（{0}）', 'Ctrl+`'), 'aria-label': tt('顯示／隱藏終端機'), html: PANEL_ICON, onclick: () => togglePanel() }),
+    };
+    win.setTools(tools.side, tools.panel);
     const grip = h('div', { class: 'pc-side-grip', title: tt('拖曳調整寬度，點兩下還原') });
     const main = h('div', { class: 'pc-main' }, tree.el, grip,
       h('div', { class: 'pc-work' },
         h('div', { class: 'pc-tabbar' }, tabsEl,
-          h('button', { type: 'button', class: 'pc-tab-add', title: tt('新增檔案'), 'aria-label': tt('新增檔案'), onclick: () => openFile() }, '+')),
-        h('div', { class: 'pc-stage' }, host, pane)));
+          h('button', { type: 'button', class: 'pc-tab-add', title: tt('新增檔案'), 'aria-label': tt('新增檔案'), onclick: () => openFile() }, '+'),
+          h('button', { type: 'button', class: 'pc-tab-more', title: tt('更多'), 'aria-label': tt('更多'), onclick: tabsMenu }, '⋯')),
+        h('div', { class: 'pc-stage' }, host, pane),
+        panel.el));
     grip.addEventListener('pointerdown', (down) => {
       if (down.button !== 0) return;
       down.preventDefault();
@@ -121,7 +149,7 @@ export function createProcoder(hub, { folder = null } = {}) {
     grip.addEventListener('dblclick', () => data.set('sideWidth', SIDE_DEFAULT));
     win.body.append(menubar, main,
       h('div', { class: 'statusbar' }, s.state, s.path, h('span', { class: 'spacer' }), s.mod, s.pos, s.wrap, s.eol, s.enc, s.lang));
-    const me = (app = { win, tabsEl, host, pane, s, main, tree, editor: null, monaco: null });
+    const me = (app = { win, tabsEl, host, pane, s, main, tree, panel, tools, editor: null, monaco: null });
     applySide();
     if (folder) tree.setRoot(folder);
     attachMenuBar(menubar, buildMenus(), focusEditor);
@@ -145,6 +173,7 @@ export function createProcoder(hub, { folder = null } = {}) {
     win.destroy = () => {
       offDrop();
       offMod();
+      panel.dispose();
       tree.destroy();
       me.editor?.dispose();
       for (const doc of docs) doc.model?.dispose();
@@ -191,6 +220,8 @@ export function createProcoder(hub, { folder = null } = {}) {
     act('toggleWordWrap', tt('切換自動換行'), [KeyMod.Alt | KeyCode.KeyZ], toggleWrap);
     act('toggleSide', tt('顯示／隱藏檔案樹'), [KeyMod.CtrlCmd | KeyCode.KeyB], toggleSide);
     act('closeTab', tt('關閉分頁'), [KeyMod.Alt | KeyCode.KeyW], () => active && closeDoc(active));
+    // Ctrl+` everywhere: Monaco's WinCtrl is Ctrl on a Mac, CtrlCmd is Ctrl elsewhere
+    act('togglePanel', tt('顯示／隱藏終端機'), [(/Mac|iPhone|iPad/.test(navigator.platform) ? KeyMod.WinCtrl : KeyMod.CtrlCmd) | KeyCode.Backquote], () => togglePanel());
     editor.addCommand(KeyMod.CtrlCmd | KeyCode.KeyY, () => editor.trigger('keyboard', 'redo', null));
     editor.onDidChangeCursorPosition(refresh);
     return monaco;
@@ -231,6 +262,7 @@ export function createProcoder(hub, { folder = null } = {}) {
           { label: tt('亮色'), checked: () => procoderMode() === 'light', run: () => setTheme('light') },
           { label: tt('暗色'), checked: () => procoderMode() === 'dark', run: () => setTheme('dark') },
           { label: tt('顯示檔案樹'), key: mod + 'B', checked: sideShown, run: toggleSide },
+          { label: tt('終端機'), key: 'Ctrl+`', checked: () => !!app?.panel.shown, run: () => togglePanel() },
           null,
           { label: tt('放大文字'), key: mod + '+', enabled: () => prefs.fontSize < FONT_MAX, run: () => setFontSize(prefs.fontSize + 1) },
           { label: tt('縮小文字'), key: mod + '-', enabled: () => prefs.fontSize > FONT_MIN, run: () => setFontSize(prefs.fontSize - 1) },
@@ -439,6 +471,16 @@ export function createProcoder(hub, { folder = null } = {}) {
 
   async function closeMany(list) {
     for (const doc of list) if (!(await closeDoc(doc))) return;
+  }
+
+  // The ⋯ at the end of the tab bar.
+  function tabsMenu(ev) {
+    const files = docs.filter((d) => d.kind === 'file');
+    const saved = files.filter((d) => !isDirty(d));
+    showContextMenu(ev, [
+      { label: tt('關閉所有分頁'), enabled: files.length > 0, run: () => closeMany(files) },
+      { label: tt('關閉已儲存分頁'), enabled: saved.length > 0, run: () => closeMany(saved) },
+    ]);
   }
 
   // ---- opening
@@ -700,6 +742,7 @@ export function createProcoder(hub, { folder = null } = {}) {
     docs,
     findDoc,
     root: () => app?.tree.root || null,
+    togglePanel: () => togglePanel(),
     ownsEditor: (editor) => !!editor && app?.editor === editor,
     // Open a file and put the cursor at a place in it (go to definition).
     async openAt(path, pos) {

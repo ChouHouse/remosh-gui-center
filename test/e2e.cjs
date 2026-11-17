@@ -850,6 +850,86 @@ const { execSync: execSyncTop } = require('node:child_process');
     await pcTab('math.ts').click();
   }
 
+  // ---- Procoder: titlebar tools, the terminal panel (Ctrl+`), the ⋯ tab menu
+  {
+    const tools = edWin.locator('.win-tools button');
+    check((await tools.count()) === 2, 'Procoder puts two tools in its title bar: file tree and terminal');
+    const geo = await edWin.evaluate((w) => {
+      const r = (s) => w.querySelector(s).getBoundingClientRect();
+      return { tools: r('.win-tools'), title: r('.titlebar .ttext'), traffic: r('.traffic'), win: w.getBoundingClientRect() };
+    });
+    check(geo.traffic.right < geo.title.left && geo.title.right < geo.tools.left && geo.win.right - geo.tools.right < 16, 'title bar: window buttons | title | the app\'s tools at the right', JSON.stringify(geo.tools));
+    const sideBtn = edWin.locator('.pc-tool-side');
+    const wasShown = (await sideBtn.getAttribute('aria-pressed')) === 'true';
+    await sideBtn.click();
+    await page.waitForFunction((was) => document.querySelector('.win[data-app="Procoder"] .pc-main').classList.contains('no-side') === was, wasShown);
+    check((await sideBtn.getAttribute('aria-pressed')) === String(!wasShown), 'the file-tree tool shows and hides the tree');
+    await sideBtn.click();
+    await page.waitForFunction((was) => document.querySelector('.win[data-app="Procoder"] .pc-main').classList.contains('no-side') === !was, wasShown);
+    // Ctrl+` from the editor opens the panel with a terminal in the project folder
+    await edWin.locator('.monaco-editor .view-lines').click();
+    await page.keyboard.press('Control+Backquote');
+    await edWin.locator('.pc-panel:not([hidden]) .pc-term-host:not([hidden]) .xterm').waitFor({ timeout: 15000 });
+    check((await edWin.locator('.pc-tool-panel').getAttribute('aria-pressed')) === 'true', 'Ctrl+` opens the terminal panel; its title-bar tool shows it is open');
+    const termText = () => edWin.locator('.pc-term-host:not([hidden]) .xterm-rows').textContent();
+    await sleep(800);
+    await page.keyboard.type('echo PANEL-$((6*7)) $PWD\n');
+    await page.waitForFunction(() => /PANEL-42 \S+\/project/.test(document.querySelector('.pc-term-host:not([hidden]) .xterm-rows')?.textContent || ''), null, { timeout: 15000 });
+    check(true, 'the terminal works and starts in the folder open in the tree');
+    await edWin.locator('.pc-term-add').click();
+    await page.waitForFunction(() => document.querySelectorAll('.win[data-app="Procoder"] .pc-term-item').length === 2);
+    await sleep(800);
+    await page.keyboard.type('echo SECOND\n');
+    await page.waitForFunction(() => /SECOND/.test(document.querySelector('.pc-term-host:not([hidden]) .xterm-rows')?.textContent || ''), null, { timeout: 15000 });
+    check((await edWin.locator('.pc-term-item .pc-term-name').allTextContents()).join() === '終端機 1,終端機 2' && (await edWin.locator('.pc-term-item.on .pc-term-name').textContent()) === '終端機 2', '+ adds a terminal to the list on the left, and switches to it');
+    await edWin.locator('.pc-term-item', { hasText: '終端機 1' }).click();
+    check((await termText()).includes('PANEL-42') && !(await termText()).includes('SECOND'), 'the list switches between terminals, each keeps its own session');
+    await edWin.locator('.pc-term-item', { hasText: '終端機 2' }).hover();
+    await edWin.locator('.pc-term-item', { hasText: '終端機 2' }).locator('.pc-term-close').click();
+    check((await edWin.locator('.pc-term-item').count()) === 1, 'a terminal can be closed from the list');
+    await edWin.locator('.pc-term-host:not([hidden]) .xterm').click();
+    await page.keyboard.press('Control+Backquote');
+    await page.waitForFunction(() => document.querySelector('.win[data-app="Procoder"] .pc-panel').hidden);
+    check(await page.evaluate(() => !!document.activeElement.closest('.monaco-editor')), 'Ctrl+` in the terminal hides the panel and goes back to the editor');
+    await edWin.locator('.menu-btn', { hasText: '介面' }).click();
+    const termItem = edWin.locator('.menu button', { hasText: '終端機' });
+    check((await termItem.locator('.key').textContent()) === 'Ctrl+`' && (await termItem.getAttribute('aria-checked')) === 'false', '介面 has 終端機 (Ctrl+`)');
+    await termItem.click();
+    await edWin.locator('.pc-panel:not([hidden])').waitFor();
+    check((await termText()).includes('PANEL-42'), 'showing it again brings back the same terminal');
+    await edWin.locator('.pc-tool-panel').click();
+    await page.waitForFunction(() => document.querySelector('.win[data-app="Procoder"] .pc-panel').hidden);
+    check(true, 'the title-bar tool hides it too');
+    // the ⋯ at the end of the tab bar, in a window of its own
+    await edWin.first().locator('.menu-btn', { hasText: '檔案' }).click();
+    await edWin.first().locator('.menu button', { hasText: '開新視窗' }).click();
+    await page.waitForFunction(() => document.querySelectorAll('.win[data-app="Procoder"]').length === 2);
+    const w2 = page.locator('.win[data-app="Procoder"]').nth(1);
+    for (const f of ['package.json', 'docs/notes.txt']) {
+      await page.evaluate((p) => import('/js/shell/apps.js').then((m) => m.launchApp('editor', { path: p })), home + (f.startsWith('docs/') ? '/' : '/project/') + f);
+      await w2.locator(`.pc-tab[data-name="${f.split('/').pop()}"]`).waitFor();
+    }
+    await w2.locator('.monaco-editor .view-lines').click();
+    await page.keyboard.type('x');
+    await w2.locator('.pc-tab.dirty').waitFor();
+    const more = w2.locator('.pc-tab-more');
+    const mb = await more.boundingBox();
+    const bar = await w2.locator('.pc-tabbar').boundingBox();
+    check(Math.abs(mb.x + mb.width - (bar.x + bar.width)) < 2, 'the tab bar ends with ⋯');
+    await more.click();
+    check((await page.locator('.ctx-menu button').allTextContents()).join('|') === '關閉所有分頁|關閉已儲存分頁', '⋯ offers 關閉所有分頁 and 關閉已儲存分頁');
+    await page.locator('.ctx-menu button', { hasText: '關閉已儲存分頁' }).click();
+    await page.waitForFunction(() => document.querySelectorAll('.win[data-app="Procoder"]')[1].querySelectorAll('.pc-tab').length === 2);
+    check((await w2.locator('.pc-tab .pc-tab-name').allTextContents()).join() === '歡迎,notes.txt', 'closing the saved tabs keeps the one with unsaved changes', (await w2.locator('.pc-tab .pc-tab-name').allTextContents()).join());
+    await more.click();
+    await page.locator('.ctx-menu button', { hasText: '關閉所有分頁' }).click();
+    await page.locator('.modal button', { hasText: '不儲存' }).click();
+    await page.waitForFunction(() => document.querySelectorAll('.win[data-app="Procoder"]')[1].querySelectorAll('.pc-tab').length === 1);
+    check((await w2.locator('.pc-tab .pc-tab-name').allTextContents()).join() === '歡迎', 'closing all tabs asks about unsaved changes, then leaves the welcome page');
+    await w2.locator('.traffic .close').click();
+    await page.waitForFunction(() => document.querySelectorAll('.win[data-app="Procoder"]').length === 1);
+  }
+
   // ---- Procoder: Python completion from pyright running in the browser, with
   // the files the program imports read from the host
   {
@@ -2268,6 +2348,8 @@ const { execSync: execSyncTop } = require('node:child_process');
   side = await sides();
   check(side.nearRight && side.closeOutermostRight, 'they can be moved to the top right, close in the corner', JSON.stringify(side));
   check(await waitSetting((st) => st.style.controls === 'right'), 'the side is saved');
+  check(await indep.evaluate((w) => getComputedStyle(w.querySelector('.traffic')).order === '3' && getComputedStyle(w.querySelector('.win-tools')).order === '0'),
+    'on the right, the window buttons go after the app\'s own titlebar tools');
   await sw.locator('.titlebar .title').dblclick();
   await sleep(350);
   await sw.locator('.traffic .max').click();
