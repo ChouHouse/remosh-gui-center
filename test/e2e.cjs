@@ -868,7 +868,7 @@ const { execSync: execSyncTop } = require('node:child_process');
     const suggestions = () => edWin.locator('.suggest-widget.visible .monaco-list-row .label-name').allTextContents();
     await page.evaluate((p) => import('/js/shell/apps.js').then((m) => m.launchApp('editor', { path: p })), pj + '/main.py');
     await pcTab('main.py').waitFor();
-    await page.waitForFunction(() => /可提示/.test(document.querySelector('.win[data-app="Procoder"] .pc-py')?.textContent || ''), null, { timeout: 60000 });
+    await page.waitForFunction(() => /可提示/.test(document.querySelector('.win[data-app="Procoder"] .pc-mod')?.textContent || ''), null, { timeout: 60000 });
     check(true, 'a Python file starts the checker; the status bar says suggestions are on');
     await caret('/pyproj/main.py', 0, 0);
     await page.keyboard.press('Enter');
@@ -886,7 +886,7 @@ const { execSync: execSyncTop } = require('node:child_process');
     await page.waitForFunction(() => window.monaco.editor.getModelMarkers({ owner: 'pyright' }).some((m) => m.message.includes('nope_name')), null, { timeout: 15000 });
     check(true, 'an unknown name is marked as an error');
     const hover = await page.evaluate(async () => {
-      const m = await import('/js/apps/editor/python-ls.js');
+      const m = await import('/js/apps/editor/modules/python/index.js');
       const { sessions, request } = m.pyDebug();
       const s = [...sessions.values()].find((x) => x.root.endsWith('/pyproj'));
       return (await request(s, 'textDocument/hover', { textDocument: { uri: 'file://' + s.root + '/main.py' }, position: { line: 1, character: 22 } }))?.contents?.value || '';
@@ -922,8 +922,76 @@ const { execSync: execSyncTop } = require('node:child_process');
     await pcTab('main.py').click({ button: 'middle' });
     await page.locator('.modal button', { hasText: '不儲存' }).click();
     await pcTab('main.py').waitFor({ state: 'detached' });
-    check(await page.evaluate(async () => (await import('/js/apps/editor/python-ls.js')).pyDebug().sessions.size === 0), 'closing the last Python file stops the checker');
+    check(await page.evaluate(async () => (await import('/js/apps/editor/modules/python/index.js')).pyDebug().sessions.size === 0), 'closing the last Python file stops the checker');
     fs.rmSync(pj, { recursive: true, force: true });
+  }
+
+  // ---- Procoder: Node.js across files (TypeScript's service in the browser,
+  // given the project's files and the packages' declarations read from the host)
+  {
+    const np = home + '/nodeproj';
+    fs.rmSync(np, { recursive: true, force: true });
+    const put = (rel, text) => { fs.mkdirSync(require('path').dirname(np + '/' + rel), { recursive: true }); fs.writeFileSync(np + '/' + rel, text); };
+    put('node_modules/fakelib/package.json', '{"name":"fakelib","types":"dist/index.d.ts"}');
+    put('node_modules/fakelib/dist/index.d.ts', 'export declare class Gadget {\n  /** Twist it. */\n  twist(turns: number): string;\n}\n');
+    put('node_modules/cjslib/package.json', '{"name":"cjslib","main":"lib.js"}');
+    put('node_modules/cjslib/lib.js', 'module.exports = { bounce() {} };\n');
+    put('node_modules/@types/cjslib/package.json', '{"name":"@types/cjslib","types":"index.d.ts"}');
+    put('node_modules/@types/cjslib/index.d.ts', 'declare const lib: { bounce(height: number): void };\nexport = lib;\n');
+    put('node_modules/@types/node/package.json', '{"name":"@types/node","types":"index.d.ts"}');
+    put('node_modules/@types/node/index.d.ts', '/// <reference path="fs.d.ts" />\n');
+    put('node_modules/@types/node/fs.d.ts', 'declare module "fs" {\n  export function readFileSync(path: string): string;\n}\ndeclare module "node:fs" {\n  export * from "fs";\n}\n');
+    put('util.ts', 'export function helper(n: number): string {\n  return String(n);\n}\n');
+    put('main.ts', "import { Gadget } from 'fakelib';\nimport cjs = require('cjslib');\nimport * as fs from 'node:fs';\nimport { helper } from './util';\n\nconst g = new Gadget();\n");
+    require('child_process').execSync(`chown -R ${owner.uid}:${owner.gid} ${JSON.stringify(np)}`);
+    const caretN = (line, col) => page.evaluate(`(() => { const e = window.monaco.editor.getEditors().find((x) => x.getModel()?.uri.path.endsWith('/nodeproj/main.ts')); const m = e.getModel(); const l = ${line} || m.getLineCount(); e.setPosition({ lineNumber: l, column: ${col} || m.getLineMaxColumn(l) }); e.focus(); })()`);
+    const suggestFor = async (text) => {
+      let got = [];
+      for (let i = 0; i < 10 && !got.length; i++) {
+        await page.keyboard.type(text);
+        await edWin.locator('.suggest-widget.visible .monaco-list-row').first().waitFor({ timeout: 4000 }).catch(() => {});
+        await sleep(200);
+        got = await edWin.locator('.suggest-widget.visible .monaco-list-row .label-name').allTextContents();
+        await page.keyboard.press('Escape');
+        for (let k = 0; k < text.length; k++) await page.keyboard.press('Backspace');
+      }
+      return got;
+    };
+    await page.evaluate((p) => import('/js/shell/apps.js').then((m) => m.launchApp('editor', { path: p })), np + '/main.ts');
+    await pcTab('main.ts').waitFor();
+    await page.waitForFunction(() => /Node\.js：可提示/.test(document.querySelector('.win[data-app="Procoder"] .pc-mod')?.textContent || ''), null, { timeout: 60000 });
+    const given = await page.evaluate(async () => [...(await import('/js/apps/editor/modules/node/index.js')).nodeDebug().sessions.values()].find((x) => x.root.endsWith('/nodeproj'))?.libs.size || 0);
+    check(given >= 8, 'a JavaScript/TypeScript file reads what it imports from the host (project files, package declarations, @types)', String(given));
+    await caretN(0, 0);
+    await page.keyboard.press('Enter');
+    const gadget = await suggestFor('g.');
+    check(gadget.includes('twist'), 'completion knows a package\'s class from its own declarations ("types" in package.json)', gadget.slice(0, 4).join());
+    const bounce = await suggestFor('cjs.');
+    check(bounce.includes('bounce'), 'a package without declarations gets them from @types', bounce.slice(0, 4).join());
+    const fsList = await suggestFor('fs.');
+    check(fsList.includes('readFileSync'), 'Node\'s own modules (node:fs) come from @types/node', fsList.slice(0, 4).join());
+    await caretN(4, 12);
+    await page.keyboard.press('F12');
+    await pcTab('util.ts').waitFor({ timeout: 15000 });
+    check(true, 'F12 on an imported function opens the project file it comes from');
+    await pcTab('util.ts').click({ button: 'middle' });
+    await pcTab('util.ts').waitFor({ state: 'detached' });
+    // 效能 › 語言解析器 switches the analysers off and on
+    await pcTab('main.ts').click();
+    await edWin.locator('.menu-btn', { hasText: '效能' }).click();
+    check((await edWin.locator('.menu button .lbl').allTextContents()).join() === '語言解析器' && (await edWin.locator('.menu button', { hasText: '語言解析器' }).getAttribute('aria-checked')) === 'true', 'Procoder has a 效能 menu with 語言解析器, on at first');
+    await edWin.locator('.menu button', { hasText: '語言解析器' }).click();
+    check(await waitApp('editor', (d) => d.analysis === false), 'switching it off is saved with Procoder\'s settings');
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.win[data-app="Procoder"] .pc-mod')).display === 'none');
+    check(await page.evaluate(async () => (await import('/js/apps/editor/modules/node/index.js')).nodeDebug().sessions.size === 0), 'off: the analysers stop and the status bar shows nothing');
+    await edWin.locator('.menu-btn', { hasText: '效能' }).click();
+    await edWin.locator('.menu button', { hasText: '語言解析器' }).click();
+    await page.waitForFunction(() => /Node\.js：可提示/.test(document.querySelector('.win[data-app="Procoder"] .pc-mod')?.textContent || ''), null, { timeout: 30000 });
+    check(await waitApp('editor', (d) => d.analysis === true), 'on again: they start again');
+    await pcTab('main.ts').click({ button: 'middle' });
+    if (await page.locator('.modal button', { hasText: '不儲存' }).count()) await page.locator('.modal button', { hasText: '不儲存' }).click();
+    await pcTab('main.ts').waitFor({ state: 'detached' });
+    fs.rmSync(np, { recursive: true, force: true });
   }
 
   // ---- Mounds: the music player

@@ -3,7 +3,7 @@ import { on } from '../../core/events.js';
 import { getLang } from '../../core/i18n.js';
 import { effectiveMode, onDeviceModeChange } from '../../shell/style.js';
 import { data, themePref } from './prefs.js';
-import { attachPython } from './python-ls.js';
+import { loadModules } from './modules.js';
 export let monacoPromise = null;
 // Monaco's own menus and messages, in the system language (English is built in).
 const MONACO_LOCALE = { 'zh-TW': 'zh-tw', ja: 'ja' };
@@ -28,6 +28,8 @@ export function loadMonaco() {
           moduleResolution: ts.ModuleResolutionKind.NodeJs,
           allowNonTsExtensions: true,
           allowJs: true,
+          esModuleInterop: true, // import fs from 'node:fs', as Node and bundlers allow
+          allowSyntheticDefaultImports: true,
           jsx: ts.JsxEmit.Preserve,
           noEmit: true,
         });
@@ -40,7 +42,7 @@ export function loadMonaco() {
       on('settings:changed', sync);
       data.onChange(sync);
       sync();
-      attachPython(monaco); // Python completion etc. (starts only when a Python file is opened)
+      loadModules(monaco); // add-on modules: the language analysers (./modules)
       resolve(monaco);
     }, reject);
   });

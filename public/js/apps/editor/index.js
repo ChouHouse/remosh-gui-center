@@ -11,7 +11,7 @@ import { APP_NAME, data, toggleSide, themePref, setTheme } from './prefs.js';
 import { dialog } from '../../core/ui.js';
 import { effectiveMode, onDeviceModeChange } from '../../shell/style.js';
 import { createProcoder } from './window.js';
-import { setRootResolver, setOpener } from './python-ls.js';
+import { initModules } from './modules.js';
 import { P } from '../../core/path.js';
 import { tt } from '../../core/i18n.js';
 
@@ -43,19 +43,21 @@ const hub = {
   },
 };
 
-// Python files are analysed per project: the folder open in the tree of the
-// window that has the file, else the file's own folder.
-setRootResolver((path) => {
-  for (const inst of [...windows].reverse()) {
-    const root = inst.root();
-    if (root && (root === '/' || path.startsWith(root + '/'))) return root;
-  }
-  return P.parent(path);
-});
+// The language analysers (./modules) work per project: the folder open in the
+// tree of the window that has the file, else the file's own folder.
 // "Go to definition" into another file opens it in the window it came from.
-setOpener((path, pos, editor) => {
-  const inst = windows.find((w) => w.ownsEditor(editor)) || windows[windows.length - 1];
-  inst?.openAt(path, pos);
+initModules({
+  rootOf(path) {
+    for (const inst of [...windows].reverse()) {
+      const root = inst.root();
+      if (root && (root === '/' || path.startsWith(root + '/'))) return root;
+    }
+    return P.parent(path);
+  },
+  openAt(path, pos, editor) {
+    const inst = windows.find((w) => w.ownsEditor(editor)) || windows[windows.length - 1];
+    inst?.openAt(path, pos);
+  },
 });
 
 // The first time Procoder is started it asks which look it should have. The

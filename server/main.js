@@ -1,5 +1,5 @@
 // ssh-desk: Node entry, used by the Docker image (`node server/main.js`).
-// Serves public/, /ws, /api/gate, /api/apps and /api/stream/<ticket>.
+// Serves public/, /ws, /api/gate, /api/apps, /api/apps/<app>/modules and /api/stream/<ticket>.
 //
 // Environment:
 //   PORT           port to listen on (default 8080)
@@ -81,13 +81,16 @@ async function readBody(req, limit = 8192) {
 
 // The apps that are installed: every folder in public/js/apps with an
 // index.js. The page loads each of them, so adding an app is adding a folder.
-function installedApps() {
-  const dir = join(PUBLIC, 'js', 'apps');
+const NAME = /^[a-z0-9][a-z0-9_-]*$/i;
+// Folders in `dir` that hold an index.js.
+function withIndex(dir) {
+  if (!statSync(dir, { throwIfNoEntry: false })?.isDirectory()) return [];
   return readdirSync(dir, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && /^[a-z0-9][a-z0-9_-]*$/i.test(e.name) && statSync(join(dir, e.name, 'index.js'), { throwIfNoEntry: false })?.isFile())
+    .filter((e) => e.isDirectory() && NAME.test(e.name) && statSync(join(dir, e.name, 'index.js'), { throwIfNoEntry: false })?.isFile())
     .map((e) => e.name)
     .sort();
 }
+const installedApps = () => withIndex(join(PUBLIC, 'js', 'apps'));
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -100,6 +103,12 @@ const server = http.createServer(async (req, res) => {
       return res.end(await response.text());
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') return res.writeHead(405).end();
+    // An app's add-on modules: the folders in js/apps/<app>/modules with an index.js.
+    const mods = /^\/api\/apps\/([^/]+)\/modules$/.exec(url.pathname);
+    if (mods) {
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      return res.end(JSON.stringify(NAME.test(mods[1]) ? withIndex(join(PUBLIC, 'js', 'apps', mods[1], 'modules')) : []));
+    }
     if (url.pathname === '/api/apps') {
       res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
       return res.end(JSON.stringify(installedApps()));

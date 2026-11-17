@@ -1,14 +1,15 @@
-// Python code intelligence for Procoder. The type checker (pyright) runs in the
-// browser; it needs the files a program imports, which live on the host. This
-// op asks the host's own python3 to find them (py/collect.py: it reads and
+// Server side of Procoder's Python module (public/js/apps/editor/modules/python).
+// The type checker (pyright) runs in the browser; it needs the files a program
+// imports, which live on the host. This
+// op asks the host's own python3 to find them (python-collect.py: it reads and
 // parses files, it never imports or runs them) and hands back their text.
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execCapture } from '../ssh.js';
-import { codeError, reqPath } from '../util.js';
+import { execCapture } from '../../ssh.js';
+import { codeError, reqPath } from '../../util.js';
 
-const SCRIPT = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'py', 'collect.py'), 'utf8');
+const SCRIPT = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'python-collect.py'), 'utf8');
 const quote = (s) => `'${s.replace(/'/g, `'\\''`)}'`;
 const MAX_BYTES = 24 * 1024 * 1024;
 

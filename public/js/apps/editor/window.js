@@ -19,7 +19,7 @@ import { pickPath } from '../../shell/picker.js';
 import { loadMonaco, themeName, procoderMode, NAME_LANG, EXT_LANG } from './monaco.js';
 import { buildWelcome } from './welcome.js';
 import { createTree } from './tree.js';
-import { pyStatus, onPyStatus, rehome } from './python-ls.js';
+import { moduleStatus, onModuleStatus, rehomeModules, analysisOn, setAnalysis } from './modules.js';
 import { pickLanguage, langName } from './lang-picker.js';
 import {
   APP_NAME, UNTITLED, WELCOME, LARGE_FILE_BYTES, FONT_DEFAULT, FONT_MIN, FONT_MAX, SIDE_DEFAULT, clampSide,
@@ -84,7 +84,7 @@ export function createProcoder(hub, { folder = null } = {}) {
       eol: h('span'),
       enc: h('span'),
       lang: h('button', { type: 'button', class: 'pc-lang-btn', title: tt('切換語言'), onclick: chooseLanguage }),
-      py: h('span', { class: 'pc-py' }),
+      mod: h('span', { class: 'pc-mod' }),
     };
     const menubar = h('div', { class: 'ed-menubar' });
     const tabsEl = h('div', { class: 'pc-tabs', role: 'tablist' });
@@ -120,7 +120,7 @@ export function createProcoder(hub, { folder = null } = {}) {
     });
     grip.addEventListener('dblclick', () => data.set('sideWidth', SIDE_DEFAULT));
     win.body.append(menubar, main,
-      h('div', { class: 'statusbar' }, s.state, s.path, h('span', { class: 'spacer' }), s.py, s.pos, s.wrap, s.eol, s.enc, s.lang));
+      h('div', { class: 'statusbar' }, s.state, s.path, h('span', { class: 'spacer' }), s.mod, s.pos, s.wrap, s.eol, s.enc, s.lang));
     const me = (app = { win, tabsEl, host, pane, s, main, tree, editor: null, monaco: null });
     applySide();
     if (folder) tree.setRoot(folder);
@@ -141,10 +141,10 @@ export function createProcoder(hub, { folder = null } = {}) {
       for (const doc of docs.filter(isDirty)) if (!(await confirmDiscard(doc))) return false;
       return true;
     };
-    const offPy = onPyStatus(() => app === me && refresh());
+    const offMod = onModuleStatus(() => app === me && refresh());
     win.destroy = () => {
       offDrop();
-      offPy();
+      offMod();
       tree.destroy();
       me.editor?.dispose();
       for (const doc of docs) doc.model?.dispose();
@@ -238,6 +238,14 @@ export function createProcoder(hub, { folder = null } = {}) {
           null,
           { label: tt('顯示右側縮圖'), checked: () => prefs.minimap, run: () => setMinimap(!prefs.minimap) },
           { label: tt('自動換行'), key: 'Alt+Z', checked: () => prefs.wordWrap === 'on', run: toggleWrap },
+        ],
+      },
+      {
+        label: tt('效能'),
+        items: [
+          // The language analysers (./modules): completion, errors, go to
+          // definition, with the files a program imports read from the host.
+          { label: tt('語言解析器'), checked: analysisOn, run: () => setAnalysis(!analysisOn()) },
         ],
       },
     ];
@@ -378,10 +386,10 @@ export function createProcoder(hub, { folder = null } = {}) {
     s.eol.textContent = ready ? (doc.model.getEOL() === '\r\n' ? 'CRLF' : 'LF') : '';
     s.wrap.textContent = ready ? (prefs.wordWrap === 'on' ? tt('換行：開') : tt('換行：關')) : '';
     s.wrap.style.display = ready ? '' : 'none';
-    const py = ready && doc.model.getLanguageId() === 'python' ? pyStatus(doc.path) : null;
-    s.py.textContent = py ? py.text : '';
-    s.py.title = py ? py.title : '';
-    s.py.style.display = py ? '' : 'none';
+    const mod = ready ? moduleStatus(doc.model) : null; // what a language analyser says about this file
+    s.mod.textContent = mod ? mod.text : '';
+    s.mod.title = mod ? mod.title : '';
+    s.mod.style.display = mod ? '' : 'none';
   }
 
   // Take a tab away without asking. The neighbour becomes active; when a file
@@ -520,13 +528,13 @@ export function createProcoder(hub, { folder = null } = {}) {
     data.set('sideShown', true);
     app.tree.setRoot(path);
     remember(path === '/' ? '/' : path + '/');
-    rehome(); // Python files now belong to this project
+    rehomeModules(); // the language analysers: files now belong to this project
   }
 
   function closeFolder() {
     if (data.get('folder') === app?.tree.root) data.set('folder', null);
     app?.tree.setRoot(null);
-    rehome();
+    rehomeModules();
   }
 
   // Something was deleted from the file tree: its tabs go too, unless they

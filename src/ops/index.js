@@ -8,7 +8,9 @@ import { procInfo, kill } from './process.js';
 import { accountInfo, changePassword, createUser } from './account.js';
 import { termOpen, termInput, termResize, termClose } from './terminal.js';
 import { streamOpen, streamClose } from '../streams.js';
-import { pyCollect } from './python.js';
+// Server side of Procoder's add-on modules (public/js/apps/editor/modules).
+import { pyCollect } from './procoder/python.js';
+import { jsCollect } from './procoder/node.js';
 
 export const ops = {
   realpath, list, stat, read, write, readChunk, writeChunk, mkdir,
@@ -17,5 +19,5 @@ export const ops = {
   accountInfo, changePassword, createUser,
   termOpen, termInput, termResize, termClose,
   streamOpen, streamClose,
-  pyCollect,
+  pyCollect, jsCollect,
 };

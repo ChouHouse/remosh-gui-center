@@ -53,6 +53,7 @@ src/
   util.js               shared helpers
   streams.js            /api/stream/<ticket>: a host file over HTTP with byte ranges, for players
   ops/                  one handler per request name
+    procoder/           server side of Procoder's add-ons (python.js + python-collect.py, node.js)
     index.js            the registry (files, manage, stats, process, terminal, account)
     files.js  manage.js  stats.js  terminal.js
 public/
@@ -67,6 +68,7 @@ public/
     apps/               one folder per app: index.js, icon.js, style.css, i18n.js (its texts in English and Japanese)
       files/            檔案櫃
       editor/           Procoder: windows with tabs and a file tree (index.js, window.js, tree.js, welcome.js, prefs.js, monaco.js)
+        modules/        Procoder add-ons: python/, node/ (language analysers)
       notepad/          記事本
       graphoto/         Graphoto (image viewer)
       mounds/           Mounds (music and video player, streamed; tags.js reads MP3 titles and artists)
@@ -252,20 +254,37 @@ TypeScript, JavaScript, JSON, CSS and HTML get diagnostics, completion and hover
 from Monaco's built-in language services, which run in the browser. Each file is
 analysed on its own — imports of other remote files are not resolved.
 
-**Python** gets completion, parameter hints, hover, errors and go to definition
-(F12, also into installed packages) from pyright — basedpyright's browser build
-(`browser-basedpyright`, MIT, pinned in `package.json`, copied to
-`public/pyright/` with a gzipped copy). It runs in Web Workers in the browser;
-nothing is installed on the host. The files a program imports are read from the
-host by `pyCollect` (`src/ops/python.js`), which runs `src/ops/py/collect.py`
-with the host's own `python3 -I`: it looks in the project, a `.venv`/`venv` in
-it, and the interpreter's site-packages, reads the files and parses their
-imports with `ast` — it never imports or runs them. pyright gets these files when
-it starts; when an edit adds an import that needs more, they are fetched and
-pyright is started again. One checker runs per project folder (the folder open
-in the file tree, else the file's own folder) and stops when its last Python
-file is closed. Without `python3` on the host only the standard library and the
-file itself are known.
+Across files, the language analysers take over. They are Procoder's add-on
+modules: each folder in `public/js/apps/editor/modules/` with an `index.js` is
+one (listed by `/api/apps/editor/modules`, loaded by `editor/modules.js`), and
+its server side, if any, is in `src/ops/procoder/`. They run while Procoder's
+**效能 › 語言解析器** is on (the default; saved with Procoder's settings), and
+the status bar says what they are doing for the file in front. Nothing is
+installed or run on the host.
+
+- **Python** (`modules/python`): completion, parameter hints, hover, errors and
+  go to definition (F12, also into installed packages) from pyright —
+  basedpyright's browser build (`browser-basedpyright`, MIT, pinned dev
+  dependency, copied to `public/pyright/` with a gzipped copy), in Web Workers.
+  The files a program imports are found by `pyCollect`
+  (`src/ops/procoder/python.js`), which runs `python-collect.py` with the host's
+  own `python3 -I`: it looks in the project, a `.venv`/`venv` in it and the
+  interpreter's site-packages, reads the files and follows their imports with
+  `ast` — it never imports or runs them. pyright gets these files when it
+  starts; an edit that adds an import needing more fetches them and starts it
+  again. Without `python3` on the host only the standard library and the file
+  itself are known.
+- **Node.js** (`modules/node`): JavaScript and TypeScript files get the files
+  they import from `jsCollect` (`src/ops/procoder/node.js`), which follows
+  Node's lookup over SFTP: the project's own files, the packages' declarations
+  (`types`/`typings` in package.json, else `@types/<name>`) and `@types/node`
+  for Node's own modules. They are given to Monaco's TypeScript service as extra
+  libraries under the files' own names, so imports resolve as on the host.
+  Packages that ship only JavaScript, without declarations or `@types`, are not
+  analysed.
+
+One analyser session runs per project folder (the folder open in the file tree,
+else the file's own folder) and ends when its last file is closed.
 
 ## Limits worth knowing
 

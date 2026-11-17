@@ -1,5 +1,6 @@
-// Python code intelligence for Procoder: completion, hover, signature help,
-// errors and "go to definition", also into the modules a file imports.
+// Procoder module: Python code intelligence. Completion, hover, signature
+// help, errors and "go to definition", also into the modules a file imports.
+// Server side: src/ops/procoder/python.js.
 //
 // The type checker is pyright (basedpyright's browser build, /pyright/). It
 // runs in this browser, in Web Workers; nothing is installed on the host. What
@@ -11,28 +12,21 @@
 // pyright takes its files once, when it starts. When an edit brings in an
 // import that needs files it does not have, they are fetched and pyright is
 // started again with the larger set.
-import { rpc } from '../../core/rpc.js';
-import { P } from '../../core/path.js';
-import { errText } from '../../core/errors.js';
-import { tt, tm } from '../../core/i18n.js';
+import { rpc } from '../../../../core/rpc.js';
+import { P } from '../../../../core/path.js';
+import { errText } from '../../../../core/errors.js';
+import { tt, tm } from '../../../../core/i18n.js';
 
 const WORKER = '/pyright/pyright.worker.js';
 const COLLECT_AFTER_MS = 1200; // pause after an edit to the imports before fetching more files
 
 let monaco = null;
-let rootOf = (path) => P.parent(path); // the folder a file's project is in (set by Procoder)
-let opener = null; // (path, position, editor) -> opens a file at a place
+let host = null; // from Procoder: rootOf(path), changed()
 const sessions = new Map(); // project folder -> session
-const watchers = new Set();
+let disposables = [];
 
-export const setRootResolver = (fn) => {
-  rootOf = fn;
-};
 // For the tests: the running checkers and a way to ask them directly.
 export const pyDebug = () => ({ sessions, request });
-export const setOpener = (fn) => {
-  opener = fn;
-};
 
 // What the status bar shows for a file: null when it is not Python.
 const STATES = {
@@ -41,16 +35,12 @@ const STATES = {
   nopython: tm('Python：只提示標準函式庫'),
   error: tm('Python：無法分析'),
 };
-export function pyStatus(path) {
-  const s = path && [...sessions.values()].find((x) => x.models.has(modelOfPath(path)));
+function status(model) {
+  const s = [...sessions.values()].find((x) => x.models.has(model));
   if (!s) return null;
   return { text: tt(STATES[s.state]), title: s.note || '' };
 }
-export function onPyStatus(fn) {
-  watchers.add(fn);
-  return () => watchers.delete(fn);
-}
-const changed = () => watchers.forEach((fn) => fn());
+const changed = () => host?.changed();
 
 const fileUri = (path) => 'file://' + path.split('/').map(encodeURIComponent).join('/');
 const pathOfUri = (uri) => decodeURIComponent(new URL(uri).pathname);
@@ -69,7 +59,7 @@ function sessionFor(root) {
   return s;
 }
 
-function stop(s) {
+function halt(s) {
   s.gen++;
   for (const w of s.workers) w.terminate();
   s.workers = [];
@@ -109,7 +99,7 @@ async function collect(s) {
 
 // Starts (or restarts) pyright with the files collected so far.
 async function boot(s) {
-  stop(s);
+  halt(s);
   const gen = s.gen;
   const config = {
     extraPaths: s.paths.filter((p) => p !== s.root),
@@ -217,7 +207,7 @@ function refresh(s) {
 
 function track(model) {
   if (!isPython(model) || [...sessions.values()].some((x) => x.models.has(model))) return;
-  const s = sessionFor(rootOf(pathOfModel(model)));
+  const s = sessionFor(host.rootOf(pathOfModel(model)));
   s.models.add(model);
   changed();
   if (s.send) open(s, model);
@@ -232,7 +222,7 @@ function untrack(model) {
     s.versions.delete(model);
     s.imports.delete(model);
     if (!s.models.size) {
-      stop(s);
+      halt(s);
       clearTimeout(s.timer);
       sessions.delete(s.root);
     }
@@ -286,7 +276,7 @@ const KINDS = ['Text', 'Method', 'Function', 'Constructor', 'Field', 'Variable',
 
 function register() {
   const L = monaco.languages;
-  L.registerCompletionItemProvider('python', {
+  return [L.registerCompletionItemProvider('python', {
     triggerCharacters: ['.'],
     async provideCompletionItems(model, position) {
       const s = ready(model);
@@ -325,7 +315,7 @@ function register() {
       } catch { /* keep what there is */ }
       return item;
     },
-  });
+  }),
   L.registerHoverProvider('python', {
     async provideHover(model, position) {
       const s = ready(model);
@@ -335,7 +325,7 @@ function register() {
       const list = Array.isArray(res.contents) ? res.contents : [res.contents];
       return { contents: list.map((c) => (typeof c === 'string' ? { value: c } : c.language ? { value: '```' + c.language + '\n' + c.value + '\n```' } : { value: c.value })), range: res.range ? toRange(res.range) : undefined };
     },
-  });
+  }),
   L.registerSignatureHelpProvider('python', {
     signatureHelpTriggerCharacters: ['(', ','],
     signatureHelpRetriggerCharacters: [','],
@@ -358,10 +348,10 @@ function register() {
         dispose() {},
       };
     },
-  });
+  }),
   // Go to definition: into the project's files and the installed packages on
   // the host (not into pyright's own copy of the standard library, which is
-  // not on the host).
+  // not on the host). Procoder opens the file.
   L.registerDefinitionProvider('python', {
     async provideDefinition(model, position) {
       const s = ready(model);
@@ -372,41 +362,40 @@ function register() {
         .filter((l) => !pathOfUri(l.uri).startsWith('/typeshed-fallback/'))
         .map((l) => ({ uri: monaco.Uri.from({ scheme: 'sftp', authority: 'remote', path: pathOfUri(l.uri) }), range: toRange(l.range) }));
     },
-  });
-  // A definition in another file opens that file in Procoder.
-  monaco.editor.registerEditorOpener({
-    openCodeEditor(source, resource, selection) {
-      if (resource.scheme !== 'sftp' || !opener) return false;
-      const pos = selection ? ('startLineNumber' in selection ? { lineNumber: selection.startLineNumber, column: selection.startColumn } : selection) : null;
-      opener(resource.path, pos, source);
-      return true;
-    },
-  });
+  })];
 }
 
-// Called once Monaco is loaded.
-export function attachPython(m) {
-  if (monaco) return;
+function start(m, h) {
   monaco = m;
-  register();
+  host = h;
+  disposables = register();
   const watch = (model) => {
-    model.onDidChangeContent(() => edited(model));
-    model.onDidChangeLanguage(() => (isPython(model) ? track(model) : untrack(model)));
+    disposables.push(
+      model.onDidChangeContent(() => edited(model)),
+      model.onDidChangeLanguage(() => (isPython(model) ? track(model) : untrack(model))),
+    );
     track(model);
   };
   monaco.editor.getModels().forEach(watch);
-  monaco.editor.onDidCreateModel(watch);
-  monaco.editor.onWillDisposeModel(untrack);
+  disposables.push(monaco.editor.onDidCreateModel(watch), monaco.editor.onWillDisposeModel(untrack));
+}
+
+function stop() {
+  for (const d of disposables) d.dispose();
+  disposables = [];
+  for (const s of [...sessions.values()]) for (const model of [...s.models]) untrack(model);
 }
 
 // The project folder of a file changed (a folder was opened or closed in the
 // tree): files move to the right pyright.
-export function rehome() {
+function rehome() {
   for (const s of [...sessions.values()]) {
     for (const model of [...s.models]) {
-      if (rootOf(pathOfModel(model)) === s.root) continue;
+      if (host.rootOf(pathOfModel(model)) === s.root) continue;
       untrack(model);
       track(model);
     }
   }
 }
+
+export default { id: 'python', start, stop, status, rehome };
