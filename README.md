@@ -287,8 +287,8 @@ installed or run on the host.
   interpreter's site-packages, reads the files and follows their imports with
   `ast` — it never imports or runs them. pyright gets these files when it
   starts; an edit that adds an import needing more fetches them and starts it
-  again. Without `python3` on the host only the standard library and the file
-  itself are known.
+  again. Without `python3` on the host, Python files get no analysis (and the
+  status bar says nothing).
 - **Node.js** (`modules/node`): JavaScript and TypeScript files get the files
   they import from `jsCollect` (`src/ops/procoder/node.js`), which follows
   Node's lookup over SFTP: the project's own files, the packages' declarations

@@ -32,12 +32,11 @@ export const pyDebug = () => ({ sessions, request });
 const STATES = {
   loading: tm('Python：分析中…'),
   ready: tm('Python：可提示'),
-  nopython: tm('Python：只提示標準函式庫'),
   error: tm('Python：無法分析'),
 };
 function status(model) {
   const s = [...sessions.values()].find((x) => x.models.has(model));
-  if (!s) return null;
+  if (!s || s.state === 'off') return null;
   return { text: tt(STATES[s.state]), title: s.note || '' };
 }
 const changed = () => host?.changed();
@@ -84,12 +83,15 @@ async function collect(s) {
     const fresh = Object.keys(res.files || {}).filter((f) => !(f in s.files));
     Object.assign(s.files, res.files || {});
     s.note = res.more ? tt('這個專案用到的檔案太多，只讀了一部分，有些提示可能不完整') : '';
-    if (s.state === 'nopython') s.state = 'loading';
+    if (s.state === 'off') s.state = 'loading';
     return fresh.length > 0;
   } catch (err) {
     if (err.code === 'no-python') {
-      s.state = 'nopython';
-      s.note = tt('主機上沒有 python3，只能提示標準函式庫和這個檔案自己的內容');
+      // No Python on the host: no analysis at all, and nothing in the status bar.
+      s.state = 'off';
+      s.note = '';
+      halt(s);
+      for (const m of s.models) monaco.editor.setModelMarkers(m, 'pyright', []);
     } else {
       s.note = tt('讀取主機上的 Python 檔案失敗：{0}', errText(err));
     }
@@ -162,7 +164,7 @@ async function boot(s) {
   if (gen !== s.gen) return;
   s.send({ method: 'initialized', params: {} });
   for (const m of s.models) open(s, m);
-  if (s.state !== 'nopython') s.state = 'ready';
+  s.state = 'ready';
   changed();
 }
 
@@ -191,7 +193,7 @@ function refresh(s) {
     do {
       s.again = false;
       const fresh = await collect(s);
-      if (fresh || !s.send) {
+      if (s.state !== 'off' && (fresh || !s.send)) {
         await boot(s).catch((err) => {
           if (err.message === 'stopped') return; // started again meanwhile
           s.state = 'error';
