@@ -19,6 +19,7 @@ import { pickPath } from '../../shell/picker.js';
 import { loadMonaco, themeName, procoderMode, NAME_LANG, EXT_LANG } from './monaco.js';
 import { buildWelcome } from './welcome.js';
 import { createTree } from './tree.js';
+import { pyStatus, onPyStatus, rehome } from './python-ls.js';
 import { pickLanguage, langName } from './lang-picker.js';
 import {
   APP_NAME, UNTITLED, WELCOME, LARGE_FILE_BYTES, FONT_DEFAULT, FONT_MIN, FONT_MAX, SIDE_DEFAULT, clampSide,
@@ -83,6 +84,7 @@ export function createProcoder(hub, { folder = null } = {}) {
       eol: h('span'),
       enc: h('span'),
       lang: h('button', { type: 'button', class: 'pc-lang-btn', title: tt('切換語言'), onclick: chooseLanguage }),
+      py: h('span', { class: 'pc-py' }),
     };
     const menubar = h('div', { class: 'ed-menubar' });
     const tabsEl = h('div', { class: 'pc-tabs', role: 'tablist' });
@@ -118,7 +120,7 @@ export function createProcoder(hub, { folder = null } = {}) {
     });
     grip.addEventListener('dblclick', () => data.set('sideWidth', SIDE_DEFAULT));
     win.body.append(menubar, main,
-      h('div', { class: 'statusbar' }, s.state, s.path, h('span', { class: 'spacer' }), s.pos, s.wrap, s.eol, s.enc, s.lang));
+      h('div', { class: 'statusbar' }, s.state, s.path, h('span', { class: 'spacer' }), s.py, s.pos, s.wrap, s.eol, s.enc, s.lang));
     const me = (app = { win, tabsEl, host, pane, s, main, tree, editor: null, monaco: null });
     applySide();
     if (folder) tree.setRoot(folder);
@@ -139,8 +141,10 @@ export function createProcoder(hub, { folder = null } = {}) {
       for (const doc of docs.filter(isDirty)) if (!(await confirmDiscard(doc))) return false;
       return true;
     };
+    const offPy = onPyStatus(() => app === me && refresh());
     win.destroy = () => {
       offDrop();
+      offPy();
       tree.destroy();
       me.editor?.dispose();
       for (const doc of docs) doc.model?.dispose();
@@ -374,6 +378,10 @@ export function createProcoder(hub, { folder = null } = {}) {
     s.eol.textContent = ready ? (doc.model.getEOL() === '\r\n' ? 'CRLF' : 'LF') : '';
     s.wrap.textContent = ready ? (prefs.wordWrap === 'on' ? tt('換行：開') : tt('換行：關')) : '';
     s.wrap.style.display = ready ? '' : 'none';
+    const py = ready && doc.model.getLanguageId() === 'python' ? pyStatus(doc.path) : null;
+    s.py.textContent = py ? py.text : '';
+    s.py.title = py ? py.title : '';
+    s.py.style.display = py ? '' : 'none';
   }
 
   // Take a tab away without asking. The neighbour becomes active; when a file
@@ -512,11 +520,13 @@ export function createProcoder(hub, { folder = null } = {}) {
     data.set('sideShown', true);
     app.tree.setRoot(path);
     remember(path === '/' ? '/' : path + '/');
+    rehome(); // Python files now belong to this project
   }
 
   function closeFolder() {
     if (data.get('folder') === app?.tree.root) data.set('folder', null);
     app?.tree.setRoot(null);
+    rehome();
   }
 
   // Something was deleted from the file tree: its tabs go too, unless they
@@ -681,6 +691,22 @@ export function createProcoder(hub, { folder = null } = {}) {
     },
     docs,
     findDoc,
+    root: () => app?.tree.root || null,
+    ownsEditor: (editor) => !!editor && app?.editor === editor,
+    // Open a file and put the cursor at a place in it (go to definition).
+    async openAt(path, pos) {
+      const owner = hub.owner(path);
+      if (owner && owner.inst !== inst) return owner.inst.openAt(path, pos);
+      await openFile(path);
+      const doc = findDoc(path);
+      if (!doc?.model || !app?.editor) return;
+      activate(doc);
+      if (pos) {
+        app.editor.setPosition(pos);
+        app.editor.revealPositionInCenter(pos);
+      }
+      app.editor.focus();
+    },
     onPrefs,
     openFile,
     openFolder,

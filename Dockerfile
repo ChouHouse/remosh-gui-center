@@ -34,10 +34,11 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY scripts ./scripts
 COPY public ./public
-# 只裝執行時需要的套件，把 Monaco / xterm 的靜態檔複製到 public，
-# 複製完就移除這兩個只在建置時需要的套件
-RUN npm ci --omit=dev --no-audit --no-fund && \
+# 把 Monaco / xterm / pyright 的靜態檔複製到 public，
+# 複製完就移除只在建置時需要的套件（pyright 是 devDependency，由 prune 移除）
+RUN npm ci --no-audit --no-fund && \
     npm run assets && \
+    npm prune --omit=dev --no-audit --no-fund && \
     rm -rf node_modules/monaco-editor node_modules/@xterm && \
     npm cache clean --force
 COPY src ./src

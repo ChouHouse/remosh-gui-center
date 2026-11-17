@@ -252,6 +252,21 @@ TypeScript, JavaScript, JSON, CSS and HTML get diagnostics, completion and hover
 from Monaco's built-in language services, which run in the browser. Each file is
 analysed on its own — imports of other remote files are not resolved.
 
+**Python** gets completion, parameter hints, hover, errors and go to definition
+(F12, also into installed packages) from pyright — basedpyright's browser build
+(`browser-basedpyright`, MIT, pinned in `package.json`, copied to
+`public/pyright/` with a gzipped copy). It runs in Web Workers in the browser;
+nothing is installed on the host. The files a program imports are read from the
+host by `pyCollect` (`src/ops/python.js`), which runs `src/ops/py/collect.py`
+with the host's own `python3 -I`: it looks in the project, a `.venv`/`venv` in
+it, and the interpreter's site-packages, reads the files and parses their
+imports with `ast` — it never imports or runs them. pyright gets these files when
+it starts; when an edit adds an import that needs more, they are fetched and
+pyright is started again. One checker runs per project folder (the folder open
+in the file tree, else the file's own folder) and stops when its last Python
+file is closed. Without `python3` on the host only the standard library and the
+file itself are known.
+
 ## Limits worth knowing
 
 - **Restrict who can use it.** With `ALLOWED_HOSTS` empty, anyone who can open

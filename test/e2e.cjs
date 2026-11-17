@@ -850,6 +850,82 @@ const { execSync: execSyncTop } = require('node:child_process');
     await pcTab('math.ts').click();
   }
 
+  // ---- Procoder: Python completion from pyright running in the browser, with
+  // the files the program imports read from the host
+  {
+    const pj = home + '/pyproj';
+    fs.rmSync(pj, { recursive: true, force: true });
+    const site = pj + '/.venv/lib/python3.13/site-packages/fakepkg';
+    fs.mkdirSync(site, { recursive: true });
+    fs.writeFileSync(pj + '/.venv/pyvenv.cfg', 'home = /usr/bin\n');
+    fs.writeFileSync(site + '/__init__.py', 'from .widget import Widget\n');
+    fs.writeFileSync(site + '/widget.py', 'class Widget:\n    """A thing that spins."""\n\n    def spin(self, times: int = 1) -> str:\n        """Spin the widget."""\n        return "spun" * times\n');
+    fs.writeFileSync(pj + '/helpers.py', 'def greet(name: str) -> str:\n    """Say hello."""\n    return "hi " + name\n');
+    fs.writeFileSync(pj + '/main.py', 'import os\nfrom helpers import greet\nfrom fakepkg import Widget\n\nw = Widget()\nprint(greet("x"), os.getcwd())\n');
+    require('child_process').execSync(`chown -R ${owner.uid}:${owner.gid} ${JSON.stringify(pj)}`);
+    const pyEd = (file) => `window.monaco.editor.getEditors().find((x) => x.getModel()?.uri.path.endsWith(${JSON.stringify(file)}))`;
+    const caret = (file, line, col) => page.evaluate(`(() => { const e = ${pyEd(file)}; const m = e.getModel(); const l = ${line} || m.getLineCount(); e.setPosition({ lineNumber: l, column: ${col} || m.getLineMaxColumn(l) }); e.focus(); })()`);
+    const suggestions = () => edWin.locator('.suggest-widget.visible .monaco-list-row .label-name').allTextContents();
+    await page.evaluate((p) => import('/js/shell/apps.js').then((m) => m.launchApp('editor', { path: p })), pj + '/main.py');
+    await pcTab('main.py').waitFor();
+    await page.waitForFunction(() => /可提示/.test(document.querySelector('.win[data-app="Procoder"] .pc-py')?.textContent || ''), null, { timeout: 60000 });
+    check(true, 'a Python file starts the checker; the status bar says suggestions are on');
+    await caret('/pyproj/main.py', 0, 0);
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('w.');
+    await edWin.locator('.suggest-widget.visible .monaco-list-row').first().waitFor({ timeout: 20000 });
+    await sleep(300);
+    const sugg = await suggestions();
+    check(sugg[0] === 'spin', 'completion knows the methods of a class from an installed package (read from the host\'s virtual environment)', sugg.slice(0, 5).join());
+    await page.keyboard.press('Escape');
+    await page.keyboard.type('spin(');
+    await edWin.locator('.parameter-hints-widget.visible').waitFor({ timeout: 10000 });
+    check((await edWin.locator('.parameter-hints-widget').textContent()).includes('times: int = 1'), 'typing ( shows the parameters');
+    await page.keyboard.press('Escape');
+    await page.keyboard.type('nope_name)');
+    await page.waitForFunction(() => window.monaco.editor.getModelMarkers({ owner: 'pyright' }).some((m) => m.message.includes('nope_name')), null, { timeout: 15000 });
+    check(true, 'an unknown name is marked as an error');
+    const hover = await page.evaluate(async () => {
+      const m = await import('/js/apps/editor/python-ls.js');
+      const { sessions, request } = m.pyDebug();
+      const s = [...sessions.values()].find((x) => x.root.endsWith('/pyproj'));
+      return (await request(s, 'textDocument/hover', { textDocument: { uri: 'file://' + s.root + '/main.py' }, position: { line: 1, character: 22 } }))?.contents?.value || '';
+    });
+    check(hover.includes('def greet(name: str) -> str') && hover.includes('Say hello.'), 'hover over a function from another file of the project shows its signature and docstring', hover);
+    // an import added while editing brings in the files it needs
+    fs.writeFileSync(pj + '/extra.py', 'class Thing:\n    def wobble(self) -> None: ...\n');
+    require('child_process').execSync(`chown ${owner.uid}:${owner.gid} ${JSON.stringify(pj + '/extra.py')}`);
+    await caret('/pyproj/main.py', 1, 1);
+    await page.keyboard.type('from extra import Thing\n');
+    await caret('/pyproj/main.py', 0, 0);
+    await page.keyboard.press('Enter');
+    let wob = [];
+    for (let i = 0; i < 15 && !wob.includes('wobble'); i++) {
+      await sleep(600);
+      await page.keyboard.type('Thing().');
+      await edWin.locator('.suggest-widget.visible .monaco-list-row').first().waitFor({ timeout: 5000 }).catch(() => {});
+      await sleep(200);
+      wob = await suggestions();
+      await page.keyboard.press('Escape');
+      for (let k = 0; k < 8; k++) await page.keyboard.press('Backspace');
+    }
+    check(wob.includes('wobble'), 'a new import typed in the editor fetches that module from the host; its contents are suggested', wob.slice(0, 4).join());
+    // go to definition into the installed package
+    await caret('/pyproj/main.py', 6, 6);
+    await page.keyboard.press('F12');
+    await pcTab('widget.py').waitFor({ timeout: 15000 });
+    await page.waitForFunction(`(${pyEd('/fakepkg/widget.py')})?.getPosition().lineNumber === 1`, null, { timeout: 5000 }).catch(() => {});
+    check(await page.evaluate(`(${pyEd('/fakepkg/widget.py')})?.getModel().uri.path`) === site + '/widget.py', 'F12 on a name from an installed package opens its source file from the host');
+    // close the two tabs (main.py has unsaved changes: drop them)
+    await pcTab('widget.py').click({ button: 'middle' });
+    await pcTab('widget.py').waitFor({ state: 'detached' });
+    await pcTab('main.py').click({ button: 'middle' });
+    await page.locator('.modal button', { hasText: '不儲存' }).click();
+    await pcTab('main.py').waitFor({ state: 'detached' });
+    check(await page.evaluate(async () => (await import('/js/apps/editor/python-ls.js')).pyDebug().sessions.size === 0), 'closing the last Python file stops the checker');
+    fs.rmSync(pj, { recursive: true, force: true });
+  }
+
   // ---- Mounds: the music player
   {
     // two short WAV files (a sine tone) for it to play

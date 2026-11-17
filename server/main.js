@@ -51,13 +51,21 @@ function serveStatic(req, res, pathname) {
     'Content-Length': st.size,
     ETag: etag,
     // The app's own files are revalidated every time; the vendored editor and terminal rarely change.
-    'Cache-Control': /^(vs|xterm)[/\\]/.test(rel) ? 'public, max-age=86400' : 'no-cache',
+    'Cache-Control': /^(vs|xterm|pyright)[/\\]/.test(rel) ? 'public, max-age=86400' : 'no-cache',
     'X-Content-Type-Options': 'nosniff',
   };
+  // A gzipped copy next to the file (made at build time for the big ones) goes
+  // to browsers that accept it.
+  const gz = /\bgzip\b/.test(req.headers['accept-encoding'] || '') && statSync(file + '.gz', { throwIfNoEntry: false });
+  if (gz) {
+    headers['Content-Encoding'] = 'gzip';
+    headers['Content-Length'] = gz.size;
+    headers.Vary = 'Accept-Encoding';
+  }
   if (req.headers['if-none-match'] === etag) return res.writeHead(304, headers).end();
   res.writeHead(200, headers);
   if (req.method === 'HEAD') return res.end();
-  createReadStream(file).pipe(res);
+  createReadStream(gz ? file + '.gz' : file).pipe(res);
 }
 
 async function readBody(req, limit = 8192) {

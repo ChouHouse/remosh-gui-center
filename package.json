@@ -17,5 +17,8 @@
   "type": "module",
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "browser-basedpyright": "1.40.2"
   }
 }

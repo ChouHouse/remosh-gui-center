@@ -3,6 +3,7 @@ import { on } from '../../core/events.js';
 import { getLang } from '../../core/i18n.js';
 import { effectiveMode, onDeviceModeChange } from '../../shell/style.js';
 import { data, themePref } from './prefs.js';
+import { attachPython } from './python-ls.js';
 export let monacoPromise = null;
 // Monaco's own menus and messages, in the system language (English is built in).
 const MONACO_LOCALE = { 'zh-TW': 'zh-tw', ja: 'ja' };
@@ -39,6 +40,7 @@ export function loadMonaco() {
       on('settings:changed', sync);
       data.onChange(sync);
       sync();
+      attachPython(monaco); // Python completion etc. (starts only when a Python file is opened)
       resolve(monaco);
     }, reject);
   });
