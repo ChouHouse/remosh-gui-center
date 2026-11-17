@@ -51,7 +51,7 @@ function serveStatic(req, res, pathname) {
     'Content-Length': st.size,
     ETag: etag,
     // The app's own files are revalidated every time; the vendored editor and terminal rarely change.
-    'Cache-Control': /^(vs|xterm|pyright)[/\\]/.test(rel) ? 'public, max-age=86400' : 'no-cache',
+    'Cache-Control': /^(vs|xterm|pyright|types)[/\\]/.test(rel) ? 'public, max-age=86400' : 'no-cache',
     'X-Content-Type-Options': 'nosniff',
   };
   // A gzipped copy next to the file (made at build time for the big ones) goes

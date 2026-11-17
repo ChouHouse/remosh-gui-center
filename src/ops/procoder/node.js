@@ -7,6 +7,7 @@
 // host, so it does not need node installed.
 import { builtinModules } from 'node:module';
 import { call, reqPath } from '../../util.js';
+import { typesVersionsPath } from './types-versions.js';
 
 const MAX_FILES = 1500;
 const MAX_BYTES = 24 * 1024 * 1024;
@@ -36,6 +37,7 @@ export async function jsCollect({ sftp }, msg) {
   const root = reqPath(msg.root);
   const strings = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []);
   const skip = new Set(strings(msg.skip));
+  const ts = typeof msg.ts === 'string' && /^\d+\.\d+(\.\d+)?$/.test(msg.ts) ? msg.ts : null; // the browser's TypeScript version
   const files = {};
   let bytes = 0;
   let more = false;
@@ -93,6 +95,13 @@ export async function jsCollect({ sftp }, msg) {
       pkg = JSON.parse(text || '{}');
     } catch { /* not JSON */ }
     const named = pkg.types || pkg.typings;
+    // the folder this TypeScript version is sent to (typesVersions), if any
+    const entry = (typeof named === 'string' ? named : 'index.d.ts').replace(/^\.\//, '');
+    const mapped = typesVersionsPath(pkg, entry, ts);
+    if (mapped !== entry) {
+      const f = await declFile(join(dir, mapped));
+      if (f) return f;
+    }
     const [a, b, c] = await Promise.all([
       typeof named === 'string' ? declFile(join(dir, named)) : null,
       typeof pkg.main === 'string' ? declFile(join(dir, pkg.main)) : null,

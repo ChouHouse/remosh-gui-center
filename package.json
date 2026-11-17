@@ -19,6 +19,7 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@types/node": "22.20.5",
     "browser-basedpyright": "1.40.2"
   }
 }

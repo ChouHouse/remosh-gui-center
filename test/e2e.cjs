@@ -1074,6 +1074,34 @@ const { execSync: execSyncTop } = require('node:child_process');
     fs.rmSync(np, { recursive: true, force: true });
   }
 
+  // ---- Procoder: a project without @types/node still knows Node's own modules
+  {
+    const mp = home + '/mintproj';
+    fs.rmSync(mp, { recursive: true, force: true });
+    fs.mkdirSync(mp);
+    fs.writeFileSync(mp + '/index.js', 'import os from "os";\n\n');
+    require('child_process').execSync(`chown -R ${owner.uid}:${owner.gid} ${JSON.stringify(mp)}`);
+    await page.evaluate((p) => import('/js/shell/apps.js').then((m) => m.launchApp('editor', { path: p })), mp + '/index.js');
+    await pcTab('index.js').waitFor();
+    await page.waitForFunction(() => /@types\/node/.test(document.querySelector('.win[data-app="Procoder"] .pc-mod')?.title || ''), null, { timeout: 30000 });
+    check(true, 'no @types/node in the project: the status says Remogui\'s own copy is used');
+    await page.evaluate(() => { const e = window.monaco.editor.getEditors().find((x) => x.getModel()?.uri.path.endsWith('/mintproj/index.js')); e.setPosition({ lineNumber: 3, column: 1 }); e.focus(); });
+    let got = [];
+    for (let i = 0; i < 10 && !got.includes('cpus'); i++) {
+      await page.keyboard.type('os.');
+      await edWin.locator('.suggest-widget.visible .monaco-list-row').first().waitFor({ timeout: 4000 }).catch(() => {});
+      await sleep(200);
+      got = await edWin.locator('.suggest-widget.visible .monaco-list-row .label-name').allTextContents();
+      await page.keyboard.press('Escape');
+      for (let k = 0; k < 3; k++) await page.keyboard.press('Backspace');
+    }
+    check(got.includes('cpus'), 'import os from "os" then os. lists what the os module has', got.slice(0, 5).join());
+    await pcTab('index.js').click({ button: 'middle' });
+    if (await page.locator('.modal button', { hasText: '不儲存' }).count()) await page.locator('.modal button', { hasText: '不儲存' }).click();
+    await pcTab('index.js').waitFor({ state: 'detached' });
+    fs.rmSync(mp, { recursive: true, force: true });
+  }
+
   // ---- Mounds: the music player
   {
     // two short WAV files (a sine tone) for it to play

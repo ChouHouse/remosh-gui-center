@@ -296,7 +296,11 @@ installed or run on the host.
   for Node's own modules. They are given to Monaco's TypeScript service as extra
   libraries under the files' own names, so imports resolve as on the host.
   Packages that ship only JavaScript, without declarations or `@types`, are not
-  analysed.
+  analysed. A project without `@types/node` of its own (usual for plain
+  JavaScript) still knows Node's modules and globals when a file uses them:
+  Remogui carries `@types/node` (pinned dev dependency, built into
+  `public/types/node.json` for the TypeScript version Monaco has, honouring
+  `typesVersions`), fetched only then.
 
 One analyser session runs per project folder (the folder open in the file tree,
 else the file's own folder) and ends when its last file is closed.
