@@ -47,7 +47,7 @@ python3 mcp.py --key 'a-long-random-secret'
 It opens a Cloudflare quick tunnel by itself (downloading cloudflared when it
 is missing) and prints the address to log in with; `--tunnel <token>` runs
 your own tunnel instead. Then pick **MCP** on the login screen and enter that
-address and the key. Without `--key` there is no token check at all. Details
+address and the key (`--no-key` runs it without one). Details
 and the tool contract: [docs/MCP.md](docs/MCP.md).
 
 ## How it works
@@ -370,7 +370,13 @@ else the file's own folder) and ends when its last file is closed.
 ```bash
 node test/ws-smoke.mjs ws://127.0.0.1:8080/ws <host> <port> <user> <password>
 NODE_PATH=<playwright>/node_modules node test/e2e.cjs http://127.0.0.1:8080 <host> <port> <user> <password> <home>
+npm run test:mcp
 ```
+
+The browser test is split by area in `test/e2e/` (`node test/e2e.cjs --list`
+names them). Add `--only=sqlite,mcp` to run just those areas: setup (logging
+in) runs first, then the areas each one needs. Without it every area runs, in
+order.
 
 Both expect the test account's home to contain `project/src/math.ts`,
 `project/README.md`, `docs/notes.txt`, `docs/blob.bin` and a Big5
