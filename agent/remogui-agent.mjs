@@ -4,11 +4,11 @@
 // tools is next to it (remogui_agent.py); the Remogui login screen offers both
 // for download (as mcp.mjs and mcp.py).
 //
-//   node mcp.mjs [--key KEY] [--tunnel TOKEN | --no-tunnel] [--port 8787] [--host 127.0.0.1]
+//   node mcp.mjs (--key KEY | --no-key) [--tunnel TOKEN | --no-tunnel] [--port 8787] [--host 127.0.0.1]
 //
 //   --key KEY       what the login screen must send as the access token.
-//                   Without it there is no check at all: anyone with the
-//                   address can use this machine.
+//   --no-key        no access token at all: anyone with the address can use
+//                   this machine. One of --key and --no-key is required.
 //   --tunnel TOKEN  run this Cloudflare tunnel (its token, from the Cloudflare
 //                   dashboard). Without it a quick tunnel is made and its
 //                   https://….trycloudflare.com address is printed.
@@ -33,20 +33,27 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 
 const VERSION = '1.0.0';
-const USAGE = `Remogui MCP agent: lets Remogui use this machine without SSH.
+const USAGE = `usage: node mcp.mjs (--key KEY | --no-key) [--tunnel TOKEN | --no-tunnel] [--port PORT] [--host HOST]
 
-usage: node mcp.mjs [--key KEY] [--tunnel TOKEN | --no-tunnel] [--port 8787] [--host 127.0.0.1]
+Remogui MCP agent: lets Remogui use this machine without SSH. It opens a
+Cloudflare tunnel and prints the address to log in with.
 
-  --key KEY       access token the login screen must send (none: no check)
-  --tunnel TOKEN  Cloudflare tunnel token (none: a quick tunnel)
+options:
+  -h, --help      show this help message and exit
+  --key KEY       access token the login screen must send
+  --no-key        no access token: anyone who has the address can use this machine
+  --tunnel TOKEN  Cloudflare tunnel token (without it: a quick tunnel)
   --no-tunnel     no tunnel; reach the agent directly
   --port PORT     port to listen on (default 8787)
-  --host HOST     address to listen on (0.0.0.0 for a LAN or a container)`;
+  --host HOST     address to listen on (0.0.0.0 for a LAN or a container)
+
+example: node mcp.mjs --key "a-long-random-secret"`;
 let opts;
 try {
   ({ values: opts } = parseArgs({
     options: {
       key: { type: 'string', default: process.env.REMOGUI_TOKEN || '' },
+      'no-key': { type: 'boolean', default: false },
       tunnel: { type: 'string', default: process.env.CLOUDFLARE_TUNNEL_TOKEN || '' },
       'no-tunnel': { type: 'boolean', default: false },
       port: { type: 'string', default: process.env.PORT || '8787' },
@@ -61,6 +68,14 @@ try {
 if (opts.help) {
   console.log(USAGE);
   process.exit(0);
+}
+if (opts.key && opts['no-key']) {
+  console.error('use either --key or --no-key, not both');
+  process.exit(2);
+}
+if (!opts.key && !opts['no-key']) {
+  console.log('To start the Remogui MCP agent, give it an access key with --key <key>, or use --no-key to let anyone in. Run it with --help to see every option.');
+  process.exit(2);
 }
 const PORT = Number(opts.port) || 8787;
 const HOST = opts.host;
@@ -555,7 +570,7 @@ server.listen(PORT, HOST, () => {
   console.log(`Remogui MCP agent ${VERSION} (Node.js)`);
   console.log(`  Listening on:   http://${HOST}:${PORT}/mcp`);
   console.log(`  Terminal:       ${TERMS_OK ? (nodePty ? 'node-pty' : 'script (no resize)') : 'not available (install node-pty or util-linux script)'}`);
-  console.log(TOKEN ? '  Access token:   set (--key)' : '  Access token:   NONE. Anyone who has the address can read, change and run anything here.');
+  console.log(TOKEN ? '  Access token:   set (--key)' : '  Access token:   NONE (--no-key). Anyone who has the address can read, change and run anything here.');
   if (!opts['no-tunnel']) {
     startTunnel(opts.tunnel).catch((err) => {
       console.error(err.message);

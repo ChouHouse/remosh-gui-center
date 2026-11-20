@@ -191,7 +191,6 @@ export default {
   'MCP 伺服器位址': 'MCP server address',
   '存取權杖（選填）': 'Access token (optional)',
   '需要下載執行檔嗎？': 'Need the program to run?',
-  '在要連的機器上執行 python3 mcp.py --key 自訂的權杖（或 node mcp.mjs），再把它顯示的登入網址貼到上面。沒加 --key 就不用填權杖，但任何拿到網址的人都能操作那台機器。': 'On the machine to connect to, run python3 mcp.py --key your-own-token (or node mcp.mjs), then paste the login address it shows above. Without --key no token is needed, but anyone who gets the address can use that machine.',
   '這個站台需要存取密碼': 'This site needs an access password',
   '存取密碼': 'Access password',
   '進入': 'Enter',

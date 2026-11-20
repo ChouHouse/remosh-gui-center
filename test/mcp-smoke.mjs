@@ -2,7 +2,7 @@
 // and agent/remogui_agent.py, one after the other) and the web server, logs in
 // with mode "mcp" over the WebSocket and runs the ops through it.
 // usage: node test/mcp-smoke.mjs [node|python]   (both when not given)
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -184,8 +184,11 @@ async function smoke(kind) {
       assert(events.some((e) => e.event === 'term:exit'), 'terminal closes');
     } else assert(false, 'termOpen: ' + JSON.stringify(r.error));
 
-    // started without --key: no token needed (and none checked)
-    run(cmd, [...args, '--port', String(AGENT_PORT + 1)], {});
+    // neither --key nor --no-key: it only says how to start it
+    const bare = spawnSync(cmd, [args[0]], { cwd: root, encoding: 'utf8' });
+    assert(bare.status === 2 && bare.stdout.includes('--no-key') && bare.stdout.includes('--help'), 'without --key or --no-key it points to --help and stops');
+    // --no-key: no token needed (and none checked)
+    run(cmd, [...args, '--port', String(AGENT_PORT + 1), '--no-key'], {});
     await waitPort(AGENT_PORT + 1);
     const ws2 = new WebSocket(`ws://127.0.0.1:${WEB_PORT}/ws`);
     await new Promise((res) => (ws2.onopen = res));
@@ -194,7 +197,7 @@ async function smoke(kind) {
       ws2.send(JSON.stringify({ id: 1, op: 'connect', mode: 'mcp', url: `http://127.0.0.1:${AGENT_PORT + 1}/mcp`, token: '' }));
     });
     ws2.close();
-    assert(r2.ok && r2.home === home, 'an agent started without --key lets in a login with no token');
+    assert(r2.ok && r2.home === home, 'an agent started with --no-key lets in a login with no token');
   } catch (err) {
     console.error('ERROR', err);
     failed++;

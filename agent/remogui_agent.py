@@ -4,11 +4,11 @@ Remogui a machine to work on without SSH. The same tools as remogui-agent.mjs
 (the Node.js version); use whichever the machine already has. The Remogui
 login screen offers both for download (as mcp.py and mcp.mjs).
 
-    python3 mcp.py [--key KEY] [--tunnel TOKEN | --no-tunnel] [--port 8787] [--host 127.0.0.1]
+    python3 mcp.py (--key KEY | --no-key) [--tunnel TOKEN | --no-tunnel] [--port 8787] [--host 127.0.0.1]
 
     --key KEY       what the login screen must send as the access token.
-                    Without it there is no check at all: anyone with the
-                    address can use this machine.
+    --no-key        no access token at all: anyone with the address can use
+                    this machine. One of --key and --no-key is required.
     --tunnel TOKEN  run this Cloudflare tunnel (its token, from the Cloudflare
                     dashboard). Without it a quick tunnel is made and its
                     https://….trycloudflare.com address is printed.
@@ -637,13 +637,23 @@ def start_tunnel(port, token):
 
 def main():
     global TOKEN
-    ap = argparse.ArgumentParser(prog='mcp.py', description='Remogui MCP agent: lets Remogui use this machine without SSH.')
-    ap.add_argument('--key', default=os.environ.get('REMOGUI_TOKEN', ''), help='access token the login screen must send (none: no check)')
-    ap.add_argument('--tunnel', metavar='TOKEN', default=os.environ.get('CLOUDFLARE_TUNNEL_TOKEN', ''), help='Cloudflare tunnel token (none: a quick tunnel)')
+    ap = argparse.ArgumentParser(
+        prog='mcp.py',
+        description='Remogui MCP agent: lets Remogui use this machine without SSH. '
+                    'It opens a Cloudflare tunnel and prints the address to log in with.',
+        epilog='example: python3 mcp.py --key "a-long-random-secret"')
+    ap.add_argument('--key', default=os.environ.get('REMOGUI_TOKEN', ''), help='access token the login screen must send')
+    ap.add_argument('--no-key', action='store_true', help='no access token: anyone who has the address can use this machine')
+    ap.add_argument('--tunnel', metavar='TOKEN', default=os.environ.get('CLOUDFLARE_TUNNEL_TOKEN', ''), help='Cloudflare tunnel token (without it: a quick tunnel)')
     ap.add_argument('--no-tunnel', action='store_true', help='no tunnel; reach the agent directly')
-    ap.add_argument('--port', type=int, default=int(os.environ.get('PORT') or 8787))
+    ap.add_argument('--port', type=int, default=int(os.environ.get('PORT') or 8787), help='port to listen on (default 8787)')
     ap.add_argument('--host', default=os.environ.get('HOST') or '127.0.0.1', help='address to listen on (0.0.0.0 for a LAN or a container)')
     opts = ap.parse_args()
+    if opts.key and opts.no_key:
+        ap.error('use either --key or --no-key, not both')
+    if not opts.key and not opts.no_key:
+        print('To start the Remogui MCP agent, give it an access key with --key <key>, or use --no-key to let anyone in. Run it with --help to see every option.')
+        sys.exit(2)
     TOKEN = opts.key
 
     server = ThreadingHTTPServer((opts.host, opts.port), Handler)
@@ -654,7 +664,7 @@ def main():
     if TOKEN:
         print('  Access token:   set (--key)', flush=True)
     else:
-        print('  Access token:   NONE. Anyone who has the address can read, change and run anything here.', flush=True)
+        print('  Access token:   NONE (--no-key). Anyone who has the address can read, change and run anything here.', flush=True)
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     if not opts.no_tunnel:
         start_tunnel(opts.port, opts.tunnel)

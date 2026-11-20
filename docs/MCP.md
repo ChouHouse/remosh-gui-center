@@ -37,7 +37,8 @@ login screen.
 
 | Option | |
 | :--- | :--- |
-| `--key KEY` | The access token the login screen must send. **Without it there is no check at all**: anyone who has the address can read, change and run anything on the machine. |
+| `--key KEY` | The access token the login screen must send. |
+| `--no-key` | No access token at all: anyone who has the address can read, change and run anything on the machine. One of `--key` and `--no-key` is required; with neither the agent only points to `--help`. |
 | `--tunnel TOKEN` | Run your own Cloudflare tunnel (the token from the Cloudflare dashboard). Its public hostname, set in the dashboard with the service `http://127.0.0.1:8787`, plus `/mcp`, is the address to log in with. |
 | (neither tunnel option) | A Cloudflare quick tunnel is made and its random `https://….trycloudflare.com` address is printed. |
 | `--no-tunnel` | No tunnel: reach the agent directly (a LAN address with `--host 0.0.0.0`, or your own reverse proxy). |
