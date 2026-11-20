@@ -1,4 +1,5 @@
-// Login overlay: host / user / password or private key.
+// Login overlay: host / user / password or private key (SSH), or the address and
+// token of an MCP server (MCP, see docs/MCP.md).
 // Host keys are deliberately not remembered: hosts here are often containers
 // that get a new key every time they are recreated.
 import { $, h } from '../core/dom.js';
@@ -17,6 +18,43 @@ const fPort = $('#f-port');
 const fUser = $('#f-user');
 const fPass = $('#f-pass');
 const loginErr = $('#login-error');
+const fUrl = $('#f-url');
+const fToken = $('#f-token');
+
+// ---- connection mode: SSH (host, account, password / key) or MCP (address, token)
+let mode = 'ssh';
+const SUB = { ssh: tm('連線到 SSH 主機，瀏覽並編輯上面的檔案'), mcp: tm('連線到 MCP 伺服器（remogui-agent 或相容的 MCP），瀏覽並編輯上面的檔案') };
+const NOTE = { ssh: tm('密碼與私鑰不會被儲存。'), mcp: tm('權杖與密碼一樣不會被儲存。') };
+function setMode(next) {
+  mode = next === 'mcp' ? 'mcp' : 'ssh';
+  const mcp = mode === 'mcp';
+  form.classList.toggle('mcp', mcp);
+  $('#mode-ssh').classList.toggle('on', !mcp);
+  $('#mode-mcp').classList.toggle('on', mcp);
+  $('#mode-ssh').setAttribute('aria-pressed', String(!mcp));
+  $('#mode-mcp').setAttribute('aria-pressed', String(mcp));
+  $('#ssh-fields').hidden = mcp;
+  $('#mcp-fields').hidden = !mcp;
+  // disabled fields are skipped by form validation, so the hidden half never blocks submit
+  for (const f of [fHost, fPort, fUser, fPass, fKey]) f.disabled = mcp;
+  for (const f of [fUrl, fToken]) f.disabled = !mcp;
+  if (!form.classList.contains('relogin')) {
+    const sub = $('#login-sub');
+    sub.dataset.i18n = SUB[mode];
+    sub.textContent = tt(SUB[mode]);
+  }
+  const note = $('#login-note');
+  note.dataset.i18n = NOTE[mode];
+  note.textContent = tt(NOTE[mode]);
+}
+$('#mode-ssh').addEventListener('click', () => {
+  setMode('ssh');
+  (fHost.value ? fUser.value ? fPass : fUser : fHost).focus();
+});
+$('#mode-mcp').addEventListener('click', () => {
+  setMode('mcp');
+  (fUrl.value ? fToken : fUrl).focus();
+});
 
 // Private key text stays in memory only (never in localStorage).
 let keyText = '';
@@ -91,10 +129,12 @@ export function showLogin(message, relogin) {
   loginEl.hidden = false;
   form.classList.toggle('relogin', !!relogin);
   renderServers();
-  $('#login-sub').textContent = message || tt('連線到 SSH 主機，瀏覽並編輯上面的檔案');
-  for (const f of [fHost, fPort, fUser]) f.readOnly = !!relogin;
+  $('#login-sub').textContent = message || tt(SUB[mode]);
+  for (const f of [fHost, fPort, fUser, fUrl]) f.readOnly = !!relogin;
   loginErr.hidden = true;
   fPass.value = '';
+  fToken.value = '';
+  if (mode === 'mcp') return (fUrl.value ? fToken : fUrl).focus();
   (fHost.value && fUser.value ? fPass : fHost.value ? fUser : fHost).focus();
 }
 
@@ -132,20 +172,27 @@ async function doLogin() {
   const host = fHost.value.trim();
   const port = Number(fPort.value) || 22;
   const username = fUser.value;
+  const url = fUrl.value.trim();
   const btn = $('#login-btn');
   loginErr.hidden = true;
   btn.disabled = true;
   btn.textContent = tt('連線中…');
   try {
-    await connectWith({
-      host,
-      port,
-      username,
-      ...(keyText ? { privateKey: keyText, passphrase: fPass.value } : { password: fPass.value }),
-    });
-    store.set('last', { host, port, username });
-    rememberServer({ host, port, username });
-    fPass.value = '';
+    if (mode === 'mcp') {
+      await connectWith({ mode: 'mcp', url, token: fToken.value });
+      store.set('last', { mode: 'mcp', url });
+      fToken.value = '';
+    } else {
+      await connectWith({
+        host,
+        port,
+        username,
+        ...(keyText ? { privateKey: keyText, passphrase: fPass.value } : { password: fPass.value }),
+      });
+      store.set('last', { mode: 'ssh', host, port, username });
+      rememberServer({ host, port, username });
+      fPass.value = '';
+    }
   } catch (err) {
     loginErr.textContent = errText(err);
     loginErr.hidden = false;
@@ -158,7 +205,7 @@ async function doLogin() {
 // The connection dropped: log in again quietly. Only when that fails (the
 // password no longer works, or the host stays unreachable) is the user asked.
 const RETRY_WAITS_MS = [0, 2000, 5000];
-const NO_RETRY = new Set(['auth-failed', 'bad-key', 'key-needs-passphrase', 'key-bad-passphrase', 'host-not-allowed']);
+const NO_RETRY = new Set(['token-refused', 'mcp-incompatible', 'auth-failed', 'bad-key', 'key-needs-passphrase', 'key-bad-passphrase', 'host-not-allowed']);
 const banner = h('div', { id: 'reconnecting', hidden: true, role: 'status', 'data-i18n': tm('連線中斷，正在重新連線…') }, tm('連線中斷，正在重新連線…'));
 document.body.append(banner);
 let reconnecting = false;
@@ -215,7 +262,9 @@ export function initLogin() {
   renderKept();
   store.remove('hostkeys'); // fingerprints remembered by earlier versions
   const last = store.get('last', null);
-  if (last) {
+  setMode(last?.mode);
+  if (last?.mode === 'mcp') fUrl.value = last.url || '';
+  else if (last) {
     fHost.value = last.host || '';
     fPort.value = last.port || 22;
     fUser.value = last.username || '';

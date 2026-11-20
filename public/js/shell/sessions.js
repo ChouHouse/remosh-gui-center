@@ -93,7 +93,9 @@ host.onChange(sessionId, () => {
 });
 export const onSessionsChange = (fn) => changeListeners.add(fn);
 
-const label = () => `${conn.info.username}@${conn.info.host}${conn.info.port === 22 ? '' : ':' + conn.info.port}`;
+// MCP servers sit behind https, so the usual web ports are not worth showing.
+export const hostLabel = ({ username, host, port, mode }) => `${username}@${host}${port === 22 || (mode === 'mcp' && (port === 443 || port === 80)) ? '' : ':' + port}`;
+const label = () => hostLabel(conn.info);
 on('session:start', () => host.setLabel(sessionId, label()));
 on('session:resume', () => host.setLabel(sessionId, label()));
 on('session:end', () => (embedded ? host.remove(sessionId) : host.setLabel('main', null)));

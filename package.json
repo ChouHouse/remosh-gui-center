@@ -5,7 +5,8 @@
   "description": "A desktop in the browser for SSH hosts (Docker / Node)",
   "scripts": {
     "assets": "node scripts/copy-assets.mjs",
-    "start": "node server/main.js"
+    "start": "node server/main.js",
+    "test:mcp": "node test/mcp-smoke.mjs"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",

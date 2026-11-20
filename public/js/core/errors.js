@@ -3,6 +3,7 @@ import { tm, tt } from './i18n.js';
 export const ERROR_TEXT = {
   'auth-failed': tm('登入失敗：帳號、密碼或金鑰不正確'),
   'connect-failed': tm('無法連線到主機，請確認位置與連接埠'),
+  'token-refused': tm('MCP 伺服器拒絕了存取權杖'),
   'connect-timeout': tm('連線逾時'),
   'host-not-allowed': tm('不允許連線到這台主機'),
   'hostkey-changed': tm('主機金鑰與上次不同'),

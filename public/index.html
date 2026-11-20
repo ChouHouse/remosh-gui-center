@@ -78,29 +78,43 @@
   <form id="login-form" class="card" autocomplete="on">
     <h1>Remogui</h1>
     <p class="sub" id="login-sub" data-i18n>連線到 SSH 主機，瀏覽並編輯上面的檔案</p>
-    <div class="row">
-      <label class="grow"><span data-i18n>主機位置</span>
-        <input id="f-host" name="host" required placeholder="example.com" autocapitalize="off" spellcheck="false">
-      </label>
-      <label class="port"><span data-i18n>連接埠</span>
-        <input id="f-port" name="port" type="number" min="1" max="65535" value="22" required>
-      </label>
+    <div class="modes" role="group" aria-label="連線方式" data-i18n-aria-label="連線方式">
+      <button type="button" id="mode-ssh" class="on" aria-pressed="true">SSH</button>
+      <button type="button" id="mode-mcp" aria-pressed="false">MCP</button>
     </div>
-    <label><span data-i18n>帳號</span>
-      <input id="f-user" name="username" required autocomplete="username" autocapitalize="off" spellcheck="false">
-    </label>
-    <label><span id="pass-label" data-i18n>密碼</span>
-      <input id="f-pass" name="password" type="password" autocomplete="current-password">
-    </label>
-    <div class="keyrow">
-      <input type="file" id="f-key" hidden>
-      <button type="button" id="key-pick" data-i18n>選擇私鑰檔…</button>
-      <span id="key-name" data-i18n>未選擇（選填，改用金鑰登入）</span>
-      <button type="button" id="key-clear" hidden data-i18n>移除</button>
+    <div id="ssh-fields" class="fields">
+      <div class="row">
+        <label class="grow"><span data-i18n>主機位置</span>
+          <input id="f-host" name="host" required placeholder="example.com" autocapitalize="off" spellcheck="false">
+        </label>
+        <label class="port"><span data-i18n>連接埠</span>
+          <input id="f-port" name="port" type="number" min="1" max="65535" value="22" required>
+        </label>
+      </div>
+      <label><span data-i18n>帳號</span>
+        <input id="f-user" name="username" required autocomplete="username" autocapitalize="off" spellcheck="false">
+      </label>
+      <label><span id="pass-label" data-i18n>密碼</span>
+        <input id="f-pass" name="password" type="password" autocomplete="current-password">
+      </label>
+      <div class="keyrow">
+        <input type="file" id="f-key" hidden>
+        <button type="button" id="key-pick" data-i18n>選擇私鑰檔…</button>
+        <span id="key-name" data-i18n>未選擇（選填，改用金鑰登入）</span>
+        <button type="button" id="key-clear" hidden data-i18n>移除</button>
+      </div>
+    </div>
+    <div id="mcp-fields" class="fields" hidden>
+      <label><span data-i18n>MCP 伺服器位址</span>
+        <input id="f-url" name="url" type="url" required placeholder="https://example.trycloudflare.com/mcp" autocapitalize="off" spellcheck="false" disabled>
+      </label>
+      <label><span data-i18n>存取權杖</span>
+        <input id="f-token" name="token" type="password" autocomplete="off" disabled>
+      </label>
     </div>
     <div id="login-error" class="error" role="alert" hidden></div>
     <button type="submit" id="login-btn" class="primary" data-i18n>登入</button>
-    <p class="note" data-i18n>密碼與私鑰不會被儲存。</p>
+    <p class="note" id="login-note" data-i18n>密碼與私鑰不會被儲存。</p>
     <p class="note version">Remogui v1.0 · Sandbox</p>
     <aside id="saved-servers" aria-label="登入過的主機" data-i18n-aria-label="登入過的主機"></aside>
   </form>

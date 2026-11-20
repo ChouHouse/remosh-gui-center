@@ -4,3 +4,4 @@ public/xterm/
 public/pyright/
 public/types/
 *.log
+__pycache__/

@@ -33,6 +33,21 @@ The access password is checked by the server: `/ws` is refused without the
 cookie it sets (HttpOnly, 12 hours), and five wrong tries from one address
 lock it for a minute.
 
+## MCP mode
+
+Besides SSH, the login screen can connect to a remote MCP server (Streamable
+HTTP) that offers the Remogui tools, so a machine without an SSH daemon can be
+used too. Run one of the agents there (Python or Node.js, no packages needed)
+and tunnel it:
+
+```bash
+REMOGUI_TOKEN='a-long-random-secret' python3 agent/remogui_agent.py
+cloudflared tunnel --url http://127.0.0.1:8787
+```
+
+Then pick **MCP** on the login screen and enter the tunnel address ending in
+`/mcp` and the token. The tool contract is in [docs/MCP.md](docs/MCP.md).
+
 ## How it works
 
 ```
@@ -44,9 +59,12 @@ Nothing is bundled for the browser: the page loads native ES modules.
 
 ```
 server/main.js          entry: static files, /ws, /api/gate, /api/apps (the app folders)
+agent/                  MCP mode agents for the machine: remogui_agent.py (Python), remogui-agent.mjs (Node.js)
+docs/MCP.md             MCP mode and the tool contract
 docker/                 run.sh, cloudflared supervisor
 src/
-  session.js            one SSH/SFTP session per WebSocket, login, op dispatch
+  session.js            one session per WebSocket: login through a backend, op dispatch
+  backends/             ssh.js (ssh2 login), mcp.js (MCP client + sftp / exec / shell look-alikes), index.js (picks by `mode`)
   net.js                opens the TCP connection to the SSH server
   ssh.js                run-a-command helper
   gate.js               optional access password (WEB_PASSWORD)

@@ -9,7 +9,7 @@ import { getSettings, updateSettings, animationMs } from '../core/settings.js';
 import { listApps, launchApp, getApp, missingFor } from './apps.js';
 import { showContextMenu } from './context-menu.js';
 import { makeDraggable } from './drag.js';
-import { host, otherSessions, onSessionsChange } from './sessions.js';
+import { host, otherSessions, onSessionsChange, hostLabel } from './sessions.js';
 import { logout } from './desktop.js';
 import { tt } from '../core/i18n.js';
 
@@ -67,10 +67,10 @@ function openStart() {
 }
 
 function showUser() {
-  const { username, host, port } = conn.info;
+  const { username } = conn.info;
   $('#sm-username').textContent = username;
   $('#sm-avatar').textContent = [...username][0] || '?';
-  $('#conn-label').textContent = `${username}@${host}${port === 22 ? '' : ':' + port}`;
+  $('#conn-label').textContent = hostLabel(conn.info);
 }
 
 // ---- pinned apps and "all apps"
