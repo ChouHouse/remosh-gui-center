@@ -14,8 +14,8 @@ const AGENT_PORT = 18787;
 const WEB_PORT = 18080;
 const TOKEN = 'smoke-token';
 const AGENTS = {
-  node: [process.execPath, ['agent/remogui-agent.mjs']],
-  python: ['python3', ['agent/remogui_agent.py']],
+  node: [process.execPath, ['agent/remogui-agent.mjs', '--no-tunnel']],
+  python: ['python3', ['agent/remogui_agent.py', '--no-tunnel']],
 };
 const which = process.argv[2] ? [process.argv[2]] : Object.keys(AGENTS);
 
@@ -54,7 +54,7 @@ async function smoke(kind) {
     return child;
   };
   const [cmd, args] = AGENTS[kind];
-  run(cmd, args, { PORT: AGENT_PORT, REMOGUI_TOKEN: TOKEN });
+  run(cmd, [...args, '--port', String(AGENT_PORT), '--key', TOKEN], {});
   run(process.execPath, ['server/main.js'], { PORT: WEB_PORT, WEB_PASSWORD: '' });
   await waitPort(AGENT_PORT);
   await waitPort(WEB_PORT);
@@ -183,6 +183,18 @@ async function smoke(kind) {
       for (let i = 0; i < 30 && !events.some((e) => e.event === 'term:exit'); i++) await sleep(100);
       assert(events.some((e) => e.event === 'term:exit'), 'terminal closes');
     } else assert(false, 'termOpen: ' + JSON.stringify(r.error));
+
+    // started without --key: no token needed (and none checked)
+    run(cmd, [...args, '--port', String(AGENT_PORT + 1)], {});
+    await waitPort(AGENT_PORT + 1);
+    const ws2 = new WebSocket(`ws://127.0.0.1:${WEB_PORT}/ws`);
+    await new Promise((res) => (ws2.onopen = res));
+    const r2 = await new Promise((res) => {
+      ws2.onmessage = (ev) => res(JSON.parse(ev.data));
+      ws2.send(JSON.stringify({ id: 1, op: 'connect', mode: 'mcp', url: `http://127.0.0.1:${AGENT_PORT + 1}/mcp`, token: '' }));
+    });
+    ws2.close();
+    assert(r2.ok && r2.home === home, 'an agent started without --key lets in a login with no token');
   } catch (err) {
     console.error('ERROR', err);
     failed++;

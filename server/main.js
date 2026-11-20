@@ -1,5 +1,6 @@
 // ssh-desk: Node entry, used by the Docker image (`node server/main.js`).
-// Serves public/, /ws, /api/gate, /api/apps, /api/apps/<app>/modules and /api/stream/<ticket>.
+// Serves public/, /ws, /api/gate, /api/apps, /api/apps/<app>/modules, /api/stream/<ticket>
+// and /download/mcp.py, /download/mcp.mjs (the MCP agents in agent/).
 //
 // Environment:
 //   PORT           port to listen on (default 8080)
@@ -15,6 +16,13 @@ import { createGate, handleGateApi } from '../src/gate.js';
 import { serveStream } from '../src/streams.js';
 
 const PUBLIC = join(dirname(fileURLToPath(import.meta.url)), '..', 'public');
+// The MCP agents, offered on the login screen. Not behind the access password,
+// so `curl -O <address>/download/mcp.py` works on the machine itself.
+const AGENT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'agent');
+const DOWNLOADS = {
+  'mcp.py': { file: 'remogui_agent.py', type: 'text/x-python; charset=utf-8' },
+  'mcp.mjs': { file: 'remogui-agent.mjs', type: 'text/javascript; charset=utf-8' },
+};
 const PORT = Number(process.env.PORT) || 8080;
 const env = { ALLOWED_HOSTS: process.env.ALLOWED_HOSTS || '', WEB_PASSWORD: process.env.WEB_PASSWORD || '' };
 const gate = createGate(env.WEB_PASSWORD);
@@ -112,6 +120,20 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/apps') {
       res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
       return res.end(JSON.stringify(installedApps()));
+    }
+    const dl = /^\/download\/([a-z.]+)$/.exec(url.pathname);
+    if (dl && Object.hasOwn(DOWNLOADS, dl[1])) {
+      const { file, type } = DOWNLOADS[dl[1]];
+      const path = join(AGENT_DIR, file);
+      res.writeHead(200, {
+        'content-type': type,
+        'content-length': statSync(path).size,
+        'content-disposition': `attachment; filename="${dl[1]}"`,
+        'cache-control': 'no-cache',
+        'x-content-type-options': 'nosniff',
+      });
+      if (req.method === 'HEAD') return res.end();
+      return createReadStream(path).pipe(res);
     }
     // A file on the host, streamed for a player (see src/streams.js).
     const stream = /^\/api\/stream\/([0-9a-f]{48})$/.exec(url.pathname);

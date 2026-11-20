@@ -46,6 +46,7 @@ RUN npm ci --include=dev --no-audit --no-fund && \
     rm -rf node_modules/monaco-editor node_modules/@xterm && \
     npm cache clean --force
 COPY server ./server
+COPY agent ./agent
 
 # 建立工作區域（旗標放這裡，與 remosh 相同）
 RUN mkdir -p /ccp/flags

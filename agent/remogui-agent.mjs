@@ -1,32 +1,70 @@
 #!/usr/bin/env node
-// Remogui agent (Node.js): a small MCP server (Streamable HTTP) that gives
-// Remogui a machine to work on without SSH. Run it on the machine you want to
-// reach, put a tunnel (e.g. cloudflared) or a reverse proxy in front of it, and
-// log in from the Remogui login screen with mode "MCP".
-// A Python version with the same tools is next to it: remogui_agent.py.
+// Remogui MCP agent (Node.js): a small MCP server (Streamable HTTP) that gives
+// Remogui a machine to work on without SSH. A Python version with the same
+// tools is next to it (remogui_agent.py); the Remogui login screen offers both
+// for download (as mcp.mjs and mcp.py).
 //
-//   REMOGUI_TOKEN=secret node remogui-agent.mjs
+//   node mcp.mjs [--key KEY] [--tunnel TOKEN | --no-tunnel] [--port 8787] [--host 127.0.0.1]
 //
-//   REMOGUI_TOKEN  bearer token the login screen must send (generated and printed when unset)
-//   PORT           port to listen on (default 8787)
-//   HOST           address to listen on (default 127.0.0.1; use 0.0.0.0 inside a container)
+//   --key KEY       what the login screen must send as the access token.
+//                   Without it there is no check at all: anyone with the
+//                   address can use this machine.
+//   --tunnel TOKEN  run this Cloudflare tunnel (its token, from the Cloudflare
+//                   dashboard). Without it a quick tunnel is made and its
+//                   https://….trycloudflare.com address is printed.
+//   --no-tunnel     no tunnel: reach the agent directly (LAN, reverse proxy).
 //
-// No dependencies. For a terminal with resize support install `node-pty`
+// cloudflared is used from PATH, else downloaded once from Cloudflare's GitHub
+// releases into ~/.cache/remogui/. The environment variables REMOGUI_TOKEN,
+// CLOUDFLARE_TUNNEL_TOKEN, PORT and HOST work as the options do.
+//
+// Node.js 20 or newer, no dependencies. For a terminal with resize support install `node-pty`
 // next to this file (npm i node-pty); without it a PTY comes from `script`
 // (no resize), and without that the terminal tools are not offered.
 // The tools and their arguments are described in docs/MCP.md.
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import os from 'node:os';
-import { spawn, spawnSync } from 'node:child_process';
+import { join } from 'node:path';
+import { createInterface } from 'node:readline';
+import { parseArgs } from 'node:util';
+import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 
 const VERSION = '1.0.0';
-const PORT = Number(process.env.PORT) || 8787;
-const HOST = process.env.HOST || '127.0.0.1';
-const GENERATED = !process.env.REMOGUI_TOKEN;
-const TOKEN = process.env.REMOGUI_TOKEN || randomBytes(18).toString('base64url');
+const USAGE = `Remogui MCP agent: lets Remogui use this machine without SSH.
+
+usage: node mcp.mjs [--key KEY] [--tunnel TOKEN | --no-tunnel] [--port 8787] [--host 127.0.0.1]
+
+  --key KEY       access token the login screen must send (none: no check)
+  --tunnel TOKEN  Cloudflare tunnel token (none: a quick tunnel)
+  --no-tunnel     no tunnel; reach the agent directly
+  --port PORT     port to listen on (default 8787)
+  --host HOST     address to listen on (0.0.0.0 for a LAN or a container)`;
+let opts;
+try {
+  ({ values: opts } = parseArgs({
+    options: {
+      key: { type: 'string', default: process.env.REMOGUI_TOKEN || '' },
+      tunnel: { type: 'string', default: process.env.CLOUDFLARE_TUNNEL_TOKEN || '' },
+      'no-tunnel': { type: 'boolean', default: false },
+      port: { type: 'string', default: process.env.PORT || '8787' },
+      host: { type: 'string', default: process.env.HOST || '127.0.0.1' },
+      help: { type: 'boolean', short: 'h', default: false },
+    },
+  }));
+} catch (err) {
+  console.error(err.message + '\n\n' + USAGE);
+  process.exit(2);
+}
+if (opts.help) {
+  console.log(USAGE);
+  process.exit(0);
+}
+const PORT = Number(opts.port) || 8787;
+const HOST = opts.host;
+const TOKEN = opts.key; // empty = no check
 const MAX_BODY = 64 * 1024 * 1024;
 const MAX_READ = 4 * 1024 * 1024;
 const MAX_OUTPUT = 8 * 1024 * 1024;
@@ -370,6 +408,7 @@ async function handleMessage(msg) {
 }
 
 function authorized(req) {
+  if (!TOKEN) return true; // started without --key
   const given = Buffer.from((req.headers.authorization || '').replace(/^Bearer /i, ''));
   const want = Buffer.from(TOKEN);
   return given.length === want.length && timingSafeEqual(given, want);
@@ -429,10 +468,99 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+// ---- cloudflared: from PATH, or downloaded once into ~/.cache/remogui
+
+const CF_RELEASES = 'https://github.com/cloudflare/cloudflared/releases/latest/download/';
+
+async function cloudflaredPath() {
+  const onPath = spawnSync('cloudflared', ['--version'], { stdio: 'ignore' });
+  if (onPath.status === 0) return 'cloudflared';
+  const cache = join(process.env.XDG_CACHE_HOME || join(os.homedir(), '.cache'), 'remogui');
+  const path = join(cache, 'cloudflared');
+  try {
+    await fs.access(path, fs.constants.X_OK);
+    return path;
+  } catch {
+    /* not there yet */
+  }
+  const arch = { x64: 'amd64', arm64: 'arm64', arm: 'arm', ia32: '386' }[process.arch];
+  const system = { linux: 'linux', darwin: 'darwin' }[process.platform];
+  if (!arch || !system || (system === 'darwin' && !['amd64', 'arm64'].includes(arch))) {
+    throw new Error(`cloudflared is not on PATH and there is no download for ${process.platform}/${process.arch}; install it, or use --no-tunnel`);
+  }
+  const name = `cloudflared-${system}-${arch}${system === 'darwin' ? '.tgz' : ''}`;
+  console.log(`Downloading cloudflared (${name}) from GitHub…`);
+  await fs.mkdir(cache, { recursive: true });
+  const tmp = join(cache, `.download-${process.pid}`);
+  try {
+    const res = await fetch(CF_RELEASES + name, { signal: AbortSignal.timeout(120000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    await fs.writeFile(tmp, Buffer.from(await res.arrayBuffer()));
+    if (name.endsWith('.tgz')) {
+      const dir = tmp + '.d';
+      await fs.mkdir(dir, { recursive: true });
+      execFileSync('tar', ['-xzf', tmp, '-C', dir]);
+      await fs.rename(join(dir, 'cloudflared'), tmp + '.bin');
+      await fs.rm(dir, { recursive: true, force: true });
+      await fs.rename(tmp + '.bin', tmp);
+    }
+    await fs.chmod(tmp, 0o755);
+    await fs.rename(tmp, path);
+  } catch (err) {
+    await fs.rm(tmp, { force: true });
+    throw new Error(`Could not download cloudflared: ${err.message} (install it yourself, or use --no-tunnel)`);
+  }
+  return path;
+}
+
+// Starts cloudflared in front of the agent; prints the address to log in with.
+async function startTunnel(token) {
+  const exe = await cloudflaredPath();
+  const env = { ...process.env };
+  let args;
+  if (token) {
+    args = ['tunnel', '--no-autoupdate', 'run'];
+    env.TUNNEL_TOKEN = token; // not on the command line, where ps would show it
+    console.log('Starting your Cloudflare tunnel…');
+  } else {
+    args = ['tunnel', '--no-autoupdate', '--url', `http://127.0.0.1:${PORT}`];
+    console.log('Starting a Cloudflare quick tunnel…');
+  }
+  const proc = spawn(exe, args, { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  process.on('exit', () => proc.exitCode === null && proc.kill());
+  let told = false;
+  const tail = [];
+  const look = (line) => {
+    tail.push(line);
+    if (tail.length > 15) tail.shift();
+    if (told) return;
+    const m = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/.exec(line);
+    if (!token && m) {
+      told = true;
+      console.log(`\n  Login address:  ${m[0]}/mcp\n`);
+    } else if (token && line.includes('Registered tunnel connection')) {
+      told = true;
+      console.log(`\n  Tunnel connected. Login address: the public hostname you gave this tunnel in\n  Cloudflare, followed by /mcp (its service must be http://127.0.0.1:${PORT}).\n`);
+    }
+  };
+  createInterface({ input: proc.stdout }).on('line', look);
+  createInterface({ input: proc.stderr }).on('line', look);
+  proc.on('exit', (code) => {
+    console.log(`cloudflared stopped (exit ${code}):\n  ${tail.join('\n  ')}`);
+    process.exit(1);
+  });
+}
+
 server.listen(PORT, HOST, () => {
-  console.log(`remogui-agent ${VERSION} listening on http://${HOST}:${PORT}/mcp`);
-  if (GENERATED) console.log(`REMOGUI_TOKEN was not set; this run's token: ${TOKEN}`);
-  console.log(TERMS_OK ? `Terminal: ${nodePty ? 'node-pty' : 'script (no resize)'}` : 'Terminal: not available (install node-pty or util-linux `script`)');
-  console.log(`Tunnel it, e.g.: cloudflared tunnel --url http://${HOST}:${PORT}`);
+  console.log(`Remogui MCP agent ${VERSION} (Node.js)`);
+  console.log(`  Listening on:   http://${HOST}:${PORT}/mcp`);
+  console.log(`  Terminal:       ${TERMS_OK ? (nodePty ? 'node-pty' : 'script (no resize)') : 'not available (install node-pty or util-linux script)'}`);
+  console.log(TOKEN ? '  Access token:   set (--key)' : '  Access token:   NONE. Anyone who has the address can read, change and run anything here.');
+  if (!opts['no-tunnel']) {
+    startTunnel(opts.tunnel).catch((err) => {
+      console.error(err.message);
+      process.exit(1);
+    });
+  }
 });
 for (const signal of ['SIGTERM', 'SIGINT']) process.on(signal, () => process.exit(0));

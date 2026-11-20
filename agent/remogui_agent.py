@@ -1,28 +1,38 @@
 #!/usr/bin/env python3
-"""Remogui agent (Python): a small MCP server (Streamable HTTP) that gives
+"""Remogui MCP agent (Python): a small MCP server (Streamable HTTP) that gives
 Remogui a machine to work on without SSH. The same tools as remogui-agent.mjs
-(the Node.js version); use whichever the machine already has.
+(the Node.js version); use whichever the machine already has. The Remogui
+login screen offers both for download (as mcp.py and mcp.mjs).
 
-Run it on the machine you want to reach, put a tunnel (e.g. cloudflared) or a
-reverse proxy in front of it, and log in from the Remogui login screen with
-mode "MCP":
+    python3 mcp.py [--key KEY] [--tunnel TOKEN | --no-tunnel] [--port 8787] [--host 127.0.0.1]
 
-    REMOGUI_TOKEN=secret python3 remogui_agent.py
+    --key KEY       what the login screen must send as the access token.
+                    Without it there is no check at all: anyone with the
+                    address can use this machine.
+    --tunnel TOKEN  run this Cloudflare tunnel (its token, from the Cloudflare
+                    dashboard). Without it a quick tunnel is made and its
+                    https://….trycloudflare.com address is printed.
+    --no-tunnel     no tunnel: reach the agent directly (LAN, reverse proxy).
 
-    REMOGUI_TOKEN  bearer token the login screen must send (generated and printed when unset)
-    PORT           port to listen on (default 8787)
-    HOST           address to listen on (default 127.0.0.1; use 0.0.0.0 inside a container)
+cloudflared is used from PATH, else downloaded once from Cloudflare's GitHub
+releases into ~/.cache/remogui/. The environment variables REMOGUI_TOKEN,
+CLOUDFLARE_TUNNEL_TOKEN, PORT and HOST work as the options do.
 
 Python 3.8 or newer, standard library only. Terminals (with resizing) come
 from the pty module, so they work on Linux and macOS. The tools and their
 arguments are described in docs/MCP.md.
 """
+import argparse
+import atexit
 import base64
 import errno
 import hmac
 import json
 import os
+import platform
 import pwd
+import re
+import shutil
 import secrets
 import signal
 import socket
@@ -30,8 +40,11 @@ import stat
 import struct
 import subprocess
 import sys
+import tarfile
+import tempfile
 import threading
 import time
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 try:
@@ -44,10 +57,7 @@ except ImportError:  # not a POSIX system: no terminal tools
     TERMS_OK = False
 
 VERSION = '1.0.0'
-PORT = int(os.environ.get('PORT') or 8787)
-HOST = os.environ.get('HOST') or '127.0.0.1'
-GENERATED = not os.environ.get('REMOGUI_TOKEN')
-TOKEN = os.environ.get('REMOGUI_TOKEN') or secrets.token_urlsafe(18)
+TOKEN = ''  # the access key; empty = no check (set from --key in main())
 MAX_BODY = 64 * 1024 * 1024
 MAX_READ = 4 * 1024 * 1024
 MAX_OUTPUT = 8 * 1024 * 1024
@@ -505,7 +515,7 @@ class Handler(BaseHTTPRequestHandler):
         given = self.headers.get('Authorization') or ''
         if given[:7].lower() == 'bearer ':
             given = given[7:]
-        if not hmac.compare_digest(given.encode(), TOKEN.encode()):
+        if TOKEN and not hmac.compare_digest(given.encode(), TOKEN.encode()):
             self.close_connection = True
             self.send(401, headers={'WWW-Authenticate': 'Bearer'})
             return False
@@ -547,15 +557,107 @@ class Handler(BaseHTTPRequestHandler):
         self.send(200, answers if batch else answers[0], {'Mcp-Session-Id': new_session()} if init else None)
 
 
+# ---- cloudflared: from PATH, or downloaded once into ~/.cache/remogui
+
+CF_RELEASES = 'https://github.com/cloudflare/cloudflared/releases/latest/download/'
+
+
+def cloudflared_path():
+    found = shutil.which('cloudflared')
+    if found:
+        return found
+    cache = os.path.join(os.environ.get('XDG_CACHE_HOME') or os.path.join(HOME, '.cache'), 'remogui')
+    path = os.path.join(cache, 'cloudflared')
+    if os.access(path, os.X_OK):
+        return path
+    arch = {'x86_64': 'amd64', 'amd64': 'amd64', 'aarch64': 'arm64', 'arm64': 'arm64',
+            'armv7l': 'arm', 'armv6l': 'arm', 'i386': '386', 'i686': '386'}.get(platform.machine().lower())
+    system = {'linux': 'linux', 'darwin': 'darwin'}.get(sys.platform)
+    if not arch or not system or (system == 'darwin' and arch not in ('amd64', 'arm64')):
+        raise SystemExit('cloudflared is not on PATH and there is no download for %s/%s; install it, or use --no-tunnel'
+                         % (sys.platform, platform.machine()))
+    name = 'cloudflared-%s-%s%s' % (system, arch, '.tgz' if system == 'darwin' else '')
+    print('Downloading cloudflared (%s) from GitHub…' % name, flush=True)
+    os.makedirs(cache, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=cache)
+    try:
+        with os.fdopen(fd, 'wb') as out, urllib.request.urlopen(CF_RELEASES + name, timeout=120) as res:
+            shutil.copyfileobj(res, out)
+        if name.endswith('.tgz'):
+            with tarfile.open(tmp) as tar:
+                member = next(m for m in tar.getmembers() if os.path.basename(m.name) == 'cloudflared' and m.isfile())
+                with tar.extractfile(member) as src, open(tmp + '.bin', 'wb') as out:
+                    shutil.copyfileobj(src, out)
+            os.replace(tmp + '.bin', tmp)
+        os.chmod(tmp, 0o755)
+        os.replace(tmp, path)
+    except Exception as err:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise SystemExit('Could not download cloudflared: %s (install it yourself, or use --no-tunnel)' % err)
+    return path
+
+
+def start_tunnel(port, token):
+    """Starts cloudflared in front of the agent; prints the address to log in with."""
+    exe = cloudflared_path()
+    env = dict(os.environ)
+    if token:
+        args = [exe, 'tunnel', '--no-autoupdate', 'run']
+        env['TUNNEL_TOKEN'] = token  # not on the command line, where ps would show it
+        print('Starting your Cloudflare tunnel…', flush=True)
+    else:
+        args = [exe, 'tunnel', '--no-autoupdate', '--url', 'http://127.0.0.1:%d' % port]
+        print('Starting a Cloudflare quick tunnel…', flush=True)
+    proc = subprocess.Popen(args, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    atexit.register(lambda: proc.poll() is None and proc.terminate())
+
+    def watch():
+        told = False
+        tail = []
+        for raw in proc.stdout:
+            line = raw.decode('utf-8', 'replace').rstrip()
+            tail = (tail + [line])[-15:]
+            if told:
+                continue
+            m = re.search(r'https://[a-z0-9-]+\.trycloudflare\.com', line)
+            if not token and m:
+                told = True
+                print('\n  Login address:  %s/mcp\n' % m.group(0), flush=True)
+            elif token and 'Registered tunnel connection' in line:
+                told = True
+                print('\n  Tunnel connected. Login address: the public hostname you gave this tunnel in\n'
+                      '  Cloudflare, followed by /mcp (its service must be http://127.0.0.1:%d).\n' % port, flush=True)
+        code = proc.wait()
+        print('cloudflared stopped (exit %s):\n  %s' % (code, '\n  '.join(tail)), flush=True)
+        os._exit(1)
+
+    threading.Thread(target=watch, daemon=True).start()
+
+
 def main():
-    server = ThreadingHTTPServer((HOST, PORT), Handler)
+    global TOKEN
+    ap = argparse.ArgumentParser(prog='mcp.py', description='Remogui MCP agent: lets Remogui use this machine without SSH.')
+    ap.add_argument('--key', default=os.environ.get('REMOGUI_TOKEN', ''), help='access token the login screen must send (none: no check)')
+    ap.add_argument('--tunnel', metavar='TOKEN', default=os.environ.get('CLOUDFLARE_TUNNEL_TOKEN', ''), help='Cloudflare tunnel token (none: a quick tunnel)')
+    ap.add_argument('--no-tunnel', action='store_true', help='no tunnel; reach the agent directly')
+    ap.add_argument('--port', type=int, default=int(os.environ.get('PORT') or 8787))
+    ap.add_argument('--host', default=os.environ.get('HOST') or '127.0.0.1', help='address to listen on (0.0.0.0 for a LAN or a container)')
+    opts = ap.parse_args()
+    TOKEN = opts.key
+
+    server = ThreadingHTTPServer((opts.host, opts.port), Handler)
     server.daemon_threads = True
-    print('remogui-agent %s (Python) listening on http://%s:%d/mcp' % (VERSION, HOST, PORT), flush=True)
-    if GENERATED:
-        print("REMOGUI_TOKEN was not set; this run's token: " + TOKEN, flush=True)
-    print('Terminal: ' + ('pty' if TERMS_OK else 'not available on this system'), flush=True)
-    print('Tunnel it, e.g.: cloudflared tunnel --url http://%s:%d' % (HOST, PORT), flush=True)
+    print('Remogui MCP agent %s (Python)' % VERSION, flush=True)
+    print('  Listening on:   http://%s:%d/mcp' % (opts.host, opts.port), flush=True)
+    print('  Terminal:       ' + ('pty' if TERMS_OK else 'not available on this system'), flush=True)
+    if TOKEN:
+        print('  Access token:   set (--key)', flush=True)
+    else:
+        print('  Access token:   NONE. Anyone who has the address can read, change and run anything here.', flush=True)
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+    if not opts.no_tunnel:
+        start_tunnel(opts.port, opts.tunnel)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -97,3 +97,11 @@ button.primary:disabled { opacity: .6; cursor: progress; }
 .fields { display: grid; gap: 12px; }
 .fields[hidden] { display: none; }
 #login-form.mcp #saved-servers { display: none; }
+
+/* MCP: download the agent */
+.mcp-get { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.mcp-get span { flex: 1; }
+.mcp-get a { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.mcp-get a:hover { border-color: var(--accent); background: var(--surface-2); }
+.mcp-get svg { width: 22px; height: 22px; display: block; }
+.card .note.mcp-run { margin: -4px 0 0; text-align: left; line-height: 1.5; }

@@ -37,16 +37,18 @@ lock it for a minute.
 
 Besides SSH, the login screen can connect to a remote MCP server (Streamable
 HTTP) that offers the Remogui tools, so a machine without an SSH daemon can be
-used too. Run one of the agents there (Python or Node.js, no packages needed)
-and tunnel it:
+used too. The login screen offers the agent for download (Python `mcp.py` or
+Node.js `mcp.mjs`, no packages needed); run it on the machine:
 
 ```bash
-REMOGUI_TOKEN='a-long-random-secret' python3 agent/remogui_agent.py
-cloudflared tunnel --url http://127.0.0.1:8787
+python3 mcp.py --key 'a-long-random-secret'
 ```
 
-Then pick **MCP** on the login screen and enter the tunnel address ending in
-`/mcp` and the token. The tool contract is in [docs/MCP.md](docs/MCP.md).
+It opens a Cloudflare quick tunnel by itself (downloading cloudflared when it
+is missing) and prints the address to log in with; `--tunnel <token>` runs
+your own tunnel instead. Then pick **MCP** on the login screen and enter that
+address and the key. Without `--key` there is no token check at all. Details
+and the tool contract: [docs/MCP.md](docs/MCP.md).
 
 ## How it works
 
@@ -58,7 +60,7 @@ browser ──WebSocket /ws──▶ Node server ──TCP──▶ SSH server
 Nothing is bundled for the browser: the page loads native ES modules.
 
 ```
-server/main.js          entry: static files, /ws, /api/gate, /api/apps (the app folders)
+server/main.js          entry: static files, /ws, /api/gate, /api/apps (the app folders), /download/mcp.py|mjs
 agent/                  MCP mode agents for the machine: remogui_agent.py (Python), remogui-agent.mjs (Node.js)
 docs/MCP.md             MCP mode and the tool contract
 docker/                 run.sh, cloudflared supervisor

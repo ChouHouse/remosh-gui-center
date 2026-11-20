@@ -20,24 +20,40 @@ sent as `Authorization: Bearer <token>` and is not stored by the page.
 ## Running an agent
 
 Two agents with the same tools are in `agent/`; use whichever the machine
-already has. Neither needs any packages.
+already has. Neither needs any packages. The login screen offers both for
+download (the Python and JavaScript icons under the MCP fields), and the
+Remogui server serves them without the access password, so on the machine
+itself this works too:
 
 ```bash
-# Python 3.8 or newer
-REMOGUI_TOKEN='a-long-random-secret' python3 agent/remogui_agent.py
-
-# or Node.js 20 or newer
-REMOGUI_TOKEN='a-long-random-secret' node agent/remogui-agent.mjs
-
-# optional for both: PORT=8787 HOST=127.0.0.1
-cloudflared tunnel --url http://127.0.0.1:8787
+curl -O https://<your-remogui>/download/mcp.py     # or mcp.mjs
+python3 mcp.py --key 'a-long-random-secret'        # Python 3.8 or newer
+node mcp.mjs --key 'a-long-random-secret'          # or Node.js 20 or newer
 ```
 
-Without `REMOGUI_TOKEN` the agent makes up a token and prints it.
+It prints the address to log in with, e.g.
+`https://some-words.trycloudflare.com/mcp`. Paste that and the key into the
+login screen.
+
+| Option | |
+| :--- | :--- |
+| `--key KEY` | The access token the login screen must send. **Without it there is no check at all**: anyone who has the address can read, change and run anything on the machine. |
+| `--tunnel TOKEN` | Run your own Cloudflare tunnel (the token from the Cloudflare dashboard). Its public hostname, set in the dashboard with the service `http://127.0.0.1:8787`, plus `/mcp`, is the address to log in with. |
+| (neither tunnel option) | A Cloudflare quick tunnel is made and its random `https://….trycloudflare.com` address is printed. |
+| `--no-tunnel` | No tunnel: reach the agent directly (a LAN address with `--host 0.0.0.0`, or your own reverse proxy). |
+| `--port`, `--host` | Where the agent listens (default `127.0.0.1:8787`). |
+
+The environment variables `REMOGUI_TOKEN`, `CLOUDFLARE_TUNNEL_TOKEN`, `PORT`
+and `HOST` work as the options do (and keep the key out of `ps`).
+
+cloudflared is taken from `PATH`; when it is not there the agent downloads it
+once from Cloudflare's GitHub releases (Linux: amd64, arm64, arm, 386; macOS:
+amd64, arm64) into `~/.cache/remogui/cloudflared`. The tunnel token is handed
+to cloudflared in its environment, not on the command line. When cloudflared
+stops, the agent stops too.
 
 The agent runs commands and edits files as the user that started it, so run
-it as an ordinary user, never as root, and keep the token secret: anyone with
-the address and the token has a shell on the machine.
+it as an ordinary user, never as root, and keep the key secret.
 
 Terminals: the Python agent uses the `pty` module (Linux and macOS), with
 window resizing. The Node.js agent uses `node-pty` when it is installed next
