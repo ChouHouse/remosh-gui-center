@@ -10,6 +10,7 @@ import { termOpen, termInput, termResize, termClose } from './terminal.js';
 import { streamOpen, streamClose } from '../streams.js';
 import { hasCommands } from './requires.js';
 import { tmuxList, tmuxDo } from './tmux.js';
+import { sqliteOpen, sqliteClose, sqliteRows, sqliteQuery } from './sqlite.js';
 // Server side of Procoder's add-on modules (public/js/apps/editor/modules).
 import { pyCollect } from './procoder/python.js';
 import { jsCollect } from './procoder/node.js';
@@ -22,5 +23,6 @@ export const ops = {
   termOpen, termInput, termResize, termClose,
   streamOpen, streamClose,
   hasCommands, tmuxList, tmuxDo,
+  sqliteOpen, sqliteClose, sqliteRows, sqliteQuery,
   pyCollect, jsCollect,
 };

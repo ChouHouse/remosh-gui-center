@@ -72,6 +72,7 @@ public/
       notepad/          記事本
       graphoto/         Graphoto (image viewer)
       mounds/           Mounds (music and video player, streamed; tags.js reads MP3 titles and artists)
+      sqlite/           SQLite 檢視器 (read-only database viewer; server side src/ops/sqlite.js)
       filex/            Filex (upload files from this computer)
       terminal/         終端機
       tmux/             tmux 終端管理器 (requires tmux; server side src/ops/tmux.js)
@@ -120,6 +121,7 @@ its `i18n.js` (`addStrings({ en, ja })`). The language is the system setting
    settings sit directly in `~/.remosh-gui/`.
 3. If it needs new data from the host, add a handler in `src/ops/` and list it
    in `src/ops/index.js`; call it from the page with `rpc('<op>', args)`.
+   `id` is the request's own field: don't use it in args or in a result.
 
 ### Drag and drop
 
@@ -159,6 +161,8 @@ sent to the server over the WebSocket for the login and kept only in memory. Hos
 connects without a warning (and a changed key is not detected).
 
 ## Run
+
+Needs Node.js 22.13 or newer (the SQLite viewer uses Node's built-in SQLite).
 
 ```bash
 npm install
@@ -229,6 +233,17 @@ On a narrow screen only the form is shown.
   end session from the buttons and right-click menus. tmux keeps sessions
   running on the host: closing the window or logging out only detaches, and
   they are there again next time. Needs tmux on the host.
+- **SQLite 檢視器** (SQLite Viewer): opens a SQLite database on the host (.db,
+  .sqlite, .sqlite3, .db3, .s3db, .sl3) with nothing installed there. The server
+  copies the file (and its -wal journal) over SFTP into a private temp folder
+  and reads the copy with Node's built-in SQLite; the copy is deleted when the
+  window closes or the session ends. The left side lists the tables and views
+  with their row counts; 資料 shows the rows 200 to a page (click a column to
+  sort), 結構 the columns, the CREATE statement and the indexes, and SQL 查詢
+  runs one read-only query at a time (SELECT / WITH / VALUES / EXPLAIN and
+  pragmas that only read; ATTACH and anything that writes are refused). What is
+  shown is the file as it was when opened; 重新讀取 takes a fresh copy. The
+  file on the host is never changed. Up to 512 MB.
 - **Graphoto**: the image viewer (png, jpg, gif, webp, avif, bmp, ico, svg).
   Wheel or +/- to zoom, drag to move, R to rotate, 0 to fit, 1 for actual size;
   ← / → (or the mouse side buttons) step through the pictures in the same folder.

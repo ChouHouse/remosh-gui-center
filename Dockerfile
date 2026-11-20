@@ -17,15 +17,18 @@ ENV NODE_ENV=production
 
 USER root
 
-# 安裝必要項目與 cloudflared
+# 安裝必要項目、Node.js 22（NodeSource；SQLite 檢視器要用 Node 內建的 SQLite）與 cloudflared
 RUN export DEBIAN_FRONTEND=noninteractive && \
     apt-get update -y && \
-    apt-get install -y --no-install-recommends curl ca-certificates gnupg nodejs npm && \
+    apt-get install -y --no-install-recommends curl ca-certificates gnupg && \
     mkdir -p --mode=0755 /usr/share/keyrings && \
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /usr/share/keyrings/nodesource.gpg && \
+    echo 'deb [signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main' > /etc/apt/sources.list.d/nodesource.list && \
     curl -fsSL https://pkg.cloudflare.com/cloudflare-public-v2.gpg -o /usr/share/keyrings/cloudflare-public-v2.gpg && \
     echo 'deb [signed-by=/usr/share/keyrings/cloudflare-public-v2.gpg] https://pkg.cloudflare.com/cloudflared any main' > /etc/apt/sources.list.d/cloudflared.list && \
     apt-get update -y && \
-    apt-get install -y --no-install-recommends cloudflared && \
+    apt-get install -y --no-install-recommends nodejs cloudflared && \
+    node -e "require('node:sqlite')" && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
